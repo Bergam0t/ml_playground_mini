@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib
 from matplotlib.colors import to_hex
 
+import calls
 import charts
 import explain
 from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
@@ -51,6 +52,12 @@ def load_data():
 @st.cache_data
 def load_shap():
     return pd.read_csv(DATA_DIR / "shap_values.csv").set_index("row_id")
+
+
+# Past appointments the model didn't train on, with what really happened (for tab 3)
+@st.cache_data
+def load_past():
+    return pd.read_csv(DATA_DIR / "past_predictions.csv")
 
 
 @st.cache_data
@@ -114,7 +121,7 @@ def demo_notice():
 # Streamlit app
 # The tabs come first so style.css can pin them to the top as a navbar; the app title
 # is drawn at the left of that bar by style.css.
-tab_appts, tab_weekly = st.tabs(["Appointments", "Weekly summary"])
+tab_appts, tab_weekly, tab_calls = st.tabs(["Appointments", "Weekly summary", "Who would we phone?"])
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
 # Load data
@@ -535,3 +542,222 @@ with tab_weekly:
     else:
         st.info("No appointment data available for the selected filters.")
     # --- END of finalized visualization ---
+
+# ---------------------------------------------------------------- tab 3
+# Ported from the "Who would we phone?" page of lambda_ml_streamlit_exercise. The counts
+# come from past appointments with known outcomes; the upcoming appointments (which follow
+# the sidebar filters) only turn the chosen setting into calls per week.
+with tab_calls:
+    demo_notice()
+    meta = load_model_meta()
+    past = load_past()
+    p_past = past["DNA_Prob_Forecast"].to_numpy()
+
+    st.subheader("Who would we phone?")
+    st.markdown(
+        "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
+        "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
+        "calls the team can make**, or by **how high the predicted risk and confidence must be**."
+    )
+    st.info(
+        "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
+        f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
+        "in them was phoned. Imagine the model had made its list for them: we can check who it would have "
+        "picked against who really did not attend."
+    )
+
+    # Upcoming appointments in the sidebar filters, by week
+    upcoming_week = pd.to_datetime(filtered_data["Activity_Date"]).dt.to_period("W-SUN")
+    per_week = upcoming_week.value_counts()
+    n_weeks = len(per_week)
+
+    mode = st.segmented_control(
+        "Choose who to phone by",
+        ["Calls the team can make", "Predicted risk and confidence"],
+        default="Calls the team can make",
+        key="call_mode",
+    ) or "Calls the team can make"
+
+    if mode == "Calls the team can make":
+        # Slider runs up to the busiest filtered week, rounded up to a multiple of 10. Clamp
+        # the kept value first, so changing the filters never leaves it out of range.
+        busiest = max(10, int(-(-per_week.max() // 10) * 10))
+        if st.session_state.get("calls_per_week", 0) > busiest:
+            st.session_state["calls_per_week"] = busiest
+        st.session_state.setdefault("calls_per_week", min(100, busiest))
+        cap = st.slider(
+            "Calls the team can make per week",
+            0,
+            busiest,
+            step=10,
+            key="calls_per_week",
+            help="Each week, the team phones this many of that week's highest-risk appointments "
+            "(from the appointments in the sidebar filters).",
+        )
+        # Each week, phone that week's highest-risk appointments, up to capacity. The past
+        # appointments then get the same share of calls, highest risk first.
+        rank_in_week = filtered_data["DNA_Prob_Forecast"].groupby(upcoming_week).rank(
+            method="first", ascending=False
+        )
+        upcoming_called = rank_in_week <= cap
+        called = calls.called_by_share(p_past, upcoming_called.mean())
+        how = (
+            "**This is the cut-off.** It isn't chosen directly: it follows from how many calls the team can "
+            "make. More calls means a lower bar, so more patients get a call, and more of them are people "
+            "who would have come anyway. **Move the slider and watch it change.**"
+        )
+    else:
+        c1, c2 = st.columns(2, gap="large")
+        with c1:
+            use_risk = st.toggle("Use predicted risk", value=True, key="use_risk")
+            risk_min = st.slider(
+                "Phone if the predicted risk is at least",
+                0,
+                100,
+                70,
+                step=5,
+                format="%d%%",
+                key="risk_min",
+                disabled=not use_risk,
+            )
+        with c2:
+            use_conf = st.toggle("Use confidence", value=True, key="use_conf")
+            conf_min = st.slider(
+                "...and the confidence is at least",
+                50,
+                99,
+                70,
+                step=1,
+                format="%d%%",
+                key="conf_min",
+                disabled=not use_conf,
+            )
+        risk_min = risk_min / 100 if use_risk else None
+        conf_min = conf_min / 100 if use_conf else None
+        called = calls.called_by_threshold(p_past, past["Confidence_Score"], risk_min, conf_min)
+        upcoming_called = pd.Series(
+            calls.called_by_threshold(
+                filtered_data["DNA_Prob_Forecast"], filtered_data["Confidence_Score"], risk_min, conf_min
+            ),
+            index=filtered_data.index,
+        )
+        how = (
+            "**Here you set the bar, and the number of calls follows from it.** A lower bar means more calls, "
+            "and more of them are to people who would have come anyway. 70% and 70% match the app's "
+            "existing high-risk flag."
+        )
+
+    out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
+
+    with st.container(border=True):
+        k1, k2 = st.columns([0.35, 0.65], gap="large")
+        k1.metric("Calls per 1,000 appointments", f"{out['calls']}")
+        k2.metric(
+            "So we phone anyone with a predicted risk of at least"
+            if mode == "Calls the team can make"
+            else "Lowest predicted risk that gets a call",
+            f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody is phoned",
+        )
+        st.markdown(how)
+
+    if out["calls"] == 0:
+        st.info("With this setting nobody would get a call. Raise the number of calls or lower the bar.")
+    else:
+        left, right = st.columns([0.62, 0.38], gap="large")
+        with left:
+            st.plotly_chart(charts.icon_array(out), width="stretch", config={"displayModeBar": False})
+            st.caption(
+                "Each marker is one of 1,000 past appointments. \"Would get a call\" is the model's list "
+                "(no calls were made). \"In reality\" is whether the patient really attended."
+            )
+            with st.expander("Show these counts as a table"):
+                st.dataframe(
+                    pd.DataFrame(
+                        {
+                            "Group": [label for _, label in calls.GROUPS],
+                            "Per 1,000 appointments": [out[k] for k, _ in calls.GROUPS],
+                        }
+                    ),
+                    hide_index=True,
+                    width="stretch",
+                )
+        with right:
+            st.markdown(
+                f"""
+**If we phoned these {out['calls']} appointments in every 1,000:**
+
+- **Precision:** {out['called_dna']} of those {out['calls']} calls would reach someone who then did not attend
+  (**{out['precision']:.0%}**). Phoning at random would manage about **{out['random_precision']:.0%}**.
+- **Recall:** we would reach **{out['called_dna']} of the {out['dna_total']}** patients who did not attend
+  (**{out['recall']:.0%}**). The other {out['not_called_dna']} would get no call.
+- **{out['called_attended']} calls** would go to people who came anyway.
+"""
+            )
+            st.caption(
+                f"Counts are scaled from {meta['n_past_test']:,} past appointments to 1,000, so they can be out "
+                "by a few. They count appointments that were missed without a call, not missed appointments a "
+                "call would have prevented."
+            )
+
+        st.divider()
+        st.subheader("What difference might the calls make?")
+        st.markdown(
+            "Reaching someone who would have missed their appointment is not the same as getting them to "
+            "come. **Nobody knows yet how many a call would change**, so this is an assumption you can vary."
+        )
+        effect = st.slider(
+            "Suppose a call gets this share of the people it reaches, who would have missed, to attend instead",
+            0,
+            50,
+            20,
+            step=5,
+            format="%d%%",
+            key="call_effect",
+            help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
+        )
+        avoided = out["called_dna"] * effect / 100
+
+        weekly_calls = upcoming_called.sum() / n_weeks
+        weekly_reached = weekly_calls * out["precision"]
+        weekly_avoided = weekly_reached * effect / 100
+
+        m1, m2, m3 = st.columns(3, gap="large")
+        m1.metric(
+            "Possibly avoided, per 1,000",
+            f"{avoided:.0f}",
+            help="Missed appointments a call might avoid, per 1,000 past appointments, if the assumption above holds.",
+        )
+        m2.metric(
+            "Calls for each one avoided",
+            f"{out['calls'] / avoided:.0f}" if avoided else "no effect assumed",
+        )
+        m3.metric(
+            "Possibly avoided, per week",
+            f"{weekly_avoided:.0f}",
+            help="For the upcoming appointments in the sidebar filters, if the assumption above holds.",
+        )
+
+        st.markdown(
+            f"**For the upcoming appointments in your filters** ({len(filtered_data):,} over {n_weeks} "
+            f"week{'s' if n_weeks != 1 else ''}), this setting means about **{weekly_calls:.0f} calls a week**. "
+            f"Going by the past appointments, about **{weekly_reached:.0f}** of them would reach someone who "
+            f"would otherwise miss their appointment, and if a call gets {effect}% of them to come, about "
+            f"**{weekly_avoided:.0f}** fewer missed appointments a week."
+        )
+        st.caption(
+            "Only this paragraph and the last figure above follow the sidebar filters, including the risk and "
+            "confidence filters: filter to high-risk appointments only and there are fewer to phone. The chart "
+            "uses all past appointments. Weekly figures use the past precision, so they are rough."
+        )
+
+    st.warning(
+        "**We don't know that a call will change whether someone attends.** The chart shows who the calls "
+        "would *reach*, not missed appointments they would *prevent*.\n\n"
+        "- Some people would still miss their appointment after a call, and some would have come anyway.\n"
+        "- The model picks the people most like those who missed appointments before, not the people a call "
+        "would help most. Someone at high risk may be the hardest to help with a phone call.\n"
+        "- Calls to people who would have come anyway still take staff time, and could worry them.\n"
+        "- The effect slider is a guess. The only way to know is to test it: for example, randomly phone half "
+        "of the flagged patients and compare how many from each half attend.",
+        icon=":material/warning:",
+    )

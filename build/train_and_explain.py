@@ -6,7 +6,8 @@ stopping, 75/10/15 train/validation/test split, TreeExplainer on predicted proba
 interventional perturbation, SHAP values scaled to percentage points.
 
 Run from the repo root:  python build/train_and_explain.py
-Writes data/forecast.csv, data/shap_values.csv and data/model_meta.json.
+Writes data/forecast.csv, data/shap_values.csv, data/past_predictions.csv and
+data/model_meta.json.
 """
 import json
 import sys
@@ -38,6 +39,12 @@ FORECAST_COLUMNS = [
     "Deprivation_Decile", "MRN", "Mobile Telephone", "Fin Number",
     "DNA_Prob_Forecast", "Confidence_Score", "DNA_Forecast",
 ]
+
+
+def confidence_score(p, rng):
+    """Synthetic stand-in for the live model's confidence score: how far the risk is
+    from a coin toss, plus a little noise."""
+    return np.clip(np.maximum(p, 1 - p) + rng.normal(0, 0.05, len(p)), 0.5, 0.99).round(3)
 
 
 def build_matrix(df):
@@ -76,8 +83,17 @@ def main():
     assert list(Xf.columns) == list(X.columns)
     p = model.predict_proba(Xf)[:, 1]
     fut["DNA_Prob_Forecast"] = p.round(4)
-    fut["Confidence_Score"] = np.clip(np.maximum(p, 1 - p) + rng.normal(0, 0.05, len(p)), 0.5, 0.99).round(3)
+    fut["Confidence_Score"] = confidence_score(p, rng)
     fut["DNA_Forecast"] = (p >= 0.5).astype(int)
+
+    # ---- Past appointments the model didn't train on, with what really happened, for the
+    # "Who would we phone?" tab. Own rng, so the forecast above never changes because of it.
+    p_past = model.predict_proba(X.loc[idx_test])[:, 1]
+    past = pd.DataFrame({
+        "DNA_Prob_Forecast": p_past.round(4),
+        "Confidence_Score": confidence_score(p_past, np.random.default_rng(SEED + 1)),
+        "Did_Not_Attend": y[idx_test].to_numpy(),
+    })
 
     # ---- SHAP on predicted probability, one-hot columns summed back to their feature
     background = shap.maskers.Independent(
@@ -110,6 +126,7 @@ def main():
     # ---- Export
     DATA_DIR.mkdir(exist_ok=True)
     fut[FORECAST_COLUMNS].to_csv(DATA_DIR / "forecast.csv", index=False)
+    past.to_csv(DATA_DIR / "past_predictions.csv", index=False)
     grouped.round(4).rename_axis(None).assign(row_id=fut["row_id"].to_numpy())[["row_id", *FEATURES]].to_csv(
         DATA_DIR / "shap_values.csv", index=False
     )
@@ -119,6 +136,8 @@ def main():
         "dna_rate_history": float(y.mean()),
         "n_history": N_HISTORY,
         "n_future": N_FUTURE,
+        "n_past_test": len(past),
+        "dna_rate_past_test": float(past["Did_Not_Attend"].mean()),
         "seed": SEED,
         "history_seed": HISTORY_SEED,
         "shap_additivity_max_error_pp": err,

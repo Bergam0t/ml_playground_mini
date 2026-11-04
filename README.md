@@ -14,15 +14,24 @@ streamlit run streamlit_app.py
 - **Appointments** tab: the filterable appointment list. Click a row to see a SHAP waterfall
   explaining that appointment's predicted risk of not attending, with a "How to read this chart" guide.
 - **Weekly summary** tab: appointments and forecast DNAs by week and day.
+- **Who would we phone?** tab: choose who an admin team would phone, by the number of calls
+  the team can make each week or by minimum predicted risk and confidence. A 1,000-marker chart
+  (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
+  reach someone who then did not attend, and how many such patients would get no call. An
+  assumed-effect slider shows how many missed appointments the calls might avoid. We don't know
+  that a call changes whether someone attends, and the tab says so.
 
-The sidebar filters apply to both tabs.
+The sidebar filters apply to the first two tabs. On the third they change only the upcoming
+calls-per-week figures, since the chart uses past appointments.
 
 ## Where the data and explanations come from
 
-The app reads three precomputed files in `data/`:
+The app reads four precomputed files in `data/`:
 
 - `forecast.csv`: the future appointments with the model's predicted DNA risk
 - `shap_values.csv`: each appointment's SHAP contributions, in percentage points
+- `past_predictions.csv`: the model's risk and confidence for the past appointments it was
+  tested on (not trained on), with whether each patient really attended
 - `model_meta.json`: the average (base) risk, test AUC and package versions
 
 They are made offline by `build/train_and_explain.py`, which follows the pipeline in

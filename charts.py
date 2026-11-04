@@ -2,12 +2,15 @@
 
 waterfall() is ported from lambda_ml_streamlit_exercise/app/charts.py. guide_waterfall()
 follows guide_chart() in geographic_playground_mini/pareto.py: a small made-up example
-with numbered badges that match the steps written beside it.
+with numbered badges that match the steps written beside it. icon_array() is ported from
+the same app's "Who would we phone?" page.
 
 Red and blue are the dataviz skill's dark-mode diverging poles, validated against the
 app background (#1b1a1a). The +/- value labels mean colour is never the only cue.
 """
 import plotly.graph_objects as go
+
+from calls import GROUPS
 
 UP = "#e66767"  # pushes the risk of not attending up
 DOWN = "#3987e5"  # pushes it down
@@ -111,3 +114,49 @@ def guide_waterfall() -> go.Figure:
         margin=dict(l=0, r=0, t=10, b=10),
         xaxis=dict(visible=False, range=[0, badge_x + 4], fixedrange=True),
     )
+
+
+# The dataviz skill's fixed status steps (good / warning / critical), plus a recessive
+# grey for the large "nothing happens" group. Green and red are close for deuteranopes,
+# so every group also has its own marker shape, a legend label with its count, a hover
+# label and a table view: colour is never the only cue.
+_ICON_STYLE = {
+    "called_dna": ("#0ca30c", "circle"),
+    "called_attended": ("#fab219", "square"),
+    "not_called_dna": ("#d03b3b", "x-thin-open"),
+    "not_called_attended": (MUTED, "circle-open"),
+}
+_COLS = 40
+
+
+def icon_array(outcomes: dict) -> go.Figure:
+    """1,000 markers (40 x 25), one per 1,000 past appointments, grouped by outcome."""
+    fig = go.Figure()
+    start = 0
+    for key, label in GROUPS:
+        count = outcomes[key]
+        idx = range(start, start + count)
+        colour, symbol = _ICON_STYLE[key]
+        fig.add_trace(
+            go.Scatter(
+                x=[i % _COLS for i in idx],
+                y=[-(i // _COLS) for i in idx],
+                mode="markers",
+                name=f"{label}: {count}",
+                marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
+                hovertemplate=f"{label}<extra></extra>",
+            )
+        )
+        start += count
+    fig.update_layout(
+        height=560,
+        margin=dict(l=0, r=0, t=10, b=0),
+        xaxis=dict(visible=False, range=[-1, _COLS], fixedrange=True),
+        yaxis=dict(visible=False, scaleanchor="x", range=[-25, 1], fixedrange=True),
+        # Above the grid, so the key is read before the markers. The labels are too long for the side.
+        legend=dict(orientation="v", yanchor="bottom", y=1.01, x=0, itemclick=False, itemdoubleclick=False),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=FONT,
+    )
+    return fig
