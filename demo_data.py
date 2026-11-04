@@ -1,7 +1,7 @@
 """Synthetic stand-in for [dbo].[vw_Combined_Future_OP_Forecast].
 
-Everything is randomly generated - no real patient or Trust data. Phone numbers use the
-Ofcom reserved drama range (07700 900xxx).
+Everything is randomly generated - no real patient or Trust data. Mobile numbers are
+random UK mobile numbers, so some may happen to match real ones.
 
 Two parts:
 - generate_appointments() makes appointments and a hidden "true" chance of not attending.
@@ -54,33 +54,73 @@ CATEGORIES = {
 }
 
 
+SITE_P = [0.35, 0.25, 0.20, 0.20]
+# How many appointments a patient has in the period, and how likely each count is
+VISITS_PER_PATIENT, VISITS_P = [1, 2, 3], [0.75, 0.19, 0.06]
+
+
 def generate_appointments(n=3200, seed=42, weeks=6):
     """Appointments with features, IDs and a hidden true DNA probability (`p_true`).
+
+    Most patients have one appointment in the period; some have two or three, on
+    different days. A patient keeps their MRN, mobile number, age, deprivation decile
+    and missed-appointment history across all of them, and usually their site and
+    specialty too (a repeat in the same specialty is a follow-up).
 
     Each row has a `day_index` (0 = the first Monday) rather than a date, so the
     weekday of a row never changes when the dates roll forward.
     """
     rng = np.random.default_rng(seed)
-    di = rng.integers(0, weeks * 5, n)
+    n_days = weeks * 5
+
+    # ---- Patients: draw more than enough, keep just enough for n appointments, and
+    # trim the last patient's count so the total is exactly n
+    visits = rng.choice(VISITS_PER_PATIENT, n, p=VISITS_P)
+    visits = visits[: np.searchsorted(np.cumsum(visits), n) + 1]
+    visits[-1] -= visits.sum() - n
+    m = len(visits)
+
+    # Random UK mobile numbers (071-075, 077-079; 070 and 076 are not mobile ranges).
+    # Made up, but some may match real numbers.
+    phones = [f"07{t}{r:08d}" for t, r in
+              zip(rng.choice(list("12345789"), m), rng.integers(0, 10**8, m))]
+    home_site = rng.choice(list(SITES), m, p=SITE_P)
+    first_specialty = rng.choice(list(SPECIALTIES), m)
+    age = np.clip(np.round(rng.normal(52, 18, m)), 18, 95).astype(int)
+    decile = rng.choice(np.arange(1, 11), m, p=np.linspace(0.14, 0.06, 10))
+
+    # ---- Appointments: each patient's are on different days, earliest first
+    patient = np.repeat(np.arange(m), visits)
+    visit_no = np.concatenate([np.arange(k) for k in visits])
+    di = np.concatenate([np.sort(rng.choice(n_days, k, replace=False)) for k in visits])
+
+    same_site = rng.random(n) < 0.9
+    site = np.where(same_site, home_site[patient], rng.choice(list(SITES), n, p=SITE_P))
+    same_specialty = (visit_no == 0) | (rng.random(n) < 0.75)
+    specialty = np.where(same_specialty, first_specialty[patient], rng.choice(list(SPECIALTIES), n))
+    appt_type = rng.choice(list(APPOINTMENT_TYPES), n, p=[0.35, 0.65])
+    appt_type[(visit_no > 0) & same_specialty] = "Follow Up"
+
     df = pd.DataFrame({
         "day_index": di,
         "Day_Of_Week": np.array(DAYS)[di % 5],
-        "Reporting_Site": rng.choice(list(SITES), n, p=[0.35, 0.25, 0.20, 0.20]),
-        "Specialty": rng.choice(list(SPECIALTIES), n),
-        "Appointment Type": rng.choice(list(APPOINTMENT_TYPES), n, p=[0.35, 0.65]),
+        "Reporting_Site": site,
+        "Specialty": specialty,
+        "Appointment Type": appt_type,
     })
     df["Appointment Location Text"] = [rng.choice(LOCATIONS[s]) for s in df["Reporting_Site"]]
 
     # Patient history and circumstances. A minority of patients miss appointments
     # repeatedly, so previous DNAs come from a mixture.
     # Some weeks (e.g. school holidays) have more patients who often miss appointments,
-    # which makes the weekly DNA rates vary.
-    week_mix = np.exp(rng.normal(0, 0.45, weeks))[di // 5]
-    habitual = rng.random(n) < np.clip(0.16 * week_mix, 0, 0.6)
-    df["Previous_DNAs"] = np.minimum(rng.poisson(np.where(habitual, 2.2, 0.25)), 8)
+    # which makes the weekly DNA rates vary. A patient counts in the week of their
+    # first appointment.
+    week_mix = np.exp(rng.normal(0, 0.45, weeks))[di[visit_no == 0] // 5]
+    habitual = rng.random(m) < np.clip(0.16 * week_mix, 0, 0.6)
+    df["Previous_DNAs"] = np.minimum(rng.poisson(np.where(habitual, 2.2, 0.25)), 8)[patient]
     df["Lead_Time_Days"] = np.clip(np.round(rng.lognormal(np.log(35), 0.75, n)), 2, 200).astype(int)
-    df["Age"] = np.clip(np.round(rng.normal(52, 18, n)), 18, 95).astype(int)
-    df["Deprivation_Decile"] = rng.choice(np.arange(1, 11), n, p=np.linspace(0.14, 0.06, 10))
+    df["Age"] = age[patient]
+    df["Deprivation_Decile"] = decile[patient]
 
     logit = 1.5 * (
         df["Reporting_Site"].map(SITES).to_numpy()
@@ -101,9 +141,13 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         lo, hi = (mid, hi) if share < 0.26 else (lo, mid)
     df["p_true"] = 1 / (1 + np.exp(-(logit + mid)))
 
-    df["MRN"] = ["MRN" + str(x).zfill(6) for x in rng.permutation(n) + 100000]
-    df["Mobile Telephone"] = ["07700900" + str(x).zfill(3) for x in rng.integers(0, 1000, n)]
-    df["Fin Number"] = ["99" + str(x).zfill(8) for x in rng.integers(0, 10**8, n)]
+    mrns = np.array(["MRN" + str(x).zfill(6) for x in rng.permutation(m) + 100000])
+    df["MRN"] = mrns[patient]
+    df["Mobile Telephone"] = np.array(phones)[patient]
+    df["Fin Number"] = ["99" + str(x).zfill(8) for x in rng.integers(0, 10**8, n)]  # one per appointment
+
+    # shuffle so a patient's appointments are not next to each other
+    df = df.iloc[rng.permutation(n)].reset_index(drop=True)
     df.insert(0, "row_id", np.arange(n))
     return df
 

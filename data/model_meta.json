@@ -1,12 +1,12 @@
 {
-  "base_value_pp": 31.345011586607452,
-  "auc_test": 0.8109839708576335,
-  "dna_rate_history": 0.3363333333333333,
+  "base_value_pp": 34.20571135953471,
+  "auc_test": 0.8138076876415266,
+  "dna_rate_history": 0.3370666666666667,
   "n_history": 30000,
   "n_future": 3200,
   "seed": 42,
   "history_seed": 7,
-  "shap_additivity_max_error_pp": 2.4529685674679058e-05,
+  "shap_additivity_max_error_pp": 3.920996989137393e-05,
   "versions": {
     "xgboost": "3.4.1",
     "shap": "0.52.0",
