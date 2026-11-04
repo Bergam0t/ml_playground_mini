@@ -23,10 +23,31 @@ streamlit run streamlit_app.py
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
   reach someone who then did not attend, and how many such patients would get no call. An
   assumed-effect slider shows how many missed appointments the calls might avoid. We don't know
-  that a call changes whether someone attends, and the tab says so.
+  that a call changes whether someone attends, and the tab says so. A "What might the calls cost,
+  and save?" section turns the weekly figures into staff hours, the cost of the calls, the value
+  of the missed appointments they reach and might avoid, and the **break-even effect**: the share
+  of people reached a call would need to get to attend to cover its own staff time.
+
+The Appointments and Weekly summary tabs also show the expected cost of missed appointments
+(each predicted risk times that appointment's cost).
 
 The sidebar filters apply to the first two tabs. On the third they change only the upcoming
 calls-per-week figures, since the chart uses past appointments.
+
+## Cost assumptions
+
+The sidebar's **Cost assumptions** section holds editable defaults, set in `costs.py`:
+
+- **Calls:** a band 5 admin at about £26 an hour. That's the Agenda for Change 2025/26 middle
+  pay point (£33,487) plus employer National Insurance and pension, over about 1,625 productive
+  hours a year. At 3 minutes a call, a call costs about £1.31.
+- **Missed appointments:** a cost by specialty and New / Follow Up, from £100 to £260
+  (about £140 on average for the current mix). These are illustrative values, loosely in line
+  with NHS Payment Scheme outpatient prices: replace them with your Trust's own costs.
+- **Share of the cost really lost:** 100% by default. Lower it if empty slots get re-used.
+
+A missed appointment's cost is the value of a clinic slot, not cash saved. The call cost counts
+staff time only.
 
 ## Where the data and explanations come from
 

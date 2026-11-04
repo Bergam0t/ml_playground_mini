@@ -8,6 +8,7 @@ import pandas as pd
 
 import calls
 import charts
+import costs
 import explain
 import weekly
 from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
@@ -375,9 +376,69 @@ if selected_confidence != "All":
     ]
 # --- END of new filter ---
 
+# Cost assumptions: not filters, so they stay out of filter_key below and editing them
+# never clears a table selection
+st.sidebar.divider()
+st.sidebar.subheader("Cost assumptions")
+band5 = costs.admin_hourly_cost(**costs.BAND5)
+with st.sidebar.expander("Calls and missed appointments", icon=":material/payments:"):
+    hourly = st.number_input(
+        "Admin staff cost per hour (£)",
+        min_value=0.0,
+        value=round(band5["hourly"], 2),
+        step=0.5,
+        format="%.2f",
+        key="cost_hourly",
+        help=f"Default: a band 5 admin. Salary £{band5['salary']:,.0f} (Agenda for Change "
+        f"2025/26, middle pay point) plus employer National Insurance £{band5['ni']:,.0f} and "
+        f"pension £{band5['pension']:,.0f}: £{band5['total']:,.0f} a year, over about "
+        f"{band5['hours']:,.0f} working hours once leave, bank holidays, sickness and training "
+        "are taken off.",
+    )
+    minutes_per_call = st.number_input(
+        "Minutes per call",
+        min_value=0.5,
+        value=float(costs.MINUTES_PER_CALL),
+        step=0.5,
+        format="%.1f",
+        key="cost_minutes",
+        help="On average, including unanswered attempts and noting the outcome.",
+    )
+    cost_per_call = hourly * minutes_per_call / 60
+    st.caption(f"So each call costs about **£{cost_per_call:.2f}** in staff time.")
+
+    share_lost = st.slider(
+        "Share of a missed appointment's cost really lost",
+        0,
+        100,
+        100,
+        step=5,
+        format="%d%%",
+        key="cost_share_lost",
+        help="Lower this if some empty slots get re-used, for example by overbooking or a "
+        "clinician catching up on other work.",
+    ) / 100
+    dna_costs = st.data_editor(
+        costs.dna_cost_table(),
+        column_config={
+            "Specialty": st.column_config.TextColumn(disabled=True),
+            "New": st.column_config.NumberColumn("New (£)", min_value=0, format="£%d"),
+            "Follow Up": st.column_config.NumberColumn("Follow up (£)", min_value=0, format="£%d"),
+        },
+        hide_index=True,
+        key="cost_dna_table",
+        alt="Cost of a missed appointment by specialty and appointment type",
+    )
+    st.caption(
+        "Cost of a missed appointment. Illustrative values, loosely in line with NHS Payment "
+        "Scheme outpatient prices: replace them with your Trust's own costs."
+    )
+
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
     st.stop()
+
+filtered_data["DNA_Cost"] = costs.appointment_costs(filtered_data, dna_costs, share_lost)
 
 # Remap DNA_Forecast values from 1/0 to Yes/No
 filtered_data["DNA_Forecast_Text"] = filtered_data["DNA_Forecast"].replace(
@@ -438,6 +499,15 @@ with tab_appts:
             f"{filtered_data['High_Risk_DNA'].mean() * 100:.1f}%",
             icon=":material/warning:",
             border=True,
+        )
+        st.metric(
+            "Expected cost of missed appointments",
+            f"£{costs.expected_dna_cost(filtered_data):,.0f}",
+            icon=":material/payments:",
+            border=True,
+            help="Each appointment's predicted risk of not attending times the cost of missing "
+            "it, added up. The costs are assumptions you can change under **Cost assumptions** "
+            "in the sidebar.",
         )
 
     st.info(
@@ -646,6 +716,17 @@ with tab_weekly:
             icon=":material/today:",
             border=True,
             help=f"{h['top_day_rate']:.0%} on {h['top_day']}s, against {h['overall']:.0%} overall.",
+        )
+        expected_cost = costs.expected_dna_cost(filtered_data)
+        st.metric(
+            "Expected cost a week",
+            f"£{expected_cost / h['n_weeks']:,.0f}",
+            icon=":material/payments:",
+            border=True,
+            help=f"£{expected_cost:,.0f} over {h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}. "
+            "Each appointment's predicted risk of not attending times the cost of missing it, "
+            "whichever count is chosen above. The costs are assumptions you can change under "
+            "**Cost assumptions** in the sidebar.",
         )
         rp = weekly.repeat_patients(filtered_data, m)
         # A bordered container rather than the metric's own border, so the button sits in the card
@@ -947,6 +1028,11 @@ with tab_calls:
             "Calls for each one avoided",
             f"{out['calls'] / avoided:.0f}" if avoided else "no effect assumed",
         )
+        if avoided:
+            m2.caption(
+                f"About **£{out['calls'] / avoided * cost_per_call:,.0f}** of staff time for each "
+                f"one avoided, at £{cost_per_call:.2f} a call."
+            )
         m3.metric(
             "Possibly avoided, per week",
             f"{weekly_avoided:.0f}",
@@ -965,6 +1051,86 @@ with tab_calls:
             "confidence filters: filter to high-risk appointments only and there are fewer to phone. The chart "
             "uses all past appointments. Weekly figures use the past precision, so they are rough."
         )
+
+        st.divider()
+        st.subheader("What might the calls cost, and save?")
+        dna_cost = costs.cost_per_dna_reached(filtered_data[upcoming_called])
+        econ = costs.call_economics(
+            weekly_calls, weekly_reached, effect / 100, cost_per_call, minutes_per_call, dna_cost
+        )
+        if weekly_calls == 0 or dna_cost is None:
+            st.info(
+                "None of the upcoming appointments in your filters would get a call with this "
+                "setting, so there is nothing to cost. Widen the sidebar filters or lower the bar."
+            )
+        else:
+            st.markdown(
+                f"Per week, for the upcoming appointments in your filters. A call costs about "
+                f"**£{cost_per_call:.2f}** of staff time, and a missed appointment among the patients "
+                f"these calls would reach costs about **£{dna_cost:,.0f}** on average (more for new "
+                "appointments and some specialties). Change these under **Cost assumptions** in the "
+                "sidebar."
+            )
+            # None when the calls reach nobody who would miss: no effect could pay for them
+            be = econ["break_even_effect"]
+            be = float("inf") if be is None else be
+            with st.container(border=True):
+                st.metric(
+                    "The calls cover their staff time if they get at least",
+                    f"{be:.1%}" if be <= 1 else "more than everyone",
+                    icon=":material/balance:",
+                )
+                st.markdown(
+                    "**...of the people they reach, who would have missed, to attend instead.** "
+                    "This doesn't depend on the guess above about what difference a call makes. "
+                    + (
+                        f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} it, "
+                        f"so the calls would {'more than ' if effect / 100 > be else 'not '}cover "
+                        "their cost."
+                        if be <= 1
+                        else "Even if every call got the patient to attend, the calls would cost more "
+                        "than the missed appointments they reach."
+                    )
+                )
+            with st.container(horizontal=True):
+                st.metric(
+                    "Staff time",
+                    f"{econ['staff_hours']:.1f} hours",
+                    border=True,
+                    icon=":material/schedule:",
+                    help=f"{weekly_calls:.0f} calls at {minutes_per_call:g} minutes each.",
+                )
+                st.metric(
+                    "Cost of calls",
+                    f"£{econ['call_cost']:,.0f}",
+                    border=True,
+                    icon=":material/call:",
+                    help=f"{weekly_calls:.0f} calls at £{cost_per_call:.2f} each.",
+                )
+                st.metric(
+                    "Missed appointments reached",
+                    f"£{econ['value_reached']:,.0f}",
+                    border=True,
+                    icon=":material/person_search:",
+                    help=f"About {weekly_reached:.0f} calls a week would reach someone who would "
+                    f"otherwise miss their appointment, at about £{dna_cost:,.0f} each.",
+                )
+                st.metric(
+                    "Possibly saved",
+                    f"£{econ['value_avoided']:,.0f}",
+                    # Sign first, so st.metric reads a loss as negative
+                    f"{'-' if econ['net'] < 0 else '+'}£{abs(econ['net']):,.0f} after the cost of calls",
+                    border=True,
+                    icon=":material/savings:",
+                    help=f"The missed appointments reached, times your guess that a call gets {effect}% "
+                    "of them to attend.",
+                )
+            st.caption(
+                "These are estimates from the assumptions in the sidebar. A missed appointment's cost "
+                "is the value of a clinic slot, not cash that comes back: the clinic still runs, and the "
+                "gain is slots used and shorter waits. Prices are not costs. The call cost counts staff "
+                "time only, not phones, supervision or rebooking."
+            )
 
     st.warning(
         "**We don't know that a call will change whether someone attends.** The chart shows who the calls "
