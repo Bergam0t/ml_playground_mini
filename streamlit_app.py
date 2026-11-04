@@ -783,17 +783,31 @@ with tab_calls:
                     width="stretch",
                 )
         with right:
-            st.markdown(
-                f"""
-**If we phoned these {out['calls']} appointments in every 1,000:**
-
-- **Precision:** {out['called_dna']} of those {out['calls']} calls would reach someone who then did not attend
-  (**{out['precision']:.0%}**). Phoning at random would manage about **{out['random_precision']:.0%}**.
-- **Recall:** we would reach **{out['called_dna']} of the {out['dna_total']}** patients who did not attend
-  (**{out['recall']:.0%}**). The other {out['not_called_dna']} would get no call.
-- **{out['called_attended']} calls** would go to people who came anyway.
-"""
-            )
+            st.markdown(f"**If we phoned these {out['calls']} appointments in every 1,000:**")
+            # Short titles on the cards, with the explanation in a caption under each number
+            with st.container(border=True, gap="small"):
+                st.metric(
+                    "Precision",
+                    f"{out['precision']:.0%}",
+                    f"{(out['precision'] - out['random_precision']) * 100:+.0f} pts vs random "
+                    f"({out['random_precision']:.0%})",
+                    icon=":material/call:",
+                )
+                st.caption(
+                    f"{out['called_dna']} of the {out['calls']} calls would reach someone who then did not attend."
+                )
+            with st.container(border=True, gap="small"):
+                st.metric("Recall", f"{out['recall']:.0%}", icon=":material/person_search:")
+                st.caption(
+                    f"We would reach {out['called_dna']} of the {out['dna_total']} patients who did not attend. "
+                    f"The other {out['not_called_dna']} would get no call."
+                )
+            with st.container(border=True, gap="small"):
+                st.metric("Came anyway", f"{out['called_attended']}", icon=":material/event_available:")
+                st.caption(
+                    f"Calls that would go to people who attended: "
+                    f"{out['called_attended'] / out['calls']:.0%} of the {out['calls']} calls."
+                )
             st.caption(
                 f"Counts are scaled from {meta['n_past_test']:,} past appointments to 1,000, so they can be out "
                 "by a few. They count appointments that were missed without a call, not missed appointments a "
