@@ -1,0 +1,17 @@
+{
+  "base_value_pp": 31.345011586607452,
+  "auc_test": 0.8109839708576335,
+  "dna_rate_history": 0.3363333333333333,
+  "n_history": 30000,
+  "n_future": 3200,
+  "seed": 42,
+  "history_seed": 7,
+  "shap_additivity_max_error_pp": 2.4529685674679058e-05,
+  "versions": {
+    "xgboost": "3.4.1",
+    "shap": "0.52.0",
+    "scikit-learn": "1.9.1",
+    "pandas": "3.1.0",
+    "numpy": "2.5.4"
+  }
+}

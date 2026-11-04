@@ -123,9 +123,95 @@ img.stLogo {
 h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-adjust: none; }
 [data-testid="stIconMaterial"] { font-size-adjust: none; }
 
-/* Header transparent; toolbar hidden */
-[data-testid="stHeader"] { background: transparent; }
-[data-testid="stToolbar"], [data-testid="stDecoration"] { display: none; }
+/* ---- Faux navbar: the page tabs are a full-width bar pinned to the top ---- */
+/* Ported from the geographic playground mini. This Streamlit renders tabs with react-aria
+	(role="tablist" / data-testid="stTab"), not baseweb, so target those. Limited to
+	top-level tabs (not inside a tab panel). */
+[role="tablist"]:not([data-testid="stTabPanel"] *) {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	/* Bleed out to the edges of the main area (cancels the container padding). */
+	margin: -2.75rem -2rem 1rem;
+	padding: 0.9rem 2rem 0.6rem;
+	background-color: #1b1a1a;
+	border-bottom: 1px solid #3a3838;
+	gap: 0.75rem;
+	/* On a narrow screen the tabs drop below the title rather than squashing it */
+	flex-wrap: wrap;
+	container-type: inline-size;
+}
+/* The app title, at the left of the bar. */
+[role="tablist"]:not([data-testid="stTabPanel"] *)::before {
+	content: "Outpatient DNA Forecast";
+	font-family: "HSMA Display", sans-serif;
+	font-size: 1.6rem;
+	letter-spacing: 0.05em;
+	margin-right: 1.25rem;
+	white-space: nowrap;
+	flex-shrink: 0;
+}
+/* Too narrow for title and tabs side by side: title on its own row, tabs underneath. */
+@container (max-width: 760px) {
+	[role="tablist"]:not([data-testid="stTabPanel"] *)::before {
+		flex-basis: 100%;
+		margin-right: 0;
+	}
+}
+/* Tabs as pills; the selected one is filled. */
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *) {
+	padding: 0.4rem 1rem;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	transition: background-color 0.15s;
+}
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *):hover {
+	background-color: rgba(255, 255, 255, 0.08);
+}
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *)[data-selected="true"] {
+	background-color: #1fb1b9;
+}
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *)[data-selected="true"] p {
+	color: #ffffff;
+}
+/* Hide the default underline indicator; the filled pill replaces it. */
+[role="tablist"]:not([data-testid="stTabPanel"] *) .react-aria-SelectionIndicator {
+	display: none;
+}
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *),
+[data-testid="stTab"]:not([data-testid="stTabPanel"] *) p {
+	font-family: "HSMA Display", sans-serif !important;
+	font-size: 1.1rem !important;
+	letter-spacing: 0.05em;
+}
+/* Let the header sit above the bar without swallowing clicks meant for the tabs.
+	The toolbar itself is hidden. */
+[data-testid="stHeader"] {
+	background: transparent;
+	pointer-events: none;
+}
+[data-testid="stToolbar"], [data-testid="stDecoration"] {
+	display: none;
+}
+/* Don't shrink the HSMA display font with the monospace adjustment. */
+[role="tablist"]::before,
+[data-testid="stTab"],
+[data-testid="stTab"] p {
+	font-size-adjust: none;
+}
+
+/* ---- "How to read this chart" box: numbered steps matching the badges on its example ---- */
+/* Ported from tab 3 of the geographic playground mini. */
+.st-key-chart_guide { background-color: rgba(255, 255, 255, 0.04); }
+.guide-step { display: flex; gap: 0.8rem; align-items: flex-start; margin-bottom: 1rem; font-size: 1.05rem; line-height: 1.45; }
+.guide-step b { font-weight: 600; }
+.guide-num {
+	flex: 0 0 auto; width: 1.8rem; height: 1.8rem; border-radius: 50%;
+	background: #ffffff; color: #1b1a1a; font-weight: 700;
+	display: flex; align-items: center; justify-content: center;
+}
 
 /* Buttons in the theme teal */
 .stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }

@@ -1,0 +1,113 @@
+"""Plotly charts for the SHAP explanations, styled for the app's dark theme.
+
+waterfall() is ported from lambda_ml_streamlit_exercise/app/charts.py. guide_waterfall()
+follows guide_chart() in geographic_playground_mini/pareto.py: a small made-up example
+with numbered badges that match the steps written beside it.
+
+Red and blue are the dataviz skill's dark-mode diverging poles, validated against the
+app background (#1b1a1a). The +/- value labels mean colour is never the only cue.
+"""
+import plotly.graph_objects as go
+
+UP = "#e66767"  # pushes the risk of not attending up
+DOWN = "#3987e5"  # pushes it down
+TOTAL = "#c3c2b7"  # the average and this appointment: neutral, not a direction
+TEXT = "#f0efec"
+MUTED = "#898781"
+FONT = dict(family="Space Grotesk, sans-serif", color=TEXT, size=15)
+
+
+def _waterfall_trace(labels, values, measure, texts):
+    return go.Waterfall(
+        orientation="h",
+        y=labels,
+        x=values,
+        measure=measure,
+        text=texts,
+        textposition="outside",
+        textfont=dict(color=TEXT),
+        increasing=dict(marker=dict(color=UP)),
+        decreasing=dict(marker=dict(color=DOWN)),
+        totals=dict(marker=dict(color=TOTAL)),
+        connector=dict(line=dict(color=MUTED, width=1)),
+        hovertemplate="%{y}: %{text}<extra></extra>",
+    )
+
+
+def _layout(fig, height, **kwargs):
+    fig.update_layout(
+        height=height,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=FONT,
+        showlegend=False,
+        yaxis=dict(autorange="reversed"),
+        **kwargs,
+    )
+    return fig
+
+
+def waterfall(expl: dict) -> go.Figure:
+    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away."""
+    steps = list(expl["shown"])
+    if expl["other"]:
+        steps.append(expl["other"])
+    labels = ["Average appointment"] + [s["label"] for s in steps] + ["This appointment"]
+    values = [expl["base"]] + [s["value"] for s in steps] + [expl["fx"]]
+    measure = ["absolute"] + ["relative"] * len(steps) + ["total"]
+    texts = [f"{expl['base']:.1f}%"] + [f"{s['value']:+.1f}" for s in steps] + [f"{expl['fx']:.1f}%"]
+    fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
+    # Room past the furthest bar end for its outside label
+    running = [expl["base"]]
+    for s in steps:
+        running.append(running[-1] + s["value"])
+    x_max = max(running) * 1.15 + 3
+    return _layout(
+        fig,
+        120 + 40 * len(labels),
+        margin=dict(l=0, r=50, t=10, b=40),
+        xaxis=dict(
+            title="Predicted risk of not attending (%). Red raises it, blue lowers it. Changes in percentage points.",
+            ticksuffix="%",
+            gridcolor="rgba(255,255,255,0.1)",
+            zeroline=False,
+            range=[min(0, min(running)), x_max],
+        ),
+    )
+
+
+# Made-up example for the "How to read this chart" box: average 30%, three factors, 47%
+GUIDE_STEPS = [
+    ("Average appointment", 30, "absolute", "30%"),
+    ("Missed appointments = 3", 18, "relative", "+18"),
+    ("Days since booking = 60", 6, "relative", "+6"),
+    ("Age = 70", -7, "relative", "-7"),
+    ("This appointment", 47, "total", "47%"),
+]
+# Which row each numbered badge sits beside (the numbers match the steps written next to it)
+GUIDE_BADGES = {1: "Average appointment", 2: "Missed appointments = 3", 3: "This appointment"}
+
+
+def guide_waterfall() -> go.Figure:
+    """Small annotated example waterfall with numbered badges in a column on the right."""
+    labels, values, measure, texts = (list(t) for t in zip(*GUIDE_STEPS))
+    fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
+    badge_x = 64
+    fig.add_trace(
+        go.Scatter(
+            x=[badge_x] * len(GUIDE_BADGES),
+            y=list(GUIDE_BADGES.values()),
+            mode="markers+text",
+            text=[f"<b>{n}</b>" for n in GUIDE_BADGES],
+            marker=dict(size=26, color="#ffffff"),
+            textfont=dict(color="#1b1a1a", size=15),
+            hoverinfo="skip",
+        )
+    )
+    return _layout(
+        fig,
+        300,
+        width=480,
+        margin=dict(l=0, r=0, t=10, b=10),
+        xaxis=dict(visible=False, range=[0, badge_x + 4], fixedrange=True),
+    )

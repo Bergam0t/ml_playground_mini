@@ -1,0 +1,7 @@
+# Offline build only (not needed to run the app). Versions match the lambda_ml_streamlit_exercise build.
+# Tested on Python 3.14.
+pandas
+numpy
+scikit-learn==1.9.1
+xgboost==3.4.1
+shap==0.52.0
