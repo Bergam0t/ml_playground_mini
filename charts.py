@@ -121,13 +121,13 @@ def importance_bars(overall: list, overall_title: str, filtered: list | None = N
     return fig
 
 
-# Made-up example for the "How to read this chart" box: average 30%, three factors, 47%
+# Made-up example for the "How to read this chart" box: average 8%, three factors, 27%
 GUIDE_STEPS = [
-    ("Average appointment", 30, "absolute", "30%"),
+    ("Average appointment", 8, "absolute", "8%"),
     ("Missed appointments = 3", 18, "relative", "+18"),
-    ("Days since booking = 60", 6, "relative", "+6"),
-    ("Age = 70", -7, "relative", "-7"),
-    ("This appointment", 47, "total", "47%"),
+    ("Days since booking = 60", 4, "relative", "+4"),
+    ("Age = 70", -3, "relative", "-3"),
+    ("This appointment", 27, "total", "27%"),
 ]
 # Which row each numbered badge sits beside (the numbers match the steps written next to it)
 GUIDE_BADGES = {1: "Average appointment", 2: "Missed appointments = 3", 3: "This appointment"}
@@ -137,7 +137,7 @@ def guide_waterfall() -> go.Figure:
     """Small annotated example waterfall with numbered badges in a column on the right."""
     labels, values, measure, texts = (list(t) for t in zip(*GUIDE_STEPS))
     fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
-    badge_x = 64
+    badge_x = 38
     fig.add_trace(
         go.Scatter(
             x=[badge_x] * len(GUIDE_BADGES),

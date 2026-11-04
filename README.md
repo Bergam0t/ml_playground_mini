@@ -63,7 +63,8 @@ They are made offline by `build/train_and_explain.py`, which follows the pipelin
 lambda_ml_streamlit_exercise:
 
 1. `demo_data.generate_appointments()` makes up past appointments with a hidden "true" chance of not attending,
-   and draws whether each patient attended.
+   and draws whether each patient attended. The chances average `DNA_RATE` (8%: recent NHS
+   outpatient figures are about 6.4%, so the demo Trust is a little worse than average).
 2. An XGBoost model is trained on those past appointments.
 3. The model scores 3,200 future appointments. Their confidence score is worked out as in the
    live pipeline (WX-BIU/Outpatient-DNAs, `src/forecast/Outpatient_Forecast.py`): the top class
@@ -81,8 +82,31 @@ pip install -r build/requirements-build.txt
 python build/train_and_explain.py
 ```
 
-The build checks that the SHAP values add up to each prediction and that the share of forecast
-DNAs and the spread of risk bands stay similar to the original demo.
+The build checks that the SHAP values add up to each prediction, that the past DNA rate is
+within a point of `DNA_RATE` and that every risk band has some appointments. It prints how the
+forecasts fall into the risk bands and the high-risk flag.
+
+It also checks **calibration** on the past appointments the model didn't train on: in each risk
+band, the average predicted risk must be close to the share who really missed. The app adds risks
+up (expected missed appointments, costs), so they must be true probabilities. That's why the
+demo model isn't class-weighted. The live model trains with `scale_pos_weight=4`, which makes its
+risks roughly four times the true odds, and that is why its thresholds (15/50/80% bands, a 70%
+flag) sit so much higher than the demo's.
+
+## Risk bands and the high-risk flag
+
+The live app's thresholds were set for much higher risks than an 8% DNA rate produces (its
+high-risk flag, risk over 70% and confidence over 70%, would catch almost nobody). The demo uses:
+
+- **Risk bands** (`DNA_Risk()` in `streamlit_app.py`): Low under 5%, Medium 5% to 20%, High 20% to
+  40%, Very High 40% or more.
+- **High-risk flag** (`HIGH_RISK_MIN`): a predicted risk of 20% or more, about two and a half
+  times the average. That's about 9% of appointments; about 40% of flagged past patients missed.
+- **Weekly summary colours** (`weekly.MEASURES`): green below and red above 5% and 15% for the
+  flag, 1% and 4% for the yes/no forecast, and 5% and 10% for the average predicted risk.
+
+The yes/no forecast ("Expected DNA") is still a risk of 50% or more, as in the live model, so few
+appointments are forecast as DNAs.
 
 To go back to live data, replace `load_forecast()` in `demo_data.py` with a read of the combined
 forecast view. You would also need SHAP values from the live model for the waterfalls.

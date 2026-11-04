@@ -55,6 +55,9 @@ CATEGORIES = {
 
 
 SITE_P = [0.35, 0.25, 0.20, 0.20]
+# Share of appointments missed. Recent NHS outpatient figures are about 6.4%; the demo
+# Trust is a little worse than average.
+DNA_RATE = 0.08
 # How many appointments a patient has in the period, and how likely each count is
 VISITS_PER_PATIENT, VISITS_P = [1, 2, 3], [0.75, 0.19, 0.06]
 
@@ -132,13 +135,12 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         - 0.025 * (df["Age"].to_numpy() - 52)
         - 0.10 * (df["Deprivation_Decile"].to_numpy() - 5.5)
     ) + rng.normal(0, 0.5, n)
-    # calibrate intercept so ~26% of appointments have a true DNA chance of 50% or more
-    # (the model, which cannot see the noise, then forecasts about 22% as DNAs)
-    lo, hi = -8.0, 4.0
-    for _ in range(40):
+    # calibrate the intercept so the average true DNA chance is DNA_RATE
+    lo, hi = -12.0, 4.0
+    for _ in range(50):
         mid = (lo + hi) / 2
-        share = ((1 / (1 + np.exp(-(logit + mid)))) >= 0.5).mean()
-        lo, hi = (mid, hi) if share < 0.26 else (lo, mid)
+        rate = (1 / (1 + np.exp(-(logit + mid)))).mean()
+        lo, hi = (mid, hi) if rate < DNA_RATE else (lo, mid)
     df["p_true"] = 1 / (1 + np.exp(-(logit + mid)))
 
     mrns = np.array(["P" + str(x).zfill(6) for x in rng.permutation(m) + 100000])

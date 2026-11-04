@@ -24,7 +24,7 @@ from xgboost import XGBClassifier
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from demo_data import CATEGORIES, DATA_DIR, FEATURES, generate_appointments  # noqa: E402
+from demo_data import CATEGORIES, DATA_DIR, DNA_RATE, FEATURES, generate_appointments  # noqa: E402
 
 SEED = 42  # seed for the future appointments the app shows
 HISTORY_SEED = 7  # seed for the past appointments the model learns from
@@ -114,16 +114,39 @@ def main():
     assert err < 0.5, f"SHAP does not sum to predicted probability (max err {err:.3f} pp)"
 
     share = fut["DNA_Forecast"].mean()
-    bands = pd.cut(fut["DNA_Prob_Forecast"], [0, 0.15, 0.5, 0.8, 1], right=False,
+    # Same bands and high-risk flag as DNA_Risk() and HIGH_RISK_MIN in streamlit_app.py
+    bands = pd.cut(fut["DNA_Prob_Forecast"], [0, 0.05, 0.2, 0.4, 1], right=False,
                    labels=["Low", "Medium", "High", "Very High"]).value_counts().sort_index()
-    high_risk = (fut["DNA_Prob_Forecast"] > 0.7) & (fut["Confidence_Score"] > 0.7)
+    high_risk = fut["DNA_Prob_Forecast"] >= 0.2
     by_day = high_risk.groupby(fut["day_index"]).mean()
-    print(f"Forecast as DNA: {share:.1%}")
+    print(f"Forecast as DNA (risk 50% or more): {share:.1%}; mean predicted risk {p.mean():.1%}")
     print("Risk bands:", bands.to_dict())
-    print(f"High-risk rate by day: min {by_day.min():.1%}, median {by_day.median():.1%}, max {by_day.max():.1%}")
+    print(f"High-risk rate: {high_risk.mean():.1%}; by day min {by_day.min():.1%}, "
+          f"median {by_day.median():.1%}, max {by_day.max():.1%}")
+    print("DNA rate among high-risk past appointments: "
+          f"{past.loc[past['DNA_Prob_Forecast'] >= 0.2, 'Did_Not_Attend'].mean():.1%}")
     print("Mean |SHAP| (pp):", grouped.abs().mean().round(2).sort_values(ascending=False).to_dict())
-    assert 0.15 <= share <= 0.30, "forecast DNA share has drifted; retune demo_data.generate_appointments"
+    assert abs(y.mean() - DNA_RATE) < 0.01, "past DNA rate has drifted from demo_data.DNA_RATE"
     assert (bands > 0).all(), "every risk band should have some appointments"
+
+    # ---- Calibration on the past appointments the model didn't train on. The app adds risks
+    # up (expected missed appointments, costs), so a predicted 30% must mean about 30% miss.
+    # Class weighting such as scale_pos_weight would break this, while barely helping ranking.
+    band = pd.cut(past["DNA_Prob_Forecast"], [0, 0.05, 0.2, 0.4, 1], right=False,
+                  labels=["Low", "Medium", "High", "Very High"])
+    cal = past.groupby(band, observed=True).agg(
+        n=("Did_Not_Attend", "size"),
+        predicted=("DNA_Prob_Forecast", "mean"),
+        actual=("Did_Not_Attend", "mean"),
+    )
+    print("Calibration by risk band (past test appointments):")
+    print(cal.round(3).to_string())
+    top = past.nlargest(len(past) // 10, "DNA_Prob_Forecast")["Did_Not_Attend"]
+    print(f"Highest-risk 10%: {top.mean():.1%} missed (precision), catching "
+          f"{top.sum() / past['Did_Not_Attend'].sum():.0%} of all who missed (recall)")
+    gap = abs(past["DNA_Prob_Forecast"].mean() - past["Did_Not_Attend"].mean())
+    assert gap < 0.015, f"average predicted risk is {gap:.1%} off the real DNA rate: not calibrated"
+    assert (abs(cal["predicted"] - cal["actual"]) < 0.08).all(), "a risk band is badly calibrated"
 
     # ---- Export
     DATA_DIR.mkdir(exist_ok=True)

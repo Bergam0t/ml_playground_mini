@@ -34,9 +34,9 @@ MEASURES = {
         cell_label="flagged",
         day_phrase="high-risk flagged",
         rate_phrase="{rate} of appointments are high-risk flagged",
-        thresholds=(0.08, 0.20),
+        thresholds=(0.05, 0.15),
         flag=True,
-        help="Predicted risk over 70% and confidence over 70%, which together mean a risk over 85%.",
+        help="Predicted risk of 20% or more (the High and Very High risk bands).",
         repeat_label="Patients flagged more than once",
     ),
     "Forecast DNAs": Measure(
@@ -45,9 +45,10 @@ MEASURES = {
         cell_label="forecast DNAs",
         day_phrase="forecast not to attend",
         rate_phrase="the model forecasts that {rate} of appointments will be missed",
-        thresholds=(0.15, 0.35),
+        thresholds=(0.01, 0.04),
         flag=True,
-        help="The model's yes/no forecast, as in the Appointments tab's 'Expected DNA' column.",
+        help="The model's yes/no forecast (a predicted risk of 50% or more), as in the "
+        "Appointments tab's 'Expected DNA' column.",
         repeat_label="Patients forecast to miss more than one",
     ),
     "Average predicted risk": Measure(
@@ -55,7 +56,7 @@ MEASURES = {
         count_label="Expected missed appointments",
         cell_label="expected DNAs",
         rate_phrase="the average predicted risk of not attending is {rate}",
-        thresholds=(0.25, 0.40),
+        thresholds=(0.05, 0.10),
         flag=False,
         help="The average of the predicted risks. Adding the risks up gives the expected "
         "number of missed appointments.",
