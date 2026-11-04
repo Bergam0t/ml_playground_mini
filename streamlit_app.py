@@ -5,12 +5,11 @@ from pathlib import Path
 
 import streamlit as st
 import pandas as pd
-import matplotlib
-from matplotlib.colors import to_hex
 
 import calls
 import charts
 import explain
+import weekly
 from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
 
 HSMA_URL = "https://hsma.co.uk"
@@ -128,6 +127,74 @@ def forecast_cell_styles(df):
     styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
     # Same bands as the sidebar's "DNA Risk" filter
     styles["Probabilty"] = (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
+    return styles
+
+
+# Appointment tables (the Appointments tab, and a day's list on the Weekly summary tab):
+# source column -> display name, in display order
+APPOINTMENT_FIELDS = {
+    "Activity_Date": "Appointment Date",
+    "MRN": "Patient ID",
+    "Mobile Telephone": "Mobile Number",
+    "Specialty": "Specialty",
+    "Appointment Location Text": "Location",
+    "Appointment Type": "Appointment Type",
+    "DNA_Forecast_Text": "Expected DNA",
+    "Confidence": "Confidence",
+    "Probabilty": "Probabilty",
+}
+
+# Fixed column widths (about 1,110px in total) so the whole table fits a 1,400px
+# main area; the grid stretches them to fill any space left over.
+APPOINTMENT_COLUMNS = {
+    "Appointment Date": st.column_config.DateColumn(
+        "Appointment Date", format="DD/MM/YYYY", width=110
+    ),
+    "Patient ID": st.column_config.TextColumn(width=95),
+    "Mobile Number": st.column_config.TextColumn(width=120),
+    #'Mobile Number (GP Record)': st.column_config.TextColumn(),
+    "Specialty": st.column_config.TextColumn(width=165),
+    "Location": st.column_config.TextColumn(width=175),
+    "Appointment Type": st.column_config.TextColumn(width=130),
+    "Expected DNA": st.column_config.TextColumn(
+        width=115,
+        help="Model forecast: will the patient miss this appointment? Red Yes, green No.",
+    ),
+    "Confidence": st.column_config.TextColumn(
+        width=105,
+        help="Model forecast: how sure the model is. Darker teal is less sure.",
+    ),
+    "Probabilty": st.column_config.NumberColumn(
+        "DNA Risk",
+        format="%.2f%%",
+        width=95,
+        help="Model forecast: probability of DNA. Colour shows the risk band, "
+        "green Low to red Very High.",
+    ),
+}
+
+
+def appointment_table(df, by_patient=False):
+    """Appointments to show in a table, with the forecast columns coloured.
+
+    `by_patient` puts the patient columns first and shades every other patient's rows,
+    for a table sorted so each patient's appointments are together.
+    """
+    fields = list(APPOINTMENT_FIELDS)
+    if by_patient:
+        patient = ["MRN", "Mobile Telephone"]
+        fields = patient + [f for f in fields if f not in patient]
+    shown = df[fields].rename(columns=APPOINTMENT_FIELDS)
+    styler = shown.style.apply(forecast_cell_styles, axis=None)
+    return styler.apply(patient_bands, axis=None) if by_patient else styler
+
+
+def patient_bands(df):
+    """Shade every other patient's rows (outside the coloured forecast columns)."""
+    patient_no = (df["Patient ID"] != df["Patient ID"].shift()).cumsum()
+    plain = [c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")]
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    styles.loc[patient_no % 2 == 0, plain] = "background-color: #2e2c2c;"
     return styles
 
 
@@ -292,6 +359,22 @@ filtered_data["DNA_Forecast_Text"] = filtered_data["DNA_Forecast"].replace(
     {1: "Yes", 0: "No"}
 )
 
+# A new key whenever the filters change, so an old table selection never points at
+# a different appointment (or day) in the newly filtered table.
+filter_key = hashlib.md5(
+    repr(
+        (
+            selected_reporting_site,
+            selected_specialty,
+            selected_appointment_type,
+            selected_appointment_location,
+            selected_dna_risk,
+            selected_confidence,
+            selected_date,
+        )
+    ).encode()
+).hexdigest()[:10]
+
 # ---------------------------------------------------------------- tab 1
 with tab_appts:
     demo_notice()
@@ -317,86 +400,16 @@ with tab_appts:
             border=True,
         )
 
-    # Fields to display
-    fields_to_display = [
-        "Activity_Date",
-        "MRN",
-        "Mobile Telephone",
-        "Specialty",
-        "Appointment Location Text",
-        "Appointment Type",
-        "DNA_Forecast_Text",
-        "Confidence",
-        "Probabilty",
-    ]
-
-    display_df = filtered_data[fields_to_display]
-
-    filtered_data_renamed = display_df.rename(
-        columns={
-            "Activity_Date": "Appointment Date",
-            "MRN": "Patient ID",
-            "Mobile Telephone": "Mobile Number",
-            "Specialty": "Specialty",
-            "Appointment Location Text": "Location",
-            "Appointment Type": "Appointment Type",
-            "DNA_Forecast_Text": "Expected DNA",
-        }
-    )
-
     st.info(
         "**Click a row in the table** to see what made the model give that "
         "appointment its risk of not attending. The coloured columns are the model's forecast.",
         icon=":material/touch_app:",
     )
 
-    # A new key whenever the filters change, so an old selection never points at
-    # a different appointment in the newly filtered table.
-    filter_key = hashlib.md5(
-        repr(
-            (
-                selected_reporting_site,
-                selected_specialty,
-                selected_appointment_type,
-                selected_appointment_location,
-                selected_dna_risk,
-                selected_confidence,
-                selected_date,
-            )
-        ).encode()
-    ).hexdigest()[:10]
-
     # Display filtered data
-    # Fixed column widths (about 1,110px in total) so the whole table fits a 1,400px
-    # main area; the grid stretches them to fill any space left over.
     table = st.dataframe(
-        filtered_data_renamed.style.apply(forecast_cell_styles, axis=None),
-        column_config={
-            "Appointment Date": st.column_config.DateColumn(
-                "Appointment Date", format="DD/MM/YYYY", width=110
-            ),
-            "Patient ID": st.column_config.TextColumn(width=95),
-            "Mobile Number": st.column_config.TextColumn(width=120),
-            #'Mobile Number (GP Record)': st.column_config.TextColumn(),
-            "Specialty": st.column_config.TextColumn(width=165),
-            "Location": st.column_config.TextColumn(width=175),
-            "Appointment Type": st.column_config.TextColumn(width=130),
-            "Expected DNA": st.column_config.TextColumn(
-                width=115,
-                help="Model forecast: will the patient miss this appointment? Red Yes, green No.",
-            ),
-            "Confidence": st.column_config.TextColumn(
-                width=105,
-                help="Model forecast: how sure the model is. Darker teal is less sure.",
-            ),
-            "Probabilty": st.column_config.NumberColumn(
-                "DNA Risk",
-                format="%.2f%%",
-                width=95,
-                help="Model forecast: probability of DNA. Colour shows the risk band, "
-                "green Low to red Very High.",
-            ),
-        },
+        appointment_table(filtered_data),
+        column_config=APPOINTMENT_COLUMNS,
         hide_index=True,
         alt="Upcoming appointments with the forecast risk of not attending",
         on_select="rerun",
@@ -467,128 +480,169 @@ with tab_weekly:
     demo_notice()
 
     st.subheader("Weekly Forecast Summary")
-    st.markdown(
-        "Appointments | DNAs (Forecast DNA Rate %). Below 8% = Green over 20% = Red"
+
+    measure = st.segmented_control(
+        "Count as a missed appointment",
+        list(weekly.MEASURES),
+        default="High-risk flagged",
+        key="weekly_measure",
+        help="  \n".join(f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()),
+    ) or "High-risk flagged"
+    m = weekly.MEASURES[measure]
+    column = m.column
+    h = weekly.headline(filtered_data, column)
+
+    # Headline figures for the appointments in the sidebar filters
+    with st.container(horizontal=True):
+        st.metric(
+            "Appointments",
+            f"{h['n']:,}",
+            icon=":material/calendar_month:",
+            border=True,
+            help=f"Over {h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}, in the sidebar filters.",
+        )
+        st.metric(
+            m.count_label,
+            f"{h['total']:,.0f} ({h['overall']:.0%})",
+            icon=":material/event_busy:",
+            border=True,
+            help=m.help,
+        )
+        # The first week in the filters: usually next week, the one there is still time to act on
+        vs_average = round(h["first_week_total"] - h["weekly_average_total"])
+        st.metric(
+            weekly.week_title(h["first_week"]),
+            f"{h['first_week_total']:,.0f} ({h['first_week_rate']:.0%})",
+            f"{vs_average:+d} vs weekly average",
+            delta_color="inverse",
+            icon=":material/event_upcoming:",
+            border=True,
+            help=f"{m.count_label} in the week ending {weekly.week_label(h['first_week'], year=True)}, "
+            f"from {h['first_week_n']:,} appointments. The weekly average is "
+            f"{h['weekly_average_total']:.0f}.",
+        )
+        st.metric(
+            "Highest-risk weekday",
+            h["top_day"],
+            weekly.pts_vs_average(h["top_day_rate"], h["overall"]),
+            delta_color="inverse",
+            icon=":material/today:",
+            border=True,
+            help=f"{h['top_day_rate']:.0%} on {h['top_day']}s, against {h['overall']:.0%} overall.",
+        )
+        rp = weekly.repeat_patients(filtered_data, m)
+        # A bordered container rather than the metric's own border, so the button sits in the card
+        with st.container(border=True, gap="small"):
+            st.metric(
+                m.repeat_label,
+                f"{rp['patients']:,}",
+                f"{rp['appointments']:,} appointments between them"
+                + ("" if m.flag else f", about {rp['expected']:.0f} expected to be missed"),
+                delta_color="off",
+                delta_arrow="off",
+                icon=":material/group:",
+                help="One reminder call could cover several of a patient's appointments. "
+                "Counted over all the weeks in the sidebar filters.",
+            )
+            showing = st.session_state.get("show_repeat_patients", False)
+            st.button(
+                "Hide patients" if showing else "Show patients",
+                icon=":material/visibility_off:" if showing else ":material/visibility:",
+                type="tertiary",
+                disabled=rp["patients"] == 0,
+                on_click=lambda: st.session_state.update(show_repeat_patients=not showing),
+            )
+
+    # The repeat patients, one patient's appointments together, soonest appointment first
+    if st.session_state.get("show_repeat_patients") and rp["patients"]:
+        st.markdown(
+            f"**{m.repeat_label}:** {rp['patients']:,} patients, {rp['appointments']:,} "
+            "appointments. The patient with the soonest appointment comes first, and "
+            "every other patient is shaded."
+        )
+        st.dataframe(
+            appointment_table(rp["rows"], by_patient=True),
+            column_config=APPOINTMENT_COLUMNS,
+            hide_index=True,
+            key=f"repeat_patients_{filter_key}",
+        )
+
+    st.markdown(weekly.summary_sentence(h, measure))
+
+    # Week-by-weekday table: newest week first, weekdays with no appointments left out
+    counts, sums, rates = weekly.weekly_tables(filtered_data, column)
+    low, high = m.thresholds
+    week_index = pd.Index(
+        [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
+    )
+    cell_text = pd.DataFrame(
+        {
+            d: [
+                f"{c} · {s:.0f} ({r:.0%})" if c else "–"
+                for c, s, r in zip(counts[d], sums[d], rates[d])
+            ]
+            for d in counts.columns
+        },
+        index=week_index,
+    )
+    cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(week_index)
+
+    st.caption(
+        f"Each cell: appointments · {m.cell_label} "
+        f"({'rate' if m.flag else 'average predicted risk'}). "
+        f"Green below {low:.0%}, red above {high:.0%}."
+    )
+    st.info(
+        "**Click a day in the table** to see its appointments, highest risk first.",
+        icon=":material/touch_app:",
+    )
+    week_table = st.dataframe(
+        cell_text.style.apply(lambda _: cell_styles, axis=None),
+        width="stretch",
+        on_select="rerun",
+        selection_mode="single-cell",
+        key=f"weekly_{filter_key}",
     )
 
-    # Prevent errors if filters result in no data
-    if not filtered_data.empty:
-        # Create a copy to avoid SettingWithCopyWarning
-        pivot_df = filtered_data.copy()
+    # Drill down into the clicked day (clicks on the week labels are ignored)
+    picked = [
+        (r, day) for r, day in week_table.selection.cells
+        if r < len(counts) and day in counts.columns
+    ]
+    if picked:
+        r, day = picked[0]
+        date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
+        day_appts = filtered_data[pd.to_datetime(filtered_data["Activity_Date"]) == date]
+        day_label = f"{date:%A} {date.day} {date:%B}"
 
-        # Ensure the Activity_Date column is a datetime type
-        pivot_df["Activity_Date"] = pd.to_datetime(pivot_df["Activity_Date"])
+        if m.flag:
+            shown = day_appts[day_appts[column] == 1]
+            st.subheader(
+                f"{day_label}: {len(shown)} of {len(day_appts)} appointments {m.day_phrase}"
+            )
+        else:
+            shown = day_appts
+            st.subheader(
+                f"{day_label}: {len(day_appts)} appointments, about "
+                f"{day_appts[column].sum():.0f} expected to be missed"
+            )
 
-        # Create 'Day of Week' and 'Weekending' (Sunday) columns for pivoting
-        pivot_df["Day of Week"] = pivot_df["Activity_Date"].dt.day_name()
-        pivot_df["Weekending"] = (
-            pivot_df["Activity_Date"]
-            .dt.to_period("W-SUN")
-            .apply(lambda r: r.end_time)
-            .dt.strftime("%d-%b-%Y")
-        )
-
-        # Define the correct order for the days of the week
-        days_of_week = [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-        ]
-        pivot_df["Day of Week"] = pd.Categorical(
-            pivot_df["Day of Week"], categories=days_of_week, ordered=True
-        )
-
-        # Create the pivot table
-        pivot_table = pd.pivot_table(
-            pivot_df,
-            values="High_Risk_DNA",
-            index="Weekending",
-            columns="Day of Week",
-            aggfunc=["count", "sum"],
-        )
-
-        # Extract the 'count' (total appointments) and 'sum' (DNA count) tables
-        counts = (
-            pivot_table.get("count", pd.DataFrame())
-            .reindex(columns=days_of_week, fill_value=0)
-            .fillna(0)
-            .astype(int)
-        )
-        sums = (
-            pivot_table.get("sum", pd.DataFrame())
-            .reindex(columns=days_of_week, fill_value=0)
-            .fillna(0)
-            .astype(int)
-        )
-
-        # Calculate DNA rate, handling division by zero
-        dna_rate = (sums / counts).fillna(0)
-
-        # --- Styling Logic ---
-        def style_dna_rate(val):
-            cmap = matplotlib.colormaps["RdYlGn_r"]
-            norm = matplotlib.colors.Normalize(vmin=0.08, vmax=0.20)
-
-            font_color = "black"  # Default font color
-            bg_color = "white"  # Default background color
-
-            if pd.isna(val) or val == 0:
-                return f"background-color: {bg_color}; color: {font_color};"
-
-            # Condition for dark green background where white text is needed
-            if val < 0.08:
-                bg_color = "#198754"  # A darker, high-contrast green
-                font_color = "white"
-            # *** CHANGE HERE: Use dark red for high rates and set font to white ***
-            elif val > 0.20:
-                bg_color = "#dc3545"  # A darker, high-contrast red
-                font_color = "white"
-            else:
-                bg_color = to_hex(cmap(norm(val)))
-
-            return f"background-color: {bg_color}; color: {font_color};"
-
-        # Create a DataFrame of styles by applying the function to the DNA rate data
-        style_df = (
-            dna_rate.map(style_dna_rate)
-            if hasattr(dna_rate, "map")
-            else dna_rate.applymap(style_dna_rate)
-        )
-
-        # Create the text to display in the table using the new format
-        # Using a loop for clarity, performance is fine for this small table
-        formatted_table = pd.DataFrame(
-            "", index=counts.index, columns=counts.columns
-        )
-        for r in formatted_table.index:
-            for c in formatted_table.columns:
-                count = counts.loc[r, c]
-                dna_sum = sums.loc[r, c]
-                rate = dna_rate.loc[r, c]
-                if count > 0:
-                    formatted_table.loc[r, c] = f"{count} | {dna_sum} ({rate:.0%})"
-                else:
-                    formatted_table.loc[r, c] = "0 | 0 (0%)"
-
-        # Sort index to have the most recent week at the top
-        formatted_table = formatted_table.sort_index(
-            key=lambda idx: pd.to_datetime(idx, format="%d-%b-%Y"),
-            ascending=False,
-        )
-        # Ensure style df matches the sorted index
-        style_df = style_df.loc[formatted_table.index]
-
-        # Apply the styles to the formatted text table
-        styler = formatted_table.style.apply(lambda x: style_df, axis=None)
-
-        st.dataframe(styler, width="stretch")
-    else:
-        st.info("No appointment data available for the selected filters.")
-    # --- END of finalized visualization ---
+        if day_appts.empty:
+            st.info("There are no appointments in the sidebar filters on this day.")
+        elif shown.empty:
+            st.info(f"None of this day's appointments are {m.day_phrase}.")
+        else:
+            st.dataframe(
+                appointment_table(shown.sort_values("DNA_Prob_Forecast", ascending=False)),
+                column_config=APPOINTMENT_COLUMNS,
+                hide_index=True,
+                key=f"weekly_day_{filter_key}",
+            )
+            st.caption(
+                "To plan reminder calls across the weeks, see the **Who would we phone?** tab. "
+                "To see why the model gave an appointment its risk, click it on the "
+                "**Appointments** tab."
+            )
 
 # ---------------------------------------------------------------- tab 3
 # Ported from the "Who would we phone?" page of lambda_ml_streamlit_exercise. The counts
