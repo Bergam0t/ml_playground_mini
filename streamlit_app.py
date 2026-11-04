@@ -889,6 +889,9 @@ with tab_calls:
         key="call_mode",
     ) or "Calls the team can make"
 
+    # The setting for who gets a call, and the guess at what a call changes, side by side
+    ctrl_left, ctrl_right = st.columns(2, gap="large")
+
     if mode == "Calls the team can make":
         # Slider runs up to the busiest filtered week, rounded up to a multiple of 10. Clamp
         # the kept value first, so changing the filters never leaves it out of range.
@@ -896,7 +899,7 @@ with tab_calls:
         if st.session_state.get("calls_per_week", 0) > busiest:
             st.session_state["calls_per_week"] = busiest
         st.session_state.setdefault("calls_per_week", min(100, busiest))
-        cap = st.slider(
+        cap = ctrl_left.slider(
             "Calls the team can make per week",
             0,
             busiest,
@@ -921,7 +924,7 @@ with tab_calls:
         # Risk only: confidence is |2 x risk - 1|, so it adds nothing a risk bar doesn't, and
         # on its own it would also pick the patients the model is confident will attend.
         # Few risks pass 60% at an 8% DNA rate, so the slider stops there, in 1% steps
-        risk_min = st.slider(
+        risk_min = ctrl_left.slider(
             "Phone if the predicted risk is at least",
             0,
             60,
@@ -941,7 +944,38 @@ with tab_calls:
             f"app's high-risk flag; {FORECAST_MIN:.0%} phones everyone forecast as a DNA."
         )
 
+    effect = ctrl_right.slider(
+        "Suppose a call gets this share of the people it reaches, who would have missed, to attend instead",
+        0,
+        100,
+        50,
+        step=5,
+        format="%d%%",
+        key="call_effect",
+        help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
+    )
+    ctrl_right.caption(
+        "A guess: nobody knows yet how many a call would change. See **What difference might the calls "
+        "make?** below."
+    )
+
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
+
+    # Weekly figures for the upcoming appointments in the sidebar filters. Precision is None
+    # when the setting phones nobody, and dna_cost is None when nobody upcoming is phoned.
+    weekly_calls = upcoming_called.sum() / n_weeks
+    dna_cost = costs.cost_per_dna_reached(filtered_data[upcoming_called])
+    has_costs = out["calls"] > 0 and weekly_calls > 0 and dna_cost is not None
+    if out["calls"] > 0:
+        weekly_reached = weekly_calls * out["precision"]
+        weekly_avoided = weekly_reached * effect / 100
+    if has_costs:
+        econ = costs.call_economics(
+            weekly_calls, weekly_reached, effect / 100, cost_per_call, minutes_per_call, dna_cost
+        )
+        # None when the calls reach nobody who would miss: no effect could pay for them
+        be = econ["break_even_effect"]
+        be = float("inf") if be is None else be
 
     with st.container(border=True):
         k1, k2 = st.columns([0.35, 0.65], gap="large")
@@ -953,6 +987,72 @@ with tab_calls:
             f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody is phoned",
         )
         st.markdown(how)
+
+    # Headline cost of the chosen setting; the breakdown is further down the tab
+    if has_costs:
+        with st.container(border=True):
+            st.markdown(
+                f"**What this setting costs and might save, per week** (about {weekly_calls:.0f} calls, "
+                "for the upcoming appointments in your filters)"
+            )
+            # Fixed columns rather than a horizontal container, so the four cards never wrap
+            c1, c2, c3, c4 = st.columns(4, gap="small")
+            c1.metric(
+                "Cost of calls",
+                f"£{econ['call_cost']:,.0f}",
+                border=True,
+                height="stretch",
+                icon=":material/call:",
+                help=f"{weekly_calls:.0f} calls at £{cost_per_call:.2f} each: "
+                f"{econ['staff_hours']:.1f} hours of staff time.",
+            )
+            c2.metric(
+                "Pays for itself at",
+                f"{be:.1%}" if be <= 1 else "more than everyone",
+                border=True,
+                height="stretch",
+                icon=":material/balance:",
+                help="The share of the people the calls reach, who would have missed, that the calls "
+                "must get to attend to cover their staff time. It doesn't depend on your guess.",
+            )
+            c3.metric(
+                "Possibly saved",
+                f"£{econ['value_avoided']:,.0f}",
+                # Sign first, so st.metric reads a loss as negative
+                f"{'-' if econ['net'] < 0 else '+'}£{abs(econ['net']):,.0f} after the cost of calls",
+                border=True,
+                height="stretch",
+                icon=":material/savings:",
+                help=f"If a call gets {effect}% of the people it reaches, who would have missed, "
+                "to attend.",
+            )
+            c4.metric(
+                "Missed appointments avoided",
+                f"{weekly_avoided:.1f}" if weekly_avoided < 10 else f"{weekly_avoided:.0f}",
+                border=True,
+                height="stretch",
+                icon=":material/event_available:",
+                help=f"About {weekly_reached:.0f} calls a week would reach someone who would otherwise "
+                f"miss their appointment. If {effect}% of them attend instead, that's about "
+                f"{weekly_avoided:.1f} fewer missed appointments a week: the assumption behind "
+                "'Possibly saved'.",
+            )
+            st.markdown(
+                (
+                    f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} the "
+                    f"break-even, so the calls would {'more than ' if effect / 100 > be else 'not '}"
+                    "cover their cost."
+                    if be <= 1
+                    else "Even if every call got the patient to attend, the calls would cost more than "
+                    "the missed appointments they reach."
+                )
+                + " Breakdown and caveats below."
+            )
+    elif out["calls"] > 0:
+        st.info(
+            "None of the upcoming appointments in your filters would get a call with this setting, so "
+            "there is nothing to cost. Widen the sidebar filters or lower the bar."
+        )
 
     if out["calls"] == 0:
         st.info("With this setting nobody would get a call. Raise the number of calls or lower the bar.")
@@ -1011,23 +1111,10 @@ with tab_calls:
         st.subheader("What difference might the calls make?")
         st.markdown(
             "Reaching someone who would have missed their appointment is not the same as getting them to "
-            "come. **Nobody knows yet how many a call would change**, so this is an assumption you can vary."
-        )
-        effect = st.slider(
-            "Suppose a call gets this share of the people it reaches, who would have missed, to attend instead",
-            0,
-            50,
-            20,
-            step=5,
-            format="%d%%",
-            key="call_effect",
-            help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
+            "come. **Nobody knows yet how many a call would change**, so it is an assumption: set it with "
+            f"the slider at the top of the tab (now **{effect}%**)."
         )
         avoided = out["called_dna"] * effect / 100
-
-        weekly_calls = upcoming_called.sum() / n_weeks
-        weekly_reached = weekly_calls * out["precision"]
-        weekly_avoided = weekly_reached * effect / 100
 
         m1, m2, m3 = st.columns(3, gap="large")
         m1.metric(
@@ -1064,12 +1151,8 @@ with tab_calls:
         )
 
         st.divider()
-        st.subheader("What might the calls cost, and save?")
-        dna_cost = costs.cost_per_dna_reached(filtered_data[upcoming_called])
-        econ = costs.call_economics(
-            weekly_calls, weekly_reached, effect / 100, cost_per_call, minutes_per_call, dna_cost
-        )
-        if weekly_calls == 0 or dna_cost is None:
+        st.subheader("How the cost is worked out")
+        if not has_costs:
             st.info(
                 "None of the upcoming appointments in your filters would get a call with this "
                 "setting, so there is nothing to cost. Widen the sidebar filters or lower the bar."
@@ -1080,29 +1163,9 @@ with tab_calls:
                 f"**£{cost_per_call:.2f}** of staff time, and a missed appointment among the patients "
                 f"these calls would reach costs about **£{dna_cost:,.0f}** on average (more for new "
                 "appointments and some specialties). Change these under **Cost assumptions** in the "
-                "sidebar."
+                "sidebar. The break-even at the top is the cost of calls divided by the missed "
+                "appointments reached."
             )
-            # None when the calls reach nobody who would miss: no effect could pay for them
-            be = econ["break_even_effect"]
-            be = float("inf") if be is None else be
-            with st.container(border=True):
-                st.metric(
-                    "The calls cover their staff time if they get at least",
-                    f"{be:.1%}" if be <= 1 else "more than everyone",
-                    icon=":material/balance:",
-                )
-                st.markdown(
-                    "**...of the people they reach, who would have missed, to attend instead.** "
-                    "This doesn't depend on the guess above about what difference a call makes. "
-                    + (
-                        f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} it, "
-                        f"so the calls would {'more than ' if effect / 100 > be else 'not '}cover "
-                        "their cost."
-                        if be <= 1
-                        else "Even if every call got the patient to attend, the calls would cost more "
-                        "than the missed appointments they reach."
-                    )
-                )
             with st.container(horizontal=True):
                 st.metric(
                     "Staff time",
