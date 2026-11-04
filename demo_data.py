@@ -63,7 +63,7 @@ def generate_appointments(n=3200, seed=42, weeks=6):
     """Appointments with features, IDs and a hidden true DNA probability (`p_true`).
 
     Most patients have one appointment in the period; some have two or three, on
-    different days. A patient keeps their MRN, mobile number, age, deprivation decile
+    different days. A patient keeps their ID, mobile number, age, deprivation decile
     and missed-appointment history across all of them, and usually their site and
     specialty too (a repeat in the same specialty is a follow-up).
 
@@ -141,7 +141,7 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         lo, hi = (mid, hi) if share < 0.26 else (lo, mid)
     df["p_true"] = 1 / (1 + np.exp(-(logit + mid)))
 
-    mrns = np.array(["MRN" + str(x).zfill(6) for x in rng.permutation(m) + 100000])
+    mrns = np.array(["P" + str(x).zfill(6) for x in rng.permutation(m) + 100000])
     df["MRN"] = mrns[patient]
     df["Mobile Telephone"] = np.array(phones)[patient]
     df["Fin Number"] = ["99" + str(x).zfill(8) for x in rng.integers(0, 10**8, n)]  # one per appointment

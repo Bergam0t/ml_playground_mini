@@ -291,7 +291,7 @@ with tab_appts:
     filtered_data_renamed = display_df.rename(
         columns={
             "Activity_Date": "Appointment Date",
-            "MRN": "MRN",
+            "MRN": "Patient ID",
             "Mobile Telephone": "Mobile Number",
             "Specialty": "Specialty",
             "Appointment Location Text": "Location",
@@ -326,7 +326,7 @@ with tab_appts:
                 "Appointment Date",
                 format="DD/MM/YYYY",
             ),
-            "MRN": st.column_config.TextColumn(),
+            "Patient ID": st.column_config.TextColumn(),
             "Mobile Number": st.column_config.TextColumn(),
             #'Mobile Number (GP Record)': st.column_config.TextColumn(),
             "Specialty": st.column_config.TextColumn(),
@@ -360,7 +360,7 @@ with tab_appts:
         )
 
         st.subheader(
-            f"Why {row['MRN']} on {row['Activity_Date']:%d/%m/%Y} has a "
+            f"Why patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y} has a "
             f"{expl['fx']:.0f}% risk of not attending"
         )
         st.markdown(
