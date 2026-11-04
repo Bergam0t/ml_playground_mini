@@ -1,0 +1,18 @@
+[theme]
+base = "dark"
+font = "Space Grotesk:https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap, sans-serif"
+backgroundColor = "#1b1a1a"
+primaryColor = "#1fb1b9"
+
+[theme.sidebar]
+backgroundColor = "#550000"
+primaryColor = "#ffffff"
+
+[client]
+toolbarMode = "viewer"
+
+[server]
+enableStaticServing = true
+
+[browser]
+gatherUsageStats = false

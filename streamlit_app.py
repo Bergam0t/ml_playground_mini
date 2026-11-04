@@ -1,3 +1,6 @@
+import base64
+from pathlib import Path
+
 import streamlit as st
 import pandas as pd
 import matplotlib
@@ -5,62 +8,31 @@ from matplotlib.colors import to_hex
 
 from demo_data import generate_forecast  # DEMO: synthetic data replaces SQL
 
-st.set_page_config(page_title="Outpatient DNA Forecast", layout="wide")
+HSMA_URL = "https://hsma.co.uk"
 
-# NHS styling
-st.markdown(
-    """
-    <style>
-    /* NHS Blue */
-    .main {
-        background-color: #f0f4f5;
-    }
-    header[data-testid="stHeader"] {
-        background: #005eb8;
-    }
-    .stApp {
-        font-family: 'Arial', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    h1, h2, h3, h4 {
-        color: #005eb8;
-        font-family: 'Arial', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-    }
-    .css-1d391kg {  /* Sidebar header */
-        background-color: #005eb8 !important;
-        color: #fff !important;
-    }
-    .css-1v0mbdj {  /* Sidebar */
-        background-color: #e8edee !important;
-    }
-    .stButton>button {
-        background-color: #007f3b;
-        color: white;
-        border-radius: 4px;
-        border: none;
-        font-weight: bold;
-    }
-    .stButton>button:hover {
-        background-color: #005eb8;
-        color: white;
-    }
-    /* Increase sidebar width */
-    section[data-testid="stSidebar"] {
-        min-width: 350px;
-        max-width: 350px;
-        width: 350px;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
+st.set_page_config(
+    page_title="Outpatient DNA Forecast",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
+st.logo(
+    "resources/Chalky HSMA-07-wide white logo tall with tagline - new tagline.png",
+    size="large",
+    link=HSMA_URL,
+)
+st.markdown(f"<style>{Path('style.css').read_text()}</style>", unsafe_allow_html=True)
 
-# NHS logo (optional)
+# HSMA display font, embedded as base64 so it loads without static file serving.
+font_b64 = base64.b64encode(
+    Path("resources/fonts/hsma-display/HSMADisplay-Regular.woff2").read_bytes()
+).decode()
 st.markdown(
-    """
-    <div style="position: absolute; top: 1.2rem; right: 2rem; z-index: 100;">
-        <img src="https://assets.nhs.uk/images/nhs-logo.png" width="120">
-    </div>
-    """,
+    f"""<style>
+    @font-face {{
+        font-family: "HSMA Display";
+        src: url(data:font/woff2;base64,{font_b64}) format("woff2");
+    }}
+    </style>""",
     unsafe_allow_html=True,
 )
 

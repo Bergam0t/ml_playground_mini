@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+/* Layout and theme ported from the geographic playground mini. */
+
+/* Body font. The theme font in .streamlit/config.toml must match (it is what
+   Streamlit's own widgets use). To switch fonts, change both and the @import.
+   --readout-font is for the metric numbers only. */
+:root {
+    --body-font: "Space Grotesk", sans-serif;
+    --readout-font: "Space Mono", monospace;
+}
+
+/* Streamlit sets its theme font on the app root, so override it there too. */
+[data-testid="stApp"],
+[data-testid="stSidebar"] {
+    font-family: var(--body-font) !important;
+}
+
+html, body, st-emotion-cache [class*="css"] {
+    font-family: var(--body-font);
+    font-size: 18px;
+    font-weight: 300;
+    color: #091747;
+}
+
+/* Metric readouts in the mono font. */
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] *,
+[data-testid="stMetricDelta"],
+[data-testid="stMetricDelta"] * {
+	font-family: var(--readout-font) !important;
+}
+
+h1, h2, h3, h4 {
+	font-family: var(--body-font);
+}
+
+.block-container,
+[data-testid="stMainBlockContainer"] {
+    width: 100%;
+    /* Top padding must clear the fixed toolbar; the navbar below cancels it
+       with a matching negative margin. */
+    padding: 2.75rem 2rem 2rem;
+    min-width: auto;
+    max-width: initial;
+}
+
+/* Hide the "running man" status widget. */
+div[class*="StatusWidget"] {
+    display: none;
+}
+
+/* ---- Sidebar ---- */
+
+/* Less space between each widget in the sidebar. */
+section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+	gap: 0.6rem;
+}
+
+/* The slider's min/max tick bar is position:absolute and only fades in on
+	hover/focus, so it reserves no layout space of its own and would otherwise
+	overlay the widget below it. Reserve room for it under each sidebar slider. */
+section[data-testid="stSidebar"] [data-testid="stSlider"] {
+	margin-bottom: 1.25rem;
+}
+section[data-testid="stSidebar"] [data-testid="stSliderTickBar"] {
+	font-size: 0.75rem;
+	opacity: 1 !important;
+	visibility: visible !important;
+}
+
+/* Pull each widget a little closer to its label. */
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {
+	margin-bottom: 0.35rem;
+}
+
+/* Less space above the section subtitles. */
+section[data-testid="stSidebar"] h3 {
+	padding-top: 0;
+	margin-top: -0.6rem;
+}
+
+section[data-testid="stSidebar"] hr {
+	margin-top: 0.8rem;
+	/* Larger than the top margin to offset the h3 pull-up above, leaving a visible gap */
+	margin-bottom: 1.6rem;
+}
+
+/* Sidebar width. */
+section[data-testid="stSidebar"][aria-expanded="true"] {
+	width: 22rem !important;
+	min-width: 22rem !important;
+}
+
+/* ---- Sidebar logo (st.logo) ---- */
+/* st.logo caps the height even at size="large"; the HSMA asset is a square
+	canvas with a landscape mark, so scale it up and let the header grow. */
+[data-testid="stSidebarHeader"] {
+	height: auto;
+	min-height: 0;
+	padding-top: 0.9rem;
+	padding-bottom: 0;
+	position: relative;
+	justify-content: center;
+}
+/* Keep the collapse button out of the flow so the logo stays centred. */
+[data-testid="stSidebarHeader"] [data-testid="stSidebarCollapseButton"] {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+}
+[data-testid="stSidebarLogo"],
+img.stLogo {
+	height: 11rem !important;
+	max-height: 11rem !important;
+	margin: 0 auto;
+	width: auto;
+	max-width: 100%;
+}
+
+/* Title in the HSMA display font */
+h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-adjust: none; }
+[data-testid="stIconMaterial"] { font-size-adjust: none; }
+
+/* Header transparent; toolbar hidden */
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stToolbar"], [data-testid="stDecoration"] { display: none; }
+
+/* Buttons in the theme teal */
+.stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }
+.stButton button:hover, .stButton button:focus:not(:active) { background-color: #1fb1b9; border-color: #1fb1b9; color: #ffffff; }
