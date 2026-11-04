@@ -86,18 +86,19 @@ GUIDE_STEPS = [
 ]
 
 
-# Risk bands and the high-risk flag, set for a DNA rate of about 8% (demo_data.DNA_RATE):
-# a 20% risk is about two and a half times the average. build/train_and_explain.py prints
-# how the forecasts fall into them.
-HIGH_RISK_MIN = 0.20
+# Risk bands, the yes/no forecast and the high-risk flag, set for a DNA rate of about 8%
+# (demo_data.DNA_RATE). The data's DNA_Forecast is a risk of FORECAST_MIN or more (set in
+# build/train_and_explain.py, which prints how the forecasts fall into all of these).
+FORECAST_MIN = 0.20  # about two and a half times the average; the live model's 50%
+HIGH_RISK_MIN = 0.40  # the Very High band
 
 
 def DNA_Risk(prob):
     if prob < 0.05:
         return "Low"
-    elif prob < HIGH_RISK_MIN:
+    elif prob < FORECAST_MIN:
         return "Medium"
-    elif prob < 0.40:
+    elif prob < HIGH_RISK_MIN:
         return "High"
     else:
         return "Very High"
@@ -168,7 +169,8 @@ APPOINTMENT_COLUMNS = {
     "Appointment Type": st.column_config.TextColumn(width=130),
     "Expected DNA": st.column_config.TextColumn(
         width=115,
-        help="Model forecast: will the patient miss this appointment? Red Yes, green No.",
+        help=f"Model forecast: will the patient miss this appointment? Yes for a predicted risk "
+        f"of {FORECAST_MIN:.0%} or more. Red Yes, green No.",
     ),
     "Confidence": st.column_config.TextColumn(
         width=105,
@@ -234,8 +236,9 @@ data = load_data()
 data["Risk"] = data["DNA_Prob_Forecast"].apply(DNA_Risk)
 data["Confidence"] = data["Confidence_Score"].apply(Confidence_Score_Txt)
 
-# Flagged high-risk: the High and Very High bands. (The live app's flag, risk over 70% and
-# confidence over 70%, would catch almost nobody at an 8% DNA rate.)
+# Flagged high-risk: the Very High band, stricter than the yes/no forecast as in the live app.
+# (The live app's flag, risk over 70% and confidence over 70%, would catch almost nobody at
+# an 8% DNA rate.)
 data["High_Risk_DNA"] = (data["DNA_Prob_Forecast"] >= HIGH_RISK_MIN).astype(int)
 data["Probabilty"] = data["DNA_Prob_Forecast"] * 100
 
@@ -344,8 +347,8 @@ selected_dna_risk = st.sidebar.selectbox(
     help="The model's predicted risk that the patient won't attend.  \n"
     "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 40%  \n"
     "**Very High:** 40% or more  \n"
-    "About 8% of appointments are missed, so 20% is about two and a half times the average. "
-    "High and Very High count as high-risk flagged.",
+    "About 8% of appointments are missed. High and Very High (20% or more, about two and a half "
+    "times the average) are forecast as DNAs; Very High is also flagged high-risk.",
 )
 
 if selected_dna_risk != "All":
@@ -470,8 +473,9 @@ with tab_appts:
         "other support might help most. A machine-learning model, trained on past appointments, "
         "gives each one a predicted risk of not attending and a confidence score. The forecasts "
         "are estimates to support staff judgement, not decisions.\n\n"
-        "About 8% of appointments are missed, so most predicted risks are low. **A risk of 20% or "
-        "more counts as high risk**: about two and a half times the average.\n\n"
+        "About 8% of appointments are missed, so most predicted risks are low. **The model "
+        "forecasts a DNA for a risk of 20% or more** (about two and a half times the average), and "
+        "**flags a risk of 40% or more as high risk**.\n\n"
         "**Confidence** is how clear-cut the model's yes-or-no call is: the gap between its chance "
         "that the patient won't attend and its chance that they will. A 90% risk (90% against 10%) "
         "gives 80% confidence; a 50% risk gives 0%, where the model could go either way. So "
@@ -495,9 +499,9 @@ with tab_appts:
             f"{int(filtered_data['DNA_Forecast'].sum()):,}",
             icon=":material/event_busy:",
             border=True,
-            help="Appointments the model forecasts as a DNA: a predicted risk of 50% or more "
-            "(the 'Expected DNA' column). Few reach 50%, so this is far fewer than the number "
-            "likely to be missed.",
+            help=f"Appointments the model forecasts as a DNA: a predicted risk of {FORECAST_MIN:.0%} "
+            "or more (the 'Expected DNA' column). Not all of them will be missed, and some "
+            "lower-risk appointments will be.",
         )
         st.metric(
             "High-risk flagged",
@@ -505,7 +509,7 @@ with tab_appts:
             icon=":material/warning:",
             border=True,
             help=f"Share of appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
-            "(the High and Very High bands).",
+            "(the Very High band).",
         )
         st.metric(
             "Expected cost of missed appointments",
@@ -934,7 +938,7 @@ with tab_calls:
         how = (
             "**Here you set the bar, and the number of calls follows from it.** A lower bar means more calls, "
             f"and more of them are to people who would have come anyway. {HIGH_RISK_MIN:.0%} matches the "
-            "app's high-risk flag."
+            f"app's high-risk flag; {FORECAST_MIN:.0%} phones everyone forecast as a DNA."
         )
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)

@@ -100,13 +100,15 @@ high-risk flag, risk over 70% and confidence over 70%, would catch almost nobody
 
 - **Risk bands** (`DNA_Risk()` in `streamlit_app.py`): Low under 5%, Medium 5% to 20%, High 20% to
   40%, Very High 40% or more.
-- **High-risk flag** (`HIGH_RISK_MIN`): a predicted risk of 20% or more, about two and a half
-  times the average. That's about 9% of appointments; about 40% of flagged past patients missed.
-- **Weekly summary colours** (`weekly.MEASURES`): green below and red above 5% and 15% for the
-  flag, 1% and 4% for the yes/no forecast, and 5% and 10% for the average predicted risk.
-
-The yes/no forecast ("Expected DNA") is still a risk of 50% or more, as in the live model, so few
-appointments are forecast as DNAs.
+- **Yes/no forecast** ("Expected DNA", `FORECAST_MIN` in the build and the app): a predicted risk
+  of 20% or more, about two and a half times the average. The live model says yes at 50%, which
+  with its `scale_pos_weight=4` is about a 20% true risk. That's about 9% of appointments; about
+  40% of those past patients missed, and they include about half of everyone who missed.
+- **High-risk flag** (`HIGH_RISK_MIN`): the Very High band, 40% or more, so it stays stricter than
+  the forecast as in the live app. About 3% of appointments; about 58% of those past patients
+  missed.
+- **Weekly summary colours** (`weekly.MEASURES`): green below and red above 2% and 6% for the
+  flag, 5% and 15% for the yes/no forecast, and 5% and 10% for the average predicted risk.
 
 To go back to live data, replace `load_forecast()` in `demo_data.py` with a read of the combined
 forecast view. You would also need SHAP values from the live model for the waterfalls.

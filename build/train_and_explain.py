@@ -32,6 +32,10 @@ N_FUTURE = 3200
 N_HISTORY = 30000
 WEEKS = 6
 N_BACKGROUND = 500  # rows used as "the average appointment" for SHAP
+# The yes/no forecast. The live model says yes at 50%, but it trains with scale_pos_weight=4,
+# which inflates the odds about four times: its 50% is about a 20% true risk.
+FORECAST_MIN = 0.20
+HIGH_RISK_MIN = 0.40  # the high-risk flag, as HIGH_RISK_MIN in streamlit_app.py
 
 FORECAST_COLUMNS = [
     "row_id", "day_index", "Reporting_Site", "Specialty", "Appointment Type",
@@ -86,7 +90,7 @@ def main():
     p = model.predict_proba(Xf)[:, 1]
     fut["DNA_Prob_Forecast"] = p.round(4)
     fut["Confidence_Score"] = confidence_score(p)
-    fut["DNA_Forecast"] = (p >= 0.5).astype(int)
+    fut["DNA_Forecast"] = (p >= FORECAST_MIN).astype(int)
 
     # ---- Past appointments the model didn't train on, with what really happened, for the
     # "Who would we phone?" tab
@@ -117,14 +121,14 @@ def main():
     # Same bands and high-risk flag as DNA_Risk() and HIGH_RISK_MIN in streamlit_app.py
     bands = pd.cut(fut["DNA_Prob_Forecast"], [0, 0.05, 0.2, 0.4, 1], right=False,
                    labels=["Low", "Medium", "High", "Very High"]).value_counts().sort_index()
-    high_risk = fut["DNA_Prob_Forecast"] >= 0.2
+    high_risk = fut["DNA_Prob_Forecast"] >= HIGH_RISK_MIN
     by_day = high_risk.groupby(fut["day_index"]).mean()
-    print(f"Forecast as DNA (risk 50% or more): {share:.1%}; mean predicted risk {p.mean():.1%}")
+    print(f"Forecast as DNA (risk {FORECAST_MIN:.0%} or more): {share:.1%}; mean predicted risk {p.mean():.1%}")
     print("Risk bands:", bands.to_dict())
     print(f"High-risk rate: {high_risk.mean():.1%}; by day min {by_day.min():.1%}, "
           f"median {by_day.median():.1%}, max {by_day.max():.1%}")
     print("DNA rate among high-risk past appointments: "
-          f"{past.loc[past['DNA_Prob_Forecast'] >= 0.2, 'Did_Not_Attend'].mean():.1%}")
+          f"{past.loc[past['DNA_Prob_Forecast'] >= HIGH_RISK_MIN, 'Did_Not_Attend'].mean():.1%}")
     print("Mean |SHAP| (pp):", grouped.abs().mean().round(2).sort_values(ascending=False).to_dict())
     assert abs(y.mean() - DNA_RATE) < 0.01, "past DNA rate has drifted from demo_data.DNA_RATE"
     assert (bands > 0).all(), "every risk band should have some appointments"
