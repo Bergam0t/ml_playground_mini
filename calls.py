@@ -24,14 +24,9 @@ def called_by_share(p, share: float) -> np.ndarray:
     return called
 
 
-def called_by_threshold(p, conf, risk_min: float | None = None, conf_min: float | None = None) -> np.ndarray:
-    """Call every appointment at or above both minimums. A minimum of None is switched off."""
-    called = np.ones(len(p), dtype=bool)
-    if risk_min is not None:
-        called &= np.asarray(p, dtype=float) >= risk_min
-    if conf_min is not None:
-        called &= np.asarray(conf, dtype=float) >= conf_min
-    return called
+def called_by_threshold(p, risk_min: float) -> np.ndarray:
+    """Call every appointment with a predicted risk at or above the minimum."""
+    return np.asarray(p, dtype=float) >= risk_min
 
 
 def call_outcomes(called, y, p) -> dict:

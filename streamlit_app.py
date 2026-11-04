@@ -64,6 +64,9 @@ def load_model_meta():
     return json.loads((DATA_DIR / "model_meta.json").read_text(encoding="utf-8"))
 
 
+# Fewer filtered appointments than this and their factor chart is too noisy to show
+MIN_GROUP_FOR_CHART = 30
+
 # The "How to read this chart" steps; the numbers match the badges on charts.guide_waterfall()
 GUIDE_STEPS = [
     (
@@ -162,7 +165,8 @@ APPOINTMENT_COLUMNS = {
     ),
     "Confidence": st.column_config.TextColumn(
         width=105,
-        help="Model forecast: how sure the model is. Darker teal is less sure.",
+        help="Model forecast: how clear-cut the yes-or-no call is. Low for risks near 50%. "
+        "Darker teal is less clear-cut.",
     ),
     "Probabilty": st.column_config.NumberColumn(
         "DNA Risk",
@@ -240,8 +244,12 @@ data["Probabilty"] = data["DNA_Prob_Forecast"] * 100
 
 # Filters
 st.sidebar.header("Filters")
+st.sidebar.caption("Choose which upcoming appointments the app shows.")
 # Start with the full data
 filtered_data = data.copy()
+
+# Facts about the appointment first, then the model's forecast for it
+st.sidebar.subheader("Appointment details")
 
 # Allow the user to filter by Site
 reporting_site_options = sorted(
@@ -296,34 +304,6 @@ if selected_appointment_location != "All":
         == selected_appointment_location
     ]
 
-# DNA Risk options (from filtered data)
-risk_options = ["Low", "Medium", "High", "Very High"]
-available_risks = [
-    r for r in risk_options if r in filtered_data["Risk"].unique()
-]
-selected_dna_risk = st.sidebar.selectbox(
-    "Select DNA Risk", options=["All"] + available_risks
-)
-
-if selected_dna_risk != "All":
-    filtered_data = filtered_data[filtered_data["Risk"] == selected_dna_risk]
-
-
-# --- NEW: Filter for Confidence Level ---
-confidence_options = ["Low", "Medium", "High", "Very High"]
-available_confidences = [
-    c for c in confidence_options if c in filtered_data["Confidence"].unique()
-]
-selected_confidence = st.sidebar.selectbox(
-    "Select Confidence Level", options=["All"] + available_confidences
-)
-
-if selected_confidence != "All":
-    filtered_data = filtered_data[
-        filtered_data["Confidence"] == selected_confidence
-    ]
-# --- END of new filter ---
-
 if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
     st.info("No appointments match the selected filters.")
     st.stop()
@@ -350,6 +330,51 @@ if isinstance(selected_date, (tuple, list)) and len(selected_date) == 2:
             <= pd.to_datetime(end_date)
         )
     ]
+
+st.sidebar.divider()
+st.sidebar.subheader("Model forecast")
+
+# DNA Risk options (from filtered data)
+risk_options = ["Low", "Medium", "High", "Very High"]
+available_risks = [
+    r for r in risk_options if r in filtered_data["Risk"].unique()
+]
+selected_dna_risk = st.sidebar.selectbox(
+    "Select DNA Risk",
+    options=["All"] + available_risks,
+    # Bands from DNA_Risk()
+    help="The model's predicted risk that the patient won't attend.  \n"
+    "**Low:** under 15%  \n**Medium:** 15% to 50%  \n**High:** 50% to 80%  \n"
+    "**Very High:** 80% or more",
+)
+
+if selected_dna_risk != "All":
+    filtered_data = filtered_data[filtered_data["Risk"] == selected_dna_risk]
+
+
+# --- NEW: Filter for Confidence Level ---
+confidence_options = ["Low", "Medium", "High", "Very High"]
+available_confidences = [
+    c for c in confidence_options if c in filtered_data["Confidence"].unique()
+]
+selected_confidence = st.sidebar.selectbox(
+    "Select Confidence Level",
+    options=["All"] + available_confidences,
+    # Bands from Confidence_Score_Txt()
+    help="How clear-cut the model's yes-or-no call is: the gap between its chance that the "
+    "patient won't attend and its chance that they will. It follows from the risk.  \n"
+    "**Low:** under 50% (risk 25% to 75%)  \n"
+    "**Medium:** 50% to 80% (risk 10% to 25% or 75% to 90%)  \n"
+    "**High:** 80% to 90% (risk 5% to 10% or 90% to 95%)  \n"
+    "**Very High:** 90% or more (risk under 5% or over 95%)",
+)
+
+if selected_confidence != "All":
+    filtered_data = filtered_data[
+        filtered_data["Confidence"] == selected_confidence
+    ]
+# --- END of new filter ---
+
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
     st.stop()
@@ -379,6 +404,21 @@ filter_key = hashlib.md5(
 with tab_appts:
     demo_notice()
 
+    st.markdown(
+        "**This app helps outpatient teams see which upcoming appointments patients are most "
+        "likely to miss** (a DNA, or 'did not attend'), so they can plan where reminder calls or "
+        "other support might help most. A machine-learning model, trained on past appointments, "
+        "gives each one a predicted risk of not attending and a confidence score. The forecasts "
+        "are estimates to support staff judgement, not decisions.\n\n"
+        "**Confidence** is how clear-cut the model's yes-or-no call is: the gap between its chance "
+        "that the patient won't attend and its chance that they will. A 90% risk (90% against 10%) "
+        "gives 80% confidence; a 50% risk gives 0%, where the model could go either way. So "
+        "confidence follows from the risk: it is Low for any risk between 25% and 75%, and high "
+        "for very low risks as well as very high ones.\n\n"
+        "This tab lists the upcoming appointments with the model's forecast for each, and explains "
+        "what lies behind any one forecast."
+    )
+
     # Summary of the filtered appointments
     with st.container(horizontal=True):
         st.metric(
@@ -402,7 +442,8 @@ with tab_appts:
 
     st.info(
         "**Click a row in the table** to see what made the model give that "
-        "appointment its risk of not attending. The coloured columns are the model's forecast.",
+        "appointment its risk of not attending. Until you do, the chart below shows what the "
+        "model relies on most. The coloured columns are the model's forecast.",
         icon=":material/touch_app:",
     )
 
@@ -474,12 +515,88 @@ with tab_appts:
             f"necessarily change whether the patient attends. The model is reasonably but not "
             f"perfectly accurate (AUC {meta['auc_test']:.2f} on past appointments it hadn't seen)."
         )
+    else:
+        # No row selected: what the model relies on across all upcoming appointments, and,
+        # when the sidebar filters narrow the table enough, for the filtered ones beside it
+        meta = load_model_meta()
+        shap_all = load_shap()
+        n = len(filtered_data)
+        is_filtered = n < len(data)
+        # Not for the forecast filters: they pick appointments by the very pushes being
+        # charted (Very High risk = big pushes up), so the comparison would be circular
+        forecast_filtered = selected_dna_risk != "All" or selected_confidence != "All"
+        show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
+
+        st.subheader("What the model relies on most")
+        st.markdown(
+            "Each bar shows how much a factor moves an appointment's predicted risk of not "
+            "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
+            "the model relies on that factor more. Hover over a bar for the figure."
+        )
+        st.plotly_chart(
+            charts.importance_bars(
+                explain.group_importance(shap_all.loc[data["row_id"]]),
+                f"All {len(data):,} upcoming appointments",
+                explain.group_importance(shap_all.loc[filtered_data["row_id"]]) if show_filtered else None,
+                f"The {n:,} appointments in your filters",
+            ),
+            key=f"importance_{filter_key}",
+            width="stretch",
+            config={"displayModeBar": False},
+        )
+
+        if show_filtered:
+            notes = [
+                (
+                    f"On average the model predicts a **{filtered_data['DNA_Prob_Forecast'].mean():.0%}** "
+                    "risk of not attending for the appointments in your filters, compared with "
+                    f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
+                )
+            ]
+            same_value = [
+                label
+                for label, choice in [
+                    ("site", selected_reporting_site),
+                    ("specialty", selected_specialty),
+                    ("appointment type", selected_appointment_type),
+                ]
+                if choice != "All"
+            ]
+            if same_value:
+                listed = " and ".join(same_value)
+                notes.append(
+                    f"Every appointment in your filters has the same {listed}, so "
+                    f"{'that bar shows' if len(same_value) == 1 else 'those bars show'} how much "
+                    f"that one {listed} moves the risk."
+                )
+            st.markdown("\n".join(f"- {note}" for note in notes))
+        elif forecast_filtered:
+            st.caption(
+                "No chart for your filters while a Model forecast filter (DNA Risk or Confidence) "
+                "is set: those filters pick appointments by the forecast this chart explains, so "
+                "the comparison would go round in circles."
+            )
+        elif is_filtered:
+            st.caption(
+                f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
+                f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
+            )
+        st.info(
+            "These bars show what the model relied on, not what causes missed appointments: "
+            "changing one of these facts would not necessarily change whether a patient attends. "
+            f"The model is reasonably but not perfectly accurate (AUC {meta['auc_test']:.2f} on "
+            "past appointments it hadn't seen)."
+        )
 
 # ---------------------------------------------------------------- tab 2
 with tab_weekly:
     demo_notice()
 
     st.subheader("Weekly Forecast Summary")
+    st.markdown(
+        "How many of the upcoming appointments are forecast to be missed, by week and day, so you "
+        "can see which weeks and days to focus on."
+    )
 
     measure = st.segmented_control(
         "Count as a missed appointment",
@@ -656,9 +773,10 @@ with tab_calls:
 
     st.subheader("Who would we phone?")
     st.markdown(
+        "This tab helps weigh up how many reminder calls to make, and who should get them. "
         "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
         "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
-        "calls the team can make**, or by **how high the predicted risk and confidence must be**."
+        "calls the team can make**, or by **how high the predicted risk must be**."
     )
     st.info(
         "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
@@ -674,7 +792,7 @@ with tab_calls:
 
     mode = st.segmented_control(
         "Choose who to phone by",
-        ["Calls the team can make", "Predicted risk and confidence"],
+        ["Calls the team can make", "Predicted risk"],
         default="Calls the team can make",
         key="call_mode",
     ) or "Calls the team can make"
@@ -708,44 +826,27 @@ with tab_calls:
             "who would have come anyway. **Move the slider and watch it change.**"
         )
     else:
-        c1, c2 = st.columns(2, gap="large")
-        with c1:
-            use_risk = st.toggle("Use predicted risk", value=True, key="use_risk")
-            risk_min = st.slider(
-                "Phone if the predicted risk is at least",
-                0,
-                100,
-                70,
-                step=5,
-                format="%d%%",
-                key="risk_min",
-                disabled=not use_risk,
-            )
-        with c2:
-            use_conf = st.toggle("Use confidence", value=True, key="use_conf")
-            conf_min = st.slider(
-                "...and the confidence is at least",
-                50,
-                99,
-                70,
-                step=1,
-                format="%d%%",
-                key="conf_min",
-                disabled=not use_conf,
-            )
-        risk_min = risk_min / 100 if use_risk else None
-        conf_min = conf_min / 100 if use_conf else None
-        called = calls.called_by_threshold(p_past, past["Confidence_Score"], risk_min, conf_min)
+        # Risk only: confidence is |2 x risk - 1|, so it adds nothing a risk bar doesn't, and
+        # on its own it would also pick the patients the model is confident will attend.
+        risk_min = st.slider(
+            "Phone if the predicted risk is at least",
+            0,
+            100,
+            85,
+            step=5,
+            format="%d%%",
+            key="risk_min",
+        ) / 100
+        called = calls.called_by_threshold(p_past, risk_min)
         upcoming_called = pd.Series(
-            calls.called_by_threshold(
-                filtered_data["DNA_Prob_Forecast"], filtered_data["Confidence_Score"], risk_min, conf_min
-            ),
+            calls.called_by_threshold(filtered_data["DNA_Prob_Forecast"], risk_min),
             index=filtered_data.index,
         )
         how = (
             "**Here you set the bar, and the number of calls follows from it.** A lower bar means more calls, "
-            "and more of them are to people who would have come anyway. 70% and 70% match the app's "
-            "existing high-risk flag."
+            "and more of them are to people who would have come anyway. 85% matches the app's existing "
+            "high-risk flag (risk over 70% and confidence over 70%): confidence follows from the risk, so "
+            "together they mean a risk over 85%."
         )
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)

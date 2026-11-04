@@ -75,6 +75,16 @@ section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] {
 	margin-bottom: 0.35rem;
 }
 
+/* The sidebar title ("Filters") in the display font, like the app title, so it stands
+	apart from the section subtitles below it. */
+section[data-testid="stSidebar"] h2 {
+	font-family: "HSMA Display", sans-serif;
+	font-size: 2rem;
+	letter-spacing: 0.05em;
+	font-size-adjust: none;
+	padding-bottom: 0;
+}
+
 /* Less space above the section subtitles. */
 section[data-testid="stSidebar"] h3 {
 	padding-top: 0;

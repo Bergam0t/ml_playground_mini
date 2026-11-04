@@ -11,11 +11,15 @@ streamlit run streamlit_app.py
 
 ## What's in the app
 
-- **Appointments** tab: the filterable appointment list. Click a row to see a SHAP waterfall
-  explaining that appointment's predicted risk of not attending, with a "How to read this chart" guide.
+- **Appointments** tab: a short introduction to the app, then the filterable appointment list.
+  Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
+  attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
+  what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
+  chart beside it for the filtered appointments when the appointment-detail filters leave at
+  least 30 (not shown for the DNA Risk and Confidence filters, which select by the forecast).
 - **Weekly summary** tab: appointments and forecast DNAs by week and day.
 - **Who would we phone?** tab: choose who an admin team would phone, by the number of calls
-  the team can make each week or by minimum predicted risk and confidence. A 1,000-marker chart
+  the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
   reach someone who then did not attend, and how many such patients would get no call. An
   assumed-effect slider shows how many missed appointments the calls might avoid. We don't know
@@ -40,7 +44,9 @@ lambda_ml_streamlit_exercise:
 1. `demo_data.generate_appointments()` makes up past appointments with a hidden "true" chance of not attending,
    and draws whether each patient attended.
 2. An XGBoost model is trained on those past appointments.
-3. The model scores 3,200 future appointments.
+3. The model scores 3,200 future appointments. Their confidence score is worked out as in the
+   live pipeline (WX-BIU/Outpatient-DNAs, `src/forecast/Outpatient_Forecast.py`): the top class
+   probability minus the second, which for a yes/no model is |2 × risk − 1|.
 4. `shap.TreeExplainer` explains each prediction on the probability scale.
 
 Dates are not stored. `demo_data.load_forecast()` dates the appointments from next Monday onwards,

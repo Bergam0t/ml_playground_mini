@@ -9,6 +9,7 @@ Red and blue are the dataviz skill's dark-mode diverging poles, validated agains
 app background (#1b1a1a). The +/- value labels mean colour is never the only cue.
 """
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 from calls import GROUPS
 
@@ -77,6 +78,47 @@ def waterfall(expl: dict) -> go.Figure:
             range=[min(0, min(running)), x_max],
         ),
     )
+
+
+FILTERED = "#1fb1b9"  # the theme's primary colour; no direction, so not red or blue
+
+
+def importance_bars(overall: list, overall_title: str, filtered: list | None = None, filtered_title: str = "") -> go.Figure:
+    """Mean |SHAP| per factor (lists from explain.group_importance), with no numbers on show.
+
+    With `filtered`, a second panel sits to the right on the same scale and in the overall
+    chart's order, with the factor names shown once, so bar lengths compare row by row. The
+    exact figures stay in the hover. No direction, so neutral colours rather than red or blue.
+    """
+    labels = [i["label"] for i in overall]
+    panels = [(overall, overall_title, TOTAL)]
+    if filtered is not None:
+        by_label = {i["label"]: i["value"] for i in filtered}
+        panels.append(([{"label": l, "value": by_label[l]} for l in labels], filtered_title, FILTERED))
+    fig = make_subplots(
+        rows=1, cols=len(panels), shared_yaxes=True, horizontal_spacing=0.04,
+        subplot_titles=[title for _, title, _ in panels],
+    )
+    for col, (items, _, colour) in enumerate(panels, start=1):
+        fig.add_trace(
+            go.Bar(
+                orientation="h",
+                y=labels,
+                x=[i["value"] for i in items],
+                marker=dict(color=colour),
+                hovertemplate="%{y}: moves the risk by %{x:.1f} percentage points on average<extra></extra>",
+            ),
+            row=1,
+            col=col,
+        )
+    x_max = max(i["value"] for items, _, _ in panels for i in items) * 1.05
+    fig.update_xaxes(range=[0, x_max], showticklabels=False, showgrid=False, zeroline=False, fixedrange=True)
+    fig.update_yaxes(fixedrange=True)
+    _layout(fig, 100 + 40 * len(labels), margin=dict(l=0, r=10, t=40, b=10))
+    # Panel titles left-aligned over their own panel
+    for ann, axis in zip(fig.layout.annotations, ["xaxis", "xaxis2"]):
+        ann.update(x=fig.layout[axis].domain[0], xanchor="left", font=dict(size=15, color=TEXT))
+    return fig
 
 
 # Made-up example for the "How to read this chart" box: average 30%, three factors, 47%

@@ -41,10 +41,12 @@ FORECAST_COLUMNS = [
 ]
 
 
-def confidence_score(p, rng):
-    """Synthetic stand-in for the live model's confidence score: how far the risk is
-    from a coin toss, plus a little noise."""
-    return np.clip(np.maximum(p, 1 - p) + rng.normal(0, 0.05, len(p)), 0.5, 0.99).round(3)
+def confidence_score(p):
+    """The live model's Confidence_Score, as in WX-BIU/Outpatient-DNAs
+    (src/forecast/Outpatient_Forecast.py): the top class probability minus the second. With
+    two classes, not attending (p) and attending (1 - p), that is |2p - 1|: 0 at a 50% risk,
+    1 at 0% or 100%. A function of the risk alone, so the same risk gets the same confidence."""
+    return np.abs(2 * p - 1).round(3)
 
 
 def build_matrix(df):
@@ -83,15 +85,15 @@ def main():
     assert list(Xf.columns) == list(X.columns)
     p = model.predict_proba(Xf)[:, 1]
     fut["DNA_Prob_Forecast"] = p.round(4)
-    fut["Confidence_Score"] = confidence_score(p, rng)
+    fut["Confidence_Score"] = confidence_score(p)
     fut["DNA_Forecast"] = (p >= 0.5).astype(int)
 
     # ---- Past appointments the model didn't train on, with what really happened, for the
-    # "Who would we phone?" tab. Own rng, so the forecast above never changes because of it.
+    # "Who would we phone?" tab
     p_past = model.predict_proba(X.loc[idx_test])[:, 1]
     past = pd.DataFrame({
         "DNA_Prob_Forecast": p_past.round(4),
-        "Confidence_Score": confidence_score(p_past, np.random.default_rng(SEED + 1)),
+        "Confidence_Score": confidence_score(p_past),
         "Did_Not_Attend": y[idx_test].to_numpy(),
     })
 

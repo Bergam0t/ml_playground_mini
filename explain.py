@@ -41,3 +41,14 @@ def patient_explanation(row: pd.Series, shap_row: pd.Series, base_pp: float, top
         "other": other,
         "all": items,
     }
+
+
+def group_importance(shap_rows: pd.DataFrame) -> list:
+    """Each factor's mean |SHAP| in percentage points across many appointments, biggest first.
+
+    How far the factor moves an appointment's predicted risk on average, in either direction.
+    (The signed mean would let pushes up and down cancel out.)
+    """
+    items = [{"label": label, "value": float(shap_rows[k].abs().mean())} for k, label in FEATURES.items()]
+    items.sort(key=lambda i: i["value"], reverse=True)
+    return items

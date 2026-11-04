@@ -36,7 +36,7 @@ MEASURES = {
         rate_phrase="{rate} of appointments are high-risk flagged",
         thresholds=(0.08, 0.20),
         flag=True,
-        help="Predicted risk over 70% and confidence over 70%.",
+        help="Predicted risk over 70% and confidence over 70%, which together mean a risk over 85%.",
         repeat_label="Patients flagged more than once",
     ),
     "Forecast DNAs": Measure(
