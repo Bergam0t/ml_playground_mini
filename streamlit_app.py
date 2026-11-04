@@ -105,6 +105,32 @@ def Confidence_Score_Txt(confidence):
         return "Very High"
 
 
+# Cell colours for the model's forecast columns on the appointments table. Dark shades
+# with white text so they read on the dark theme; the patient columns stay uncoloured.
+EXPECTED_DNA_COLOURS = {"Yes": "#8b1e2d", "No": "#1e5631"}
+# Confidence is neither good nor bad, so it uses a single-hue teal ramp, not red/green
+CONFIDENCE_COLOURS = {
+    "Low": "#1c3436", "Medium": "#164f53", "High": "#0f6a70", "Very High": "#07858d",
+}
+RISK_COLOURS = {
+    "Low": "#1e5631", "Medium": "#7a6a12", "High": "#9a4a12", "Very High": "#8b1e2d",
+}
+
+
+def forecast_cell_styles(df):
+    """CSS for each cell of the appointments table: only the forecast columns are coloured."""
+
+    def css(colour):
+        return f"background-color: {colour}; color: #ffffff;"
+
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    styles["Expected DNA"] = df["Expected DNA"].map(EXPECTED_DNA_COLOURS).map(css)
+    styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
+    # Same bands as the sidebar's "DNA Risk" filter
+    styles["Probabilty"] = (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
+    return styles
+
+
 def High_Risk_DNA(prob, conf):
     if prob > 0.8 and conf > 0.8:
         return 1
@@ -270,15 +296,26 @@ filtered_data["DNA_Forecast_Text"] = filtered_data["DNA_Forecast"].replace(
 with tab_appts:
     demo_notice()
 
-    # Display filtered data
-    st.write(
-        "Filtered Data Count:",
-        len(filtered_data),
-        "      |       Forecasted DNAs:",
-        sum(filtered_data["DNA_Forecast"]),
-        "      |       DNA Rate - (High Confidence & High Risk) %:",
-        round(sum(filtered_data["High_Risk_DNA"]) / len(filtered_data) * 100, 2),
-    )
+    # Summary of the filtered appointments
+    with st.container(horizontal=True):
+        st.metric(
+            "Appointments (filtered)",
+            f"{len(filtered_data):,}",
+            icon=":material/calendar_month:",
+            border=True,
+        )
+        st.metric(
+            "Forecast DNAs",
+            f"{int(filtered_data['DNA_Forecast'].sum()):,}",
+            icon=":material/event_busy:",
+            border=True,
+        )
+        st.metric(
+            "DNA rate (high confidence & high risk)",
+            f"{filtered_data['High_Risk_DNA'].mean() * 100:.1f}%",
+            icon=":material/warning:",
+            border=True,
+        )
 
     # Fields to display
     fields_to_display = [
@@ -307,7 +344,11 @@ with tab_appts:
         }
     )
 
-    st.caption("Click a row to see why the model gave that appointment its risk.")
+    st.info(
+        "**Click a row in the table** to see what made the model give that "
+        "appointment its risk of not attending. The coloured columns are the model's forecast.",
+        icon=":material/touch_app:",
+    )
 
     # A new key whenever the filters change, so an old selection never points at
     # a different appointment in the newly filtered table.
@@ -326,26 +367,38 @@ with tab_appts:
     ).hexdigest()[:10]
 
     # Display filtered data
+    # Fixed column widths (about 1,110px in total) so the whole table fits a 1,400px
+    # main area; the grid stretches them to fill any space left over.
     table = st.dataframe(
-        filtered_data_renamed,
+        filtered_data_renamed.style.apply(forecast_cell_styles, axis=None),
         column_config={
             "Appointment Date": st.column_config.DateColumn(
-                "Appointment Date",
-                format="DD/MM/YYYY",
+                "Appointment Date", format="DD/MM/YYYY", width=110
             ),
-            "Patient ID": st.column_config.TextColumn(),
-            "Mobile Number": st.column_config.TextColumn(),
+            "Patient ID": st.column_config.TextColumn(width=95),
+            "Mobile Number": st.column_config.TextColumn(width=120),
             #'Mobile Number (GP Record)': st.column_config.TextColumn(),
-            "Specialty": st.column_config.TextColumn(),
-            "Location": st.column_config.TextColumn(),
-            "Appointment Type": st.column_config.TextColumn(),
-            "Expected DNA": st.column_config.TextColumn(),
-            "Confidence": st.column_config.TextColumn(),
+            "Specialty": st.column_config.TextColumn(width=165),
+            "Location": st.column_config.TextColumn(width=175),
+            "Appointment Type": st.column_config.TextColumn(width=130),
+            "Expected DNA": st.column_config.TextColumn(
+                width=115,
+                help="Model forecast: will the patient miss this appointment? Red Yes, green No.",
+            ),
+            "Confidence": st.column_config.TextColumn(
+                width=105,
+                help="Model forecast: how sure the model is. Darker teal is less sure.",
+            ),
             "Probabilty": st.column_config.NumberColumn(
-                "DNA Risk", format="%.2f%%", help="Probability of DNA"
+                "DNA Risk",
+                format="%.2f%%",
+                width=95,
+                help="Model forecast: probability of DNA. Colour shows the risk band, "
+                "green Low to red Very High.",
             ),
         },
         hide_index=True,
+        alt="Upcoming appointments with the forecast risk of not attending",
         on_select="rerun",
         selection_mode="single-row",
         key=f"appointments_{filter_key}",
@@ -353,13 +406,7 @@ with tab_appts:
 
     # Selected positions refer to the rows as passed in, whatever sorting the user applies
     selected_rows = [r for r in table.selection.rows if r < len(filtered_data)]
-    if not selected_rows:
-        st.info(
-            "**Click a row in the table** to see what made the model give that "
-            "appointment its risk of not attending.",
-            icon=":material/touch_app:",
-        )
-    else:
+    if selected_rows:
         row = filtered_data.iloc[selected_rows[0]]
         meta = load_model_meta()
         expl = explain.patient_explanation(
