@@ -34,6 +34,26 @@ The Appointments and Weekly summary tabs also show the expected cost of missed a
 The sidebar filters apply to the first two tabs. On the third they change only the upcoming
 calls-per-week figures, since the chart uses past appointments.
 
+## Screen size
+
+The page names in the top bar show as three buttons when there is room. When the bar is narrower
+than about 1100px, they become a dropdown instead. The sidebar takes 22rem (396px), so with it open
+the browser window needs to be about 1570px wide for the buttons (about 1170px with it shut).
+
+Windows display scaling reduces the width the browser sees. On a 1920x1080 screen, 100% scaling gives
+1920px (buttons), 125% gives 1536px and 150% gives 1280px (both get the dropdown). To get the buttons
+back, set scaling to 100% or zoom the browser out (Ctrl and minus; 90% at 125% scaling gives about
+1700px). Everything still works with the dropdown; it just takes one more click to change page.
+
+Below 1300px wide, some side-by-side rows wrap onto more lines (the keyed `reflow_*` containers in
+`streamlit_app.py`, styled at the end of `style.css`). On phones the sidebar opens over the page and
+can be shut and reopened with the arrows at the top left.
+
+Streamlit is pinned to 1.66.1 in `requirements.txt`, because `style.css` and `mobile_nav.py` depend on
+Streamlit's internal markup (`stToolbar`, `data-collapsed`, `stLayoutWrapper`, the tab bar), which can
+change in any release. After upgrading, re-check the sidebar's reopen button, the top bar and the page
+dropdown at desktop and phone widths.
+
 ## Cost assumptions
 
 The sidebar's **Cost assumptions** section holds editable defaults, set in `costs.py`:
