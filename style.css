@@ -149,6 +149,56 @@ section[data-testid="stSidebar"] hr {
 	[role="tablist"]:not([data-testid="stTabPanel"] *) {
 	padding-left: 2rem;
 }
+
+/* ---- The way on from "Your rule vs the model" ---- */
+/* Ported from the geographic mini's next-step boxes: a lightly outlined box, split in two
+	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or
+	above the second when they stack below 1300px. Both halves are full height with the
+	buttons pinned to the bottom, so the buttons line up if one heading wraps. */
+.st-key-game_next {
+	padding: 1.25rem 1.5rem;
+	border: 2px solid rgba(31, 177, 185, 0.55);
+	border-radius: 0.75rem;
+	background-color: rgba(31, 177, 185, 0.06);
+}
+.st-key-game_next h3 {
+	padding-top: 0;
+}
+.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
+	border-left: 1px solid rgba(31, 177, 185, 0.35);
+	padding-left: 2rem;
+}
+.st-key-reflow_stack_game_next [data-testid="stHorizontalBlock"] { align-items: stretch; }
+.st-key-reflow_stack_game_next [data-testid="stColumn"] { display: flex; flex-direction: column; }
+.st-key-reflow_stack_game_next [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
+.st-key-to_appts,
+.st-key-to_calls {
+	margin: auto 0 0;
+}
+.st-key-to_appts button,
+.st-key-to_calls button {
+	min-height: 3.5rem;
+	padding: 0 1.5rem;
+}
+.st-key-to_appts button p,
+.st-key-to_calls button p {
+	font-family: "HSMA Display", sans-serif;
+	font-size: 1.1rem;
+	letter-spacing: 0.05em;
+}
+@media (max-width: 1299.98px) {
+	.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
+		border-left: none;
+		padding-left: 0;
+		border-top: 1px solid rgba(31, 177, 185, 0.35);
+		padding-top: 1.25rem;
+	}
+}
+@media (max-width: 767.98px) {
+	.st-key-game_next {
+		padding: 1rem;
+	}
+}
 [data-testid="stSidebarLogo"],
 [data-testid="stSidebar"] img.stLogo {
 	height: 11rem !important;

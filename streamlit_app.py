@@ -259,6 +259,13 @@ def intro_columns(key, notice=demo_notice_full):
     return left
 
 
+def go_to_tab(label):
+    """Switch tab from a button; the new tab would otherwise open at the old scroll position.
+    Ported from the geographic playground mini."""
+    st.session_state.page = label
+    st.session_state.scroll_to_top = True
+
+
 def call_blocks(outcomes, key, height):
     """The Your rule vs the model tab's two blocks of past appointments, phoned (10 wide) and
     not phoned (30 wide), side by side, or one above the other on narrower screens. The phoned
@@ -282,9 +289,9 @@ def call_blocks(outcomes, key, height):
 # is drawn at the left of that bar by style.css.
 # Dropdown in place of the tab pills on narrower screens (shown by style.css)
 add_mobile_nav()
-tab_game, tab_appts, tab_weekly, tab_calls = st.tabs(
-    ["Your rule vs the model", "Appointments", "Weekly summary", "Who would we phone?"]
-)
+# Keyed and rerun on change, so buttons can switch tab (go_to_tab), as in the geographic mini
+TAB_LABELS = ["Your rule vs the model", "Appointments", "Weekly summary", "Who would we phone?"]
+tab_game, tab_appts, tab_weekly, tab_calls = st.tabs(TAB_LABELS, key="page", on_change="rerun")
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
 # Load data
@@ -1541,6 +1548,44 @@ with tab_game:
     elif st.session_state.get("game_trained") and best:
         draw_model(len(frames) - 1, "done", best)
 
+    # ---- Why a computer? (like the geographic mini's "Why computers?", after the animation)
+    if st.session_state.get("game_trained") and best:
+        st.markdown("#### Why a computer?")
+        n_clues = len(rule_game.CLUES)
+        w1, w2, w3 = st.container(key="reflow_halves_game_why").columns(3, gap="small")
+        w1.metric(
+            f"Rules you can make with the {n_clues} buttons",
+            f"{2 ** n_clues - 1:,}",
+            border=True,
+            height="stretch",
+            help="Every combination of one or more clues, each with an equal say.",
+        )
+        w2.metric(
+            f"Ways to give {n_clues} clues 0 to 10 points each",
+            f"{11 ** n_clues:,}",
+            border=True,
+            height="stretch",
+            help="The model doesn't try these one by one: it works out the best points straight from the "
+            "past appointments.",
+        )
+        w3.metric(
+            "Past appointments the model learnt from",
+            f"{learning['n_train']:,}",
+            border=True,
+            height="stretch",
+        )
+        st.markdown(
+            "- **It weighs many clues at once.** Most of us can juggle two or three. A model weighs all "
+            f"{n_clues} for every patient, the same way every time.\n"
+            "- **It learns how much each clue counts, and which way it points,** from what really happened, "
+            "not from a hunch.\n"
+            "- **Some models can also spot clues that only matter in combination,** like a long wait "
+            "mattering more for new patients than for follow-ups.\n"
+            "- **But it only knows what's in the data.** It can't see a new job or a bus strike, and it "
+            "learns past patterns, unfair ones included. That's why its forecasts support staff judgement "
+            "rather than replace it."
+        )
+
     # ---- 3. The verdict
     if st.session_state.get("game_trained") and best:
         st.markdown("#### 3. See whose list did best")
@@ -1549,8 +1594,8 @@ with tab_game:
         if at is not None:
             st.success(
                 f"**The model overtook your best rule after learning from {at:,} past appointments.** "
-                f"With all {learning['n_train']:,}, its list would have reached {final['outcomes']['called_dna']} of the "
-                f"{n_missed} missed appointments, against your {best['outcomes']['called_dna']}.",
+                f"With all {learning['n_train']:,}, its list would have reached {final['outcomes']['called_dna']} "
+                f"of the {n_missed} missed appointments, against your {best['outcomes']['called_dna']}.",
                 icon=":material/emoji_events:",
             )
         else:
@@ -1581,27 +1626,59 @@ with tab_game:
         say = final["say"]
         top_two = say_order[:2]
         st.markdown(
-            "**Why did the model win?** It weighs all eight clues at once, and it learnt how much each "
-            "should count from what happened at past appointments. Your rule gave each of its clues an equal "
-            f"say. The model gives *{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of "
-            f"the say and *{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest "
-            "less. With only a few hundred appointments to learn from it did worse than you: it had to work "
-            "out which way each clue points, too.\n\n"
+            "**Why did the model win here?** Your rule gave each of its clues an equal say. The model gives "
+            f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of the say and "
+            f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. With only "
+            "a few hundred appointments to learn from it did worse than you: it had to work out which way "
+            "each clue points, too.\n\n"
             f"**Accuracy is the wrong score.** Phoning nobody is the most accurate rule in the table "
             f"({none['accuracy']:.0%}), because most patients attend, so \"everyone will come\" is usually "
             "right. It just puts nobody on the call list. What matters is how many of the people who missed "
             "are on the list, and how many places on it go to people who attended.\n\n"
             f"**Nobody gets them all.** Even a perfect model, which knew each patient's true chance of "
             f"missing, would have put only {perfect['outcomes']['called_dna']} of the {n_missed} on its "
-            "list. Many missed "
-            "appointments come down to things no data records."
+            "list. Many missed appointments come down to things no data records."
         )
         st.caption(
             "The model here is the simplest kind (logistic regression). The one on the other tabs is a "
             f"more complex kind (XGBoost); on these appointments its list would have reached "
             f"{learning['app_model']['outcomes']['called_dna']} of {n_missed} too."
         )
-        st.markdown(
-            "**Next:** see what the model says about upcoming appointments on the **Appointments** tab, and "
-            "weigh up how many calls to make on **Who would we phone?**"
+
+    # ---- The way on: styled like the geographic mini's next-step boxes (style.css)
+    st.divider()
+    with st.container(key="game_next"):
+        onward, plan = st.container(key="reflow_stack_game_next").columns(2, gap="large")
+        onward.markdown(
+            "### See the model at work\n"
+            "The tool this demo is based on gives every upcoming appointment a predicted risk. See which "
+            "ones it flags, and what it relied on."
         )
+        onward.button(
+            "See upcoming appointments",
+            key="to_appts",
+            on_click=go_to_tab,
+            args=(TAB_LABELS[1],),
+            icon=":material/arrow_forward:",
+            type="primary",
+        )
+        plan.markdown(
+            "### Or plan the calls\n"
+            "How many calls should the team make, and would they be worth the staff time?"
+        )
+        plan.button(
+            "Plan the calls",
+            key="to_calls",
+            on_click=go_to_tab,
+            args=(TAB_LABELS[3],),
+            icon=":material/arrow_forward:",
+        )
+
+# After a next-tab button, open the new tab at the top (from the geographic mini)
+if st.session_state.pop("scroll_to_top", False):
+    st.html(
+        "<script>setTimeout(function () {"
+        "var m = document.querySelector('[data-testid=\"stMain\"]'); if (m) m.scrollTo(0, 0);"
+        "window.scrollTo(0, 0);}, 100);</script>",
+        unsafe_allow_javascript=True,
+    )

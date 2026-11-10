@@ -17,8 +17,14 @@ streamlit run streamlit_app.py
     to phone from the eight clues the model sees, with each chosen clue getting an equal say.
   - They then watch a model learn its own weighting from 0 to 22,500 past appointments,
     overtaking their rule after a few hundred.
+  - A "Why a computer?" section follows: how many rules and weightings there are to choose
+    from, and what a model can and can't do. It mentions in general terms that some models
+    find clues that only matter in combination. The demo data has none (see the build notes
+    below).
   - It ends with a table where "phone nobody" has the best accuracy and reaches nobody, and a
     perfect model reaches only 42 of 79.
+  - Two buttons lead on to the Appointments and Who would we phone? tabs, as in the
+    geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
 - **Appointments** tab: a short introduction to the app, then the filterable appointment list.
   Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
   attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
