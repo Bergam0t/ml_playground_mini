@@ -1388,7 +1388,7 @@ with tab_game:
     n_calls = round(rule_game.CALL_SHARE * 1000)
 
     with intro_columns("intro_game", notice=demo_notice_synthetic):
-        st.subheader("Can you beat the model?")
+        st.subheader("Can you beat a computer?")
         st.markdown(
             f"A clinic team has time for **{n_calls} reminder calls** for every 1,000 appointments. They "
             "need a <span class=\"highlight\">rule for putting the call list in order, so the people "
@@ -1397,23 +1397,46 @@ with tab_game:
             "that rule.",
             unsafe_allow_html=True,
         )
-        # How the rules are tested, in three small boxes (stacked on narrower screens, style.css)
-        fact1, fact2, fact3 = st.container(key="reflow_stack_game_facts").columns(3, gap="small")
-        fact1.container(border=True, height="stretch").markdown(
-            "We've got **1,000 past appointments** where no reminder calls were made, and we know "
-            "whether people missed them."
-        )
-        fact2.container(border=True, height="stretch").markdown(
-            f"In these 1,000 past appointments, **{n_missed} people missed** their appointment."
-        )
-        fact3.container(border=True, height="stretch").markdown(
-            f"So we can ask of any rule: if it had made the call list back then, how many of those "
-            f"**{n_missed}** would have been on it?"
-        )
+
+    # How the rules are tested, in three small boxes across the full page width (stacked on
+    # narrower screens, style.css). The icons are Font Awesome, loaded in style.css.
+    fact1, fact2, fact3 = st.container(key="reflow_stack_game_facts").columns(3, gap="small")
+    for column, icon, text in (
+        (
+            fact1,
+            "clock-rotate-left",
+            "We've got **1,000 past appointments** where no reminder calls were made.",
+        ),
+        (
+            fact2,
+            "user-xmark",
+            (
+                f"We know that in these 1,000 past appointments, **{n_missed} people missed** their "
+                "appointment."
+            ),
+        ),
+        (
+            fact3,
+            "list-check",
+            (
+                "So we can ask of any rule, made by a human or a computer:\n\n"
+                '<span class="game-fact-question">If it had made the call list back then, how many of '
+                f"those **{n_missed}** would have been on it?</span>"
+            ),
+        ),
+    ):
+        with column.container(border=True, height="stretch", key=f"game_fact_{icon}"):
+            st.markdown(f'<i class="fa-solid fa-{icon} game-fact-icon"></i>', unsafe_allow_html=True)
+            st.markdown(text, unsafe_allow_html=True)
 
     # ---- 1. The visitor's rule, between dividers so it reads as the thing to do first
     st.divider()
     st.markdown("#### 1. Make your rule")
+    st.markdown(
+        '<span class="highlight">What do you think matters when predicting whether someone won\'t '
+        "attend?</span>",
+        unsafe_allow_html=True,
+    )
     # A tinted box (style.css) rather than st.info, which can't carry the help tooltip
     with st.container(key="game_instruction"):
         st.markdown(
@@ -1424,7 +1447,7 @@ with tab_game:
                 "**How an equal say works.** Each clue gives every patient a score from 0 to 1, by where "
                 "they rank on that clue: 1 is the top of the ranking. Your rule adds up the scores for the "
                 "clues you picked, and the highest totals are phoned first.\n\n"
-                "**Example:** you pick *most missed appointments before* and *the youngest*.\n\n"
+                "**Example:** you pick *most missed appointments before* and *being younger*.\n\n"
                 "- **Patient A** has missed 3 appointments before; only 5% of patients have missed more, "
                 "so A scores 0.95. A is 70, younger than only about 16% of patients: 0.17. "
                 "**Total 1.12.**\n"

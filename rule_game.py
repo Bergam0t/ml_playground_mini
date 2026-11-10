@@ -20,12 +20,12 @@ CALL_SHARE = 0.10
 # the rule gives each an equal say, so the game is about how much each clue should count.
 CLUES = {
     "Previous_DNAs": "Most missed appointments before",
-    "Age": "The youngest",
-    "Lead_Time_Days": "Longest since booking",
+    "Age": "Being younger",
+    "Lead_Time_Days": "A longer time since booking",
     "Day_Of_Week": "Riskiest days of the week",
     "Deprivation_Decile": "Most deprived areas",
-    "Appointment Type": "New appointments",
-    "Specialty": "Specialties that miss most",
+    "Appointment Type": "First appointments, not follow ups",
+    "Specialty": "A speciality with a high miss rate",
     "Reporting_Site": "Sites that miss most",
 }
 # Short names for the say chart
