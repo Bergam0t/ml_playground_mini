@@ -219,6 +219,18 @@ def demo_notice():
     )
 
 
+def demo_notice_full():
+    """The fuller version of the notice, beside tab 1's opening text."""
+    st.warning(
+        "**DEMONSTRATION VERSION**\n\n"
+        "This is a demonstration of a real tool that is in active operational use by "
+        "outpatient teams. The real tool forecasts real upcoming appointments.\n\n"
+        "Here, all the data is synthetic and the model is trained on synthetic past "
+        "appointments. No real patients or Trust data are displayed.",
+        icon=":material/science:",
+    )
+
+
 # Streamlit app
 # The tabs come first so style.css can pin them to the top as a navbar; the app title
 # is drawn at the left of that bar by style.css.
@@ -478,61 +490,133 @@ filter_key = hashlib.md5(
 
 # ---------------------------------------------------------------- tab 1
 with tab_appts:
-    demo_notice()
 
-    st.markdown(
-        "**This app helps outpatient teams see which upcoming appointments patients are most "
-        "likely to miss** (a DNA, or 'did not attend'), so they can plan where reminder calls or "
-        "other support might help most. A machine-learning model, trained on past appointments, "
-        "gives each one a predicted risk of not attending and a confidence score. The forecasts "
-        "are estimates to support staff judgement, not decisions.\n\n"
-        "About 8% of appointments are missed, so most predicted risks are low. **The model "
-        "forecasts a DNA for a risk of 20% or more** (about two and a half times the average), and "
-        "**flags a risk of 40% or more as high risk**.\n\n"
-        "**Confidence** is how clear-cut the model's yes-or-no call is: the gap between its chance "
-        "that the patient won't attend and its chance that they will. A 90% risk (90% against 10%) "
-        "gives 80% confidence; a 50% risk gives 0%, where the model could go either way. So "
-        "confidence follows from the risk: it is Low for any risk between 25% and 75%, and high "
-        "for very low risks as well as very high ones. Most appointments here have high confidence, "
-        "because the model is fairly sure the patient will attend.\n\n"
-        "This tab lists the upcoming appointments with the model's forecast for each, and explains "
-        "what lies behind any one forecast."
-    )
+    # What really happened to past appointments the model did not train on
+    past = load_past()
+    past_dna_rate = past["Did_Not_Attend"].mean()
 
-    # Summary of the filtered appointments
-    with st.container(horizontal=True):
-        st.metric(
-            "Appointments (filtered)",
-            f"{len(filtered_data):,}",
-            icon=":material/calendar_month:",
-            border=True,
+    def catch_rates(threshold):
+        """Share of the missed appointments at or above this risk, and share of those that were missed."""
+        picked = past["DNA_Prob_Forecast"] >= threshold
+        missed = past["Did_Not_Attend"] == 1
+        return (picked & missed).sum() / missed.sum(), missed[picked].mean()
+
+    forecast_recall, forecast_precision = catch_rates(FORECAST_MIN)
+    high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
+
+    # Opening text beside the demonstration notice (stacked on narrower screens, see style.css)
+    intro_col, notice_col = st.container(key="reflow_stack_intro").columns([0.65, 0.35], gap="large")
+    with notice_col:
+        demo_notice_full()
+    with intro_col:
+        st.markdown(
+            f"""
+            ### Which appointments are patients most likely to miss?
+
+            A machine-learning model, trained on past appointments, gives each upcoming one a
+            predicted **risk of not attending** (a DNA, or 'did not attend') and a **confidence
+            score**, so outpatient teams can plan where reminder calls might help most. The
+            forecasts are <span class="highlight">estimates to support staff judgement, not
+            decisions</span>.
+
+            <div class="threshold-pills">
+            <span class="pill">About {past_dna_rate:.0%} of past appointments were missed</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
-        st.metric(
-            "Forecast DNAs",
-            f"{int(filtered_data['DNA_Forecast'].sum()):,}",
-            icon=":material/event_busy:",
-            border=True,
-            help=f"Appointments the model forecasts as a DNA: a predicted risk of {FORECAST_MIN:.0%} "
-            "or more (the 'Expected DNA' column). Not all of them will be missed, and some "
-            "lower-risk appointments will be.",
+        st.markdown(
+            f"That is the recorded outcome in {len(past):,} past appointments the model was tested on, "
+            "so most predicted risks are low."
         )
-        st.metric(
-            "High-risk flagged",
-            f"{filtered_data['High_Risk_DNA'].mean() * 100:.1f}%",
-            icon=":material/warning:",
-            border=True,
-            help=f"Share of appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
-            "(the Very High band).",
+        with st.expander("What does the confidence score mean?", icon=":material/help:"):
+            st.markdown(
+                "Confidence is how clear-cut the model's yes-or-no call is. A 90% risk gives 80% "
+                "confidence; a 50% risk gives 0%, because the model could go either way. So it is "
+                "**Low for any risk between 25% and 75%**, and high at both ends. Most appointments "
+                "here are high-confidence because the model is fairly sure the patient *will* attend."
+            )
+
+    # Summary of the filtered appointments. Every card is a bordered container holding a
+    # metric and a one-line caption, so the four are the same height; the 20%+ and 40%+
+    # pills sit above two of them, so the row is bottom-aligned to keep the boxes level.
+    n_filtered = len(filtered_data)
+
+    def pill(risk_band, threshold):
+        st.markdown(
+            f'<span class="pill" style="background-color:{RISK_COLOURS[risk_band]};color:#fff">'
+            f"{threshold:.0%}+ risk</span>",
+            unsafe_allow_html=True,
         )
-        st.metric(
-            "Expected cost of missed appointments",
-            f"£{costs.expected_dna_cost(filtered_data):,.0f}",
-            icon=":material/payments:",
-            border=True,
-            help="Each appointment's predicted risk of not attending times the cost of missing "
-            "it, added up. The costs are assumptions you can change under **Cost assumptions** "
-            "in the sidebar.",
-        )
+
+    def share_of_appointments(count):
+        return f"{count / n_filtered:.1%} of upcoming appointments"
+
+    with st.container(horizontal=True, vertical_alignment="bottom"):
+        with st.container(border=True):
+            st.metric(
+                "Appointments (filtered)",
+                f"{n_filtered:,}",
+                icon=":material/calendar_month:",
+            )
+            st.caption("Matching the filters on the left")
+        with st.container():
+            pill("High", FORECAST_MIN)
+            with st.container(border=True):
+                n_forecast = int(filtered_data["DNA_Forecast"].sum())
+                st.metric(
+                    "Forecast DNAs",
+                    f"{n_forecast:,}",
+                    share_of_appointments(n_forecast),
+                    delta_color="off",
+                    delta_arrow="off",
+                    icon=":material/event_busy:",
+                    help=f"Appointments the model forecasts as a DNA: a predicted risk of "
+                    f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them "
+                    "will be missed, and some lower-risk appointments will be.",
+                )
+                st.caption(
+                    f"Catches {forecast_recall:.0%} of past DNAs",
+                    help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
+                    f"missed in the past appointments the model was tested on, "
+                    f"{forecast_recall:.0%} had a predicted risk of {FORECAST_MIN:.0%} or more. "
+                    f"Of all those forecast as a DNA, {forecast_precision:.0%} were missed.",
+                )
+        with st.container():
+            pill("Very High", HIGH_RISK_MIN)
+            with st.container(border=True):
+                n_high = int(filtered_data["High_Risk_DNA"].sum())
+                st.metric(
+                    "High-risk flagged",
+                    f"{n_high:,}",
+                    share_of_appointments(n_high),
+                    delta_color="off",
+                    delta_arrow="off",
+                    icon=":material/warning:",
+                    help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
+                    "(the Very High band).",
+                )
+                st.caption(
+                    f"Catches {high_recall:.0%} of past DNAs",
+                    help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
+                    f"missed in the past appointments the model was tested on, "
+                    f"{high_recall:.0%} had a predicted risk of {HIGH_RISK_MIN:.0%} or more. "
+                    f"Of all those flagged, {high_precision:.0%} were missed.",
+                )
+        with st.container(border=True):
+            st.metric(
+                "Expected cost of missed appointments",
+                f"£{costs.expected_dna_cost(filtered_data):,.0f}",
+                icon=":material/payments:",
+                help="Each appointment's predicted risk of not attending times the cost of "
+                "missing it, added up. The costs are assumptions you can change under "
+                "**Cost assumptions** in the sidebar.",
+            )
+            dates = pd.to_datetime(filtered_data["Activity_Date"])
+            days = (dates.max() - dates.min()).days + 1
+            weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
+            length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
+            st.caption(f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})")
 
     st.info(
         "**Click a row in the table** to see what made the model give that "
