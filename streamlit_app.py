@@ -223,10 +223,15 @@ def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a real tool that is in active operational use by "
+        "This is a demonstration of a real tool that is being piloted by "
         "outpatient teams. The real tool forecasts real upcoming appointments.\n\n"
         "Here, all the data is synthetic and the model is trained on synthetic past "
-        "appointments. No real patients or Trust data are displayed.",
+        "appointments. No real patients or Trust data are displayed.\n\n"
+        "Read the story behind the real tool in this "
+        "[impact poster](https://hsma.co.uk/impact_posters/Outpatient%20non%20attendance.png), "
+        "or hear more directly from the associate "
+        "[here](https://hsma.co.uk/previous_projects/hsma_6/"
+        "H6_6046_Proactive_Patient_attendance_prediction/index.html).",
         icon=":material/science:",
     )
 
