@@ -269,8 +269,10 @@ def go_to_tab(label):
 def call_blocks(outcomes, key, height):
     """The Your rule vs the model tab's two blocks of past appointments, phoned (10 wide) and
     not phoned (30 wide), side by side, or one above the other on narrower screens. The phoned
-    block is a third as tall, so both draw their markers at the same size."""
-    phoned, not_phoned = st.columns([1, 3], gap="small")
+    block is a third as tall, so both draw their markers at the same size. Its column is wider
+    than its square needs, to leave room for the heading; the not-phoned square is sized by its
+    height, so it doesn't shrink."""
+    phoned, not_phoned = st.columns([1.4, 3], gap="small")
     rows_height = height - charts.BLOCK_HEADER
     for column, is_phoned, block_height in (
         (phoned, True, charts.BLOCK_HEADER + round(rows_height / 3)),
@@ -1389,37 +1391,50 @@ with tab_game:
         st.subheader("Can you beat the model?")
         st.markdown(
             f"A clinic team has time for **{n_calls} reminder calls** for every 1,000 appointments. They "
-            "need a **rule for putting the call list in order**, so the people most likely to miss their "
-            "appointment are phoned first.\n\n"
-            f"We'll test every rule on the same 1,000 past appointments. Nobody was phoned for them, "
-            f"and we know who really missed: **{n_missed} of them**. So we can ask of any rule: if it "
-            f"had made the call list back then, how many of those {n_missed} would have been on it?\n\n"
-            "1. **Make your rule** from the clues the model sees.\n"
-            "2. **Watch a machine learning model learn its own rule** from past appointments.\n"
-            f"3. **See whose list did best – yours or the model's:** whose {n_calls} calls would have "
-            f"reached more of the {n_missed} people who missed?"
+            "need a <span class=\"highlight\">rule for putting the call list in order, so the people "
+            "most likely to miss their appointment are phoned first</span>.\n\n"
+            "We're going to compete with a <span class=\"pill\">machine learning model</span> to make "
+            "that rule.",
+            unsafe_allow_html=True,
+        )
+        # How the rules are tested, in three small boxes (stacked on narrower screens, style.css)
+        fact1, fact2, fact3 = st.container(key="reflow_stack_game_facts").columns(3, gap="small")
+        fact1.container(border=True, height="stretch").markdown(
+            "We've got **1,000 past appointments** where no reminder calls were made, and we know "
+            "whether people missed them."
+        )
+        fact2.container(border=True, height="stretch").markdown(
+            f"In these 1,000 past appointments, **{n_missed} people missed** their appointment."
+        )
+        fact3.container(border=True, height="stretch").markdown(
+            f"So we can ask of any rule: if it had made the call list back then, how many of those "
+            f"**{n_missed}** would have been on it?"
         )
 
-    # ---- 1. The visitor's rule
+    # ---- 1. The visitor's rule, between dividers so it reads as the thing to do first
+    st.divider()
     st.markdown("#### 1. Make your rule")
-    st.markdown(
-        "Pick one clue or several. Each clue you pick gets an equal say in who goes first on the list.",
-        # Worked example from the real scores in data/rule_game_past.csv (rule_game.rule_score)
-        help=(
-            "**How an equal say works.** Each clue gives every patient a score from 0 to 1, by where "
-            "they rank on that clue: 1 is the top of the ranking. Your rule adds up the scores for the "
-            "clues you picked, and the highest totals are phoned first.\n\n"
-            "**Example:** you pick *most missed appointments before* and *the youngest*.\n\n"
-            "- **Patient A** has missed 3 appointments before; only 5% of patients have missed more, "
-            "so A scores 0.95. A is 70, younger than only about 16% of patients: 0.17. "
-            "**Total 1.12.**\n"
-            "- **Patient B** has never missed one. Two-thirds of patients haven't, and they share the "
-            "bottom of that ranking: 0.33. B is 25, younger than about 93% of patients: 0.94. "
-            "**Total 1.27.**\n\n"
-            "So B goes above A on the list, even though A has missed 3 appointments: with an equal say, "
-            "being young counts as much as having missed before."
-        ),
-    )
+    # A tinted box (style.css) rather than st.info, which can't carry the help tooltip
+    with st.container(key="game_instruction"):
+        st.markdown(
+            ":material/touch_app: **Pick one clue or several.** Each clue you pick gets an equal say in "
+            "who goes first on the list.",
+            # Worked example from the real scores in data/rule_game_past.csv (rule_game.rule_score)
+            help=(
+                "**How an equal say works.** Each clue gives every patient a score from 0 to 1, by where "
+                "they rank on that clue: 1 is the top of the ranking. Your rule adds up the scores for the "
+                "clues you picked, and the highest totals are phoned first.\n\n"
+                "**Example:** you pick *most missed appointments before* and *the youngest*.\n\n"
+                "- **Patient A** has missed 3 appointments before; only 5% of patients have missed more, "
+                "so A scores 0.95. A is 70, younger than only about 16% of patients: 0.17. "
+                "**Total 1.12.**\n"
+                "- **Patient B** has never missed one. Two-thirds of patients haven't, and they share the "
+                "bottom of that ranking: 0.33. B is 25, younger than about 93% of patients: 0.94. "
+                "**Total 1.27.**\n\n"
+                "So B goes above A on the list, even though A has missed 3 appointments: with an equal "
+                "say, being young counts as much as having missed before."
+            ),
+        )
     clues = st.pills(
         "Put these patients first on the call list:",
         options=list(rule_game.CLUES),
@@ -1476,6 +1491,7 @@ with tab_game:
             st.caption("Try adding or taking away a clue. Does more information always help?")
 
     # ---- 2. The model learns
+    st.divider()
     st.markdown("#### 2. Watch a machine learning model learn its own rule")
     st.markdown(
         f"The model gets the same eight clues, and **{learning['n_train']:,} other past appointments** to "

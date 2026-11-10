@@ -150,6 +150,18 @@ section[data-testid="stSidebar"] hr {
 	padding-left: 2rem;
 }
 
+/* ---- "Pick one clue or several", the first thing to do on "Your rule vs the model" ---- */
+/* Tinted in the primary teal so it stands out, like st.info but able to carry a help tooltip */
+.st-key-game_instruction {
+	padding: 0.9rem 1.25rem;
+	border-left: 4px solid #1fb1b9;
+	border-radius: 0.5rem;
+	background-color: rgba(31, 177, 185, 0.14);
+}
+.st-key-game_instruction p {
+	font-size: 1.1rem;
+}
+
 /* ---- The way on from "Your rule vs the model" ---- */
 /* Ported from the geographic mini's next-step boxes: a lightly outlined box, split in two
 	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or

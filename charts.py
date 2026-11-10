@@ -308,7 +308,7 @@ _BLOCK_KEY = {
     "not_called_attended": ("○", "Attended"),
 }
 # Room above each block for its heading and two key lines
-BLOCK_HEADER = 78
+BLOCK_HEADER = 92
 
 
 def call_block(outcomes: dict, phoned: bool, height: int) -> go.Figure:
@@ -341,7 +341,8 @@ def call_block(outcomes: dict, phoned: bool, height: int) -> go.Figure:
     )
     fig.add_annotation(
         x=0, xref="paper", xanchor="left", y=1, yref="paper", yanchor="bottom", align="left",
-        text=f"<b>{title}: {start}</b><br>{key_lines}", showarrow=False, font=dict(size=14, color=TEXT),
+        text=f"<span style='font-size:18px'><b>{title}: {start}</b></span><br>{key_lines}",
+        showarrow=False, font=dict(size=14, color=TEXT),
     )
     fig.update_layout(
         height=height,
