@@ -12,6 +12,7 @@ import costs
 import explain
 import weekly
 from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
+from mobile_nav import add_mobile_nav
 
 HSMA_URL = "https://hsma.co.uk"
 
@@ -221,6 +222,8 @@ def demo_notice():
 # Streamlit app
 # The tabs come first so style.css can pin them to the top as a navbar; the app title
 # is drawn at the left of that bar by style.css.
+# Dropdown in place of the tab pills on narrower screens (shown by style.css)
+add_mobile_nav()
 tab_appts, tab_weekly, tab_calls = st.tabs(["Appointments", "Weekly summary", "Who would we phone?"])
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
@@ -561,7 +564,10 @@ with tab_appts:
         with st.expander(
             "How to read this chart", expanded=True, key="chart_guide", icon=":material/help:"
         ):
-            example_col, steps_col = st.columns([4, 5], vertical_alignment="center")
+            # Keyed so style.css stacks the example above the steps on narrower screens
+            example_col, steps_col = st.container(key="reflow_stack_guide").columns(
+                [4, 5], vertical_alignment="center"
+            )
             example_col.plotly_chart(
                 charts.guide_waterfall(),
                 key="guide_waterfall",
@@ -889,8 +895,10 @@ with tab_calls:
         key="call_mode",
     ) or "Calls the team can make"
 
-    # The setting for who gets a call, and the guess at what a call changes, side by side
-    ctrl_left, ctrl_right = st.columns(2, gap="large")
+    # The setting for who gets a call, and the guess at what a call changes, side by side.
+    # The reflow_docked_ keys here and below let style.css stack rows where the sidebar
+    # leaves the page narrow.
+    ctrl_left, ctrl_right = st.container(key="reflow_docked_controls").columns(2, gap="large")
 
     if mode == "Calls the team can make":
         # Slider runs up to the busiest filtered week, rounded up to a multiple of 10. Clamp
@@ -978,7 +986,7 @@ with tab_calls:
         be = float("inf") if be is None else be
 
     with st.container(border=True):
-        k1, k2 = st.columns([0.35, 0.65], gap="large")
+        k1, k2 = st.container(key="reflow_docked_cutoff").columns([0.35, 0.65], gap="large")
         k1.metric("Calls per 1,000 appointments", f"{out['calls']}")
         k2.metric(
             "So we phone anyone with a predicted risk of at least"
@@ -996,7 +1004,8 @@ with tab_calls:
                 "for the upcoming appointments in your filters)"
             )
             # Fixed columns rather than a horizontal container, so the four cards never wrap
-            c1, c2, c3, c4 = st.columns(4, gap="small")
+            # three and one. Keyed so style.css shows them two per line on narrower screens.
+            c1, c2, c3, c4 = st.container(key="reflow_halves_costs").columns(4, gap="small")
             c1.metric(
                 "Cost of calls",
                 f"£{econ['call_cost']:,.0f}",
@@ -1057,7 +1066,8 @@ with tab_calls:
     if out["calls"] == 0:
         st.info("With this setting nobody would get a call. Raise the number of calls or lower the bar.")
     else:
-        left, right = st.columns([0.62, 0.38], gap="large")
+        # Keyed so style.css puts the cards under the chart on narrower screens
+        left, right = st.container(key="reflow_stack_icons").columns([0.62, 0.38], gap="large")
         with left:
             st.plotly_chart(charts.icon_array(out), width="stretch", config={"displayModeBar": False})
             st.caption(
@@ -1116,7 +1126,7 @@ with tab_calls:
         )
         avoided = out["called_dna"] * effect / 100
 
-        m1, m2, m3 = st.columns(3, gap="large")
+        m1, m2, m3 = st.container(key="reflow_docked_difference").columns(3, gap="large")
         m1.metric(
             "Possibly avoided, per 1,000",
             f"{avoided:.0f}",

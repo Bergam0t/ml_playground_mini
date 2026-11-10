@@ -97,8 +97,10 @@ section[data-testid="stSidebar"] hr {
 	margin-bottom: 1.6rem;
 }
 
-/* Sidebar width. */
-section[data-testid="stSidebar"][aria-expanded="true"] {
+/* Sidebar width. This Streamlit marks an open sidebar with data-collapsed, not
+	aria-expanded (an aria-expanded rule here never matched, leaving Streamlit's 300px).
+	On phones Streamlit's own cap wins instead (see the end of this file). */
+section[data-testid="stSidebar"][data-collapsed="false"] {
 	width: 22rem !important;
 	min-width: 22rem !important;
 }
@@ -120,8 +122,24 @@ section[data-testid="stSidebar"][aria-expanded="true"] {
 	top: 0.5rem;
 	right: 0.5rem;
 }
+/* While the sidebar is shut, Streamlit shows its re-expand button and a copy of the
+	logo in the header, over the navbar title. Keep the button, at any screen size, so
+	the filters can always be got back; hide the logo copy and start the title after
+	the button. (Ported from the geographic playground mini.) */
+[data-testid="stHeaderLogo"] {
+	display: none;
+}
+[data-testid="stApp"]:has([data-testid="stExpandSidebarButton"])
+	[role="tablist"]:not([data-testid="stTabPanel"] *) {
+	padding-left: 4.5rem;
+}
+/* Streamlit puts the button near the top of the header, above the navbar title;
+	move it down level with the title. */
+[data-testid="stExpandSidebarButton"] {
+	transform: translateY(2.15rem);
+}
 [data-testid="stSidebarLogo"],
-img.stLogo {
+[data-testid="stSidebar"] img.stLogo {
 	height: 11rem !important;
 	max-height: 11rem !important;
 	margin: 0 auto;
@@ -163,11 +181,44 @@ h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-
 	white-space: nowrap;
 	flex-shrink: 0;
 }
-/* Too narrow for title and tabs side by side: title on its own row, tabs underneath. */
-@container (max-width: 760px) {
-	[role="tablist"]:not([data-testid="stTabPanel"] *)::before {
-		flex-basis: 100%;
-		margin-right: 0;
+/* ---- Page dropdown in place of the tab pills ---- */
+/* Too narrow for the title and three pills side by side (they need about 1090px, so a
+	window under about 1570px with the sidebar open, a tablet, a phone): swap the pills for
+	a dropdown, added by add_mobile_nav in mobile_nav.py. The container holding its script
+	never takes up space. On a phone the dropdown drops below the title (the bar wraps).
+	Ported from the geographic playground mini. */
+select.mobile-nav,
+.st-key-mobile_nav,
+/* Its layout wrapper too, or it still takes a flex gap and pushes the navbar down */
+[data-testid="stLayoutWrapper"]:has(> .st-key-mobile_nav) {
+	display: none;
+}
+@container (max-width: 1100px) {
+	[data-testid="stTab"]:not([data-testid="stTabPanel"] *) {
+		display: none;
+	}
+	select.mobile-nav {
+		display: block;
+		flex: none;
+		padding: 0.4rem 2rem 0.4rem 1rem;
+		border: 1px solid transparent;
+		border-radius: 999px;
+		background-color: #1fb1b9;
+		/* White chevron for the dropdown arrow */
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 0.8rem center;
+		color: #ffffff;
+		font-family: "HSMA Display", sans-serif;
+		font-size: 1.1rem;
+		letter-spacing: 0.05em;
+		appearance: none;
+		-webkit-appearance: none;
+		cursor: pointer;
+	}
+	select.mobile-nav option {
+		background-color: #1b1a1a;
+		color: #fafafa;
 	}
 }
 /* Tabs as pills; the selected one is filled. */
@@ -196,13 +247,24 @@ h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-
 	font-size: 1.1rem !important;
 	letter-spacing: 0.05em;
 }
-/* Let the header sit above the bar without swallowing clicks meant for the tabs.
-	The toolbar itself is hidden. */
+/* Let the header sit above the bar without swallowing clicks meant for the tabs. */
 [data-testid="stHeader"] {
 	background: transparent;
 	pointer-events: none;
 }
-[data-testid="stToolbar"], [data-testid="stDecoration"] {
+/* Don't hide the toolbar itself: the sidebar's expand button is drawn inside it.
+	It spans the header's width, so only the button takes clicks. Visitors don't
+	need the menu, so that is hidden. */
+[data-testid="stToolbar"] {
+	pointer-events: none;
+}
+[data-testid="stExpandSidebarButton"] {
+	pointer-events: auto;
+}
+[data-testid="stMainMenu"],
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stDecoration"] {
 	display: none;
 }
 /* Don't shrink the HSMA display font with the monospace adjustment. */
@@ -226,3 +288,70 @@ h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-
 /* Buttons in the theme teal */
 .stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }
 .stButton button:hover, .stButton button:focus:not(:active) { background-color: #1fb1b9; border-color: #1fb1b9; color: #ffffff; }
+
+/* ---- Reflow side-by-side rows on narrower screens (from the DES and geographic minis) ---- */
+/* Streamlit only stacks columns below 640px, so at in-between widths (a laptop window
+	at half width, a tablet) these rows got too cramped. Below 1300px, wrap them onto
+	more lines; below 640px Streamlit's own stacking takes over again. Rows opt in
+	through the key of the container they sit in (set in streamlit_app.py):
+	- reflow_stack_*: one item per line
+	- reflow_halves_*: two per line (one per line from 768 to 1000px, see below)
+	- reflow_docked_*: one per line from 768 to 1000px only */
+@media (max-width: 1299.98px) {
+	[class*="st-key-reflow_"] [data-testid="stHorizontalBlock"] {
+		flex-wrap: wrap;
+	}
+	/* Same rule Streamlit uses to stack columns. */
+	[class*="st-key-reflow_stack_"] [data-testid="stColumn"] {
+		min-width: calc(100% - 2rem);
+	}
+}
+@media (min-width: 640px) and (max-width: 1299.98px) {
+	[class*="st-key-reflow_halves_"] [data-testid="stColumn"] {
+		min-width: calc(50% - 1rem);
+	}
+}
+/* From 768px the sidebar sits beside the page instead of over it, so up to about
+	1000px the main area is under 600px wide: one per line there, for the halves rows
+	and for rows that are only cramped there (reflow_docked_*). */
+@media (min-width: 768px) and (max-width: 999.98px) {
+	[class*="st-key-reflow_halves_"] [data-testid="stColumn"],
+	[class*="st-key-reflow_docked_"] [data-testid="stColumn"] {
+		min-width: calc(100% - 2rem);
+	}
+	/* These rows use gap="large", which is far too much between stacked items. */
+	[class*="st-key-reflow_docked_"] [data-testid="stHorizontalBlock"] {
+		row-gap: 1rem;
+	}
+}
+
+/* Let a long metric label or delta ("+£1,957 after the cost of calls") wrap onto a
+	second line instead of being cut off with "...". */
+[data-testid="stMetricLabel"] [data-testid="stMarkdownContainer"],
+[data-testid="stMetricLabel"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stMetricDelta"] [data-testid="stMarkdownContainer"],
+[data-testid="stMetricDelta"] [data-testid="stMarkdownContainer"] p {
+	white-space: normal;
+	text-overflow: clip;
+}
+
+/* ---- Phones (Streamlit's own breakpoint: under 768px the sidebar is an overlay) ---- */
+@media (max-width: 767.98px) {
+	/* The sidebar is an overlay here: let Streamlit's own cap (about 90% of the
+		screen) win over the 22rem width, or it runs off the edge of a phone. */
+	section[data-testid="stSidebar"][data-collapsed="false"] {
+		min-width: 0 !important;
+	}
+	/* A smaller navbar title and dropdown. The title has to fit beside the
+		expand button on a 360px-wide phone, so the bar's right padding is trimmed too. */
+	[role="tablist"]:not([data-testid="stTabPanel"] *) {
+		padding-right: 1rem;
+	}
+	[role="tablist"]:not([data-testid="stTabPanel"] *)::before {
+		font-size: 1.05rem;
+		margin-right: 0.75rem;
+	}
+	select.mobile-nav {
+		font-size: 0.95rem;
+	}
+}
