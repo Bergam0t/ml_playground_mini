@@ -212,13 +212,6 @@ def patient_bands(df):
     return styles
 
 
-def demo_notice():
-    st.warning(
-        "DEMONSTRATION VERSION - all data shown is synthetic. "
-        "No real patients or Trust data are displayed."
-    )
-
-
 def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
@@ -234,6 +227,17 @@ def demo_notice_full():
         "H6_6046_Proactive_Patient_attendance_prediction/index.html).",
         icon=":material/science:",
     )
+
+
+def intro_columns(key):
+    """Columns for a tab's opening text (left) beside the demonstration notice (right).
+
+    Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
+    """
+    left, right = st.container(key=f"reflow_stack_{key}").columns([0.65, 0.35], gap="large")
+    with right:
+        demo_notice_full()
+    return left
 
 
 # Streamlit app
@@ -510,10 +514,7 @@ with tab_appts:
     high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
 
     # Opening text beside the demonstration notice (stacked on narrower screens, see style.css)
-    intro_col, notice_col = st.container(key="reflow_stack_intro").columns([0.65, 0.35], gap="large")
-    with notice_col:
-        demo_notice_full()
-    with intro_col:
+    with intro_columns("intro"):
         st.markdown(
             f"""
             ### Which appointments are patients most likely to miss?
@@ -776,13 +777,12 @@ with tab_appts:
 
 # ---------------------------------------------------------------- tab 2
 with tab_weekly:
-    demo_notice()
-
-    st.subheader("Weekly Forecast Summary")
-    st.markdown(
-        "How many of the upcoming appointments are forecast to be missed, by week and day, so you "
-        "can see which weeks and days to focus on."
-    )
+    with intro_columns("intro_weekly"):
+        st.subheader("Weekly Forecast Summary")
+        st.markdown(
+            "How many of the upcoming appointments are forecast to be missed, by week and day, so you "
+            "can see which weeks and days to focus on."
+        )
 
     measure = st.segmented_control(
         "Count as a missed appointment",
@@ -963,18 +963,18 @@ with tab_weekly:
 # come from past appointments with known outcomes; the upcoming appointments (which follow
 # the sidebar filters) only turn the chosen setting into calls per week.
 with tab_calls:
-    demo_notice()
     meta = load_model_meta()
     past = load_past()
     p_past = past["DNA_Prob_Forecast"].to_numpy()
 
-    st.subheader("Who would we phone?")
-    st.markdown(
-        "This tab helps weigh up how many reminder calls to make, and who should get them. "
-        "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
-        "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
-        "calls the team can make**, or by **how high the predicted risk must be**."
-    )
+    with intro_columns("intro_calls"):
+        st.subheader("Who would we phone?")
+        st.markdown(
+            "This tab helps weigh up how many reminder calls to make, and who should get them. "
+            "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
+            "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
+            "calls the team can make**, or by **how high the predicted risk must be**."
+        )
     st.info(
         "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
         f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
