@@ -151,7 +151,7 @@ def forecast_cell_styles(df):
     return styles
 
 
-# Appointment tables (the Appointments tab, and a day's list on the Weekly summary tab):
+# Appointment tables (the all-appointments view, and a day's list in the next-week summary):
 # source column -> display name, in display order
 APPOINTMENT_FIELDS = {
     "Activity_Date": "Appointment Date",
@@ -266,6 +266,12 @@ def go_to_tab(label):
     st.session_state.scroll_to_top = True
 
 
+def go_to_call_list():
+    """From the bottom of the all-appointments view to the admin team's call list view."""
+    st.session_state.appt_view = VIEW_WEEK
+    st.session_state.scroll_to_top = True
+
+
 def call_blocks(outcomes, key, height):
     """The Your rule vs the model tab's two blocks of past appointments, phoned (10 wide) and
     not phoned (30 wide), side by side, or one above the other on narrower screens. The phoned
@@ -292,8 +298,8 @@ def call_blocks(outcomes, key, height):
 # Dropdown in place of the tab pills on narrower screens (shown by style.css)
 add_mobile_nav()
 # Keyed and rerun on change, so buttons can switch tab (go_to_tab), as in the geographic mini
-TAB_LABELS = ["Your rule vs the model", "Appointments", "Weekly summary", "Who would we phone?"]
-tab_game, tab_appts, tab_weekly, tab_calls = st.tabs(TAB_LABELS, key="page", on_change="rerun")
+TAB_LABELS = ["Your rule vs the model", "Upcoming appointments", "How many people should we phone?"]
+tab_game, tab_appts, tab_calls = st.tabs(TAB_LABELS, key="page", on_change="rerun")
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
 # Load data
@@ -324,6 +330,18 @@ with st.sidebar.container(key="nihr_logo"):
         width="stretch",
         link="https://arc-sw.nihr.ac.uk/",
     )
+
+# Which view the Upcoming appointments tab shows. Only offered on that tab; the tabs are
+# keyed, so the page state says which one is open.
+VIEW_ALL = "Show all appointments"
+VIEW_WEEK = "Show next week call list"
+DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
+if st.session_state.get("page") == TAB_LABELS[1]:
+    st.sidebar.segmented_control(
+        "View", [VIEW_ALL, VIEW_WEEK], key="appt_view",
+        help="What the Upcoming appointments tab shows: the list of appointments, or a summary by week and day.",
+    )
+view = st.session_state.get("appt_view") or VIEW_ALL
 
 # Filters
 st.sidebar.header("Filters")
@@ -390,29 +408,6 @@ if selected_appointment_location != "All":
 if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
     st.info("No appointments match the selected filters.")
     st.stop()
-
-# Date filter (from filtered data)
-min_date = pd.to_datetime(filtered_data["Activity_Date"]).min()
-max_date = pd.to_datetime(filtered_data["Activity_Date"]).max()
-selected_date = st.sidebar.date_input(
-    "Select Date",
-    value=(min_date, max_date),
-    min_value=min_date,
-    max_value=max_date,
-)
-
-if isinstance(selected_date, (tuple, list)) and len(selected_date) == 2:
-    start_date, end_date = selected_date
-    filtered_data = filtered_data[
-        (
-            pd.to_datetime(filtered_data["Activity_Date"])
-            >= pd.to_datetime(start_date)
-        )
-        & (
-            pd.to_datetime(filtered_data["Activity_Date"])
-            <= pd.to_datetime(end_date)
-        )
-    ]
 
 st.sidebar.divider()
 st.sidebar.subheader("Model forecast")
@@ -540,471 +535,503 @@ filter_key = hashlib.md5(
             selected_appointment_location,
             selected_dna_risk,
             selected_confidence,
-            selected_date,
         )
     ).encode()
 ).hexdigest()[:10]
 
 # ---------------------------------------------------------------- tab 1
+# One tab, two views picked by the switch at the top of the sidebar
 with tab_appts:
+    if view == VIEW_ALL:
+        # What really happened to past appointments the model did not train on
+        past = load_past()
+        past_dna_rate = past["Did_Not_Attend"].mean()
 
-    # What really happened to past appointments the model did not train on
-    past = load_past()
-    past_dna_rate = past["Did_Not_Attend"].mean()
+        def catch_rates(threshold):
+            """Share of the missed appointments at or above this risk, and share of those that were missed."""
+            picked = past["DNA_Prob_Forecast"] >= threshold
+            missed = past["Did_Not_Attend"] == 1
+            return (picked & missed).sum() / missed.sum(), missed[picked].mean()
 
-    def catch_rates(threshold):
-        """Share of the missed appointments at or above this risk, and share of those that were missed."""
-        picked = past["DNA_Prob_Forecast"] >= threshold
-        missed = past["Did_Not_Attend"] == 1
-        return (picked & missed).sum() / missed.sum(), missed[picked].mean()
+        forecast_recall, forecast_precision = catch_rates(FORECAST_MIN)
+        high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
 
-    forecast_recall, forecast_precision = catch_rates(FORECAST_MIN)
-    high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
-
-    # Opening text beside the demonstration notice (stacked on narrower screens, see style.css)
-    with intro_columns("intro"):
-        st.markdown(
-            f"""
-            ### Which appointments are patients most likely to miss?
-
-            A machine-learning model, trained on past appointments, gives each upcoming one a
-            predicted **risk of not attending** (a DNA, or 'did not attend') and a **confidence
-            score**, so outpatient teams can plan where reminder calls might help most. The
-            forecasts are <span class="highlight">estimates to support staff judgement, not
-            decisions</span>.
-
-            <div class="threshold-pills">
-            <span class="pill">About {past_dna_rate:.0%} of past appointments were missed</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            f"That is the recorded outcome in {len(past):,} past appointments the model was tested on, "
-            "so most predicted risks are low."
-        )
-        with st.expander("What does the confidence score mean?", icon=":material/help:"):
+        # Opening text beside the demonstration notice (stacked on narrower screens, see style.css)
+        with intro_columns("intro"):
             st.markdown(
-                "Confidence is how clear-cut the model's yes-or-no call is. A 90% risk gives 80% "
-                "confidence; a 50% risk gives 0%, because the model could go either way. So it is "
-                "**Low for any risk between 25% and 75%**, and high at both ends. Most appointments "
-                "here are high-confidence because the model is fairly sure the patient *will* attend."
+                f"""
+                ### Which appointments are patients most likely to miss?
+
+                A machine-learning model, trained on past appointments, gives each upcoming one a
+                predicted **risk of not attending** (a DNA, or 'did not attend') and a **confidence
+                score**, so outpatient teams can plan where reminder calls might help most. The
+                forecasts are <span class="highlight">estimates to support staff judgement, not
+                decisions</span>.
+
+                <div class="threshold-pills">
+                <span class="pill">About {past_dna_rate:.0%} of past appointments were missed</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-
-    # Summary of the filtered appointments. Every card is a bordered container holding a
-    # metric and a one-line caption, so the four are the same height; the 20%+ and 40%+
-    # pills sit above two of them, so the row is bottom-aligned to keep the boxes level.
-    n_filtered = len(filtered_data)
-
-    def pill(risk_band, threshold):
-        st.markdown(
-            f'<span class="pill" style="background-color:{RISK_COLOURS[risk_band]};color:#fff">'
-            f"{threshold:.0%}+ risk</span>",
-            unsafe_allow_html=True,
-        )
-
-    def share_of_appointments(count):
-        return f"{count / n_filtered:.1%} of upcoming appointments"
-
-    with st.container(horizontal=True, vertical_alignment="bottom"):
-        with st.container(border=True):
-            st.metric(
-                "Appointments (filtered)",
-                f"{n_filtered:,}",
-                icon=":material/calendar_month:",
+            st.markdown(
+                f"That is the recorded outcome in {len(past):,} past appointments the model was tested on, "
+                "so most predicted risks are low."
             )
-            st.caption("Matching the filters on the left")
-        with st.container():
-            pill("High", FORECAST_MIN)
-            with st.container(border=True):
-                n_forecast = int(filtered_data["DNA_Forecast"].sum())
-                st.metric(
-                    "Forecast DNAs",
-                    f"{n_forecast:,}",
-                    share_of_appointments(n_forecast),
-                    delta_color="off",
-                    delta_arrow="off",
-                    icon=":material/event_busy:",
-                    help=f"Appointments the model forecasts as a DNA: a predicted risk of "
-                    f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them "
-                    "will be missed, and some lower-risk appointments will be.",
+            with st.expander("What does the confidence score mean?", icon=":material/help:"):
+                st.markdown(
+                    "Confidence is how clear-cut the model's yes-or-no call is. A 90% risk gives 80% "
+                    "confidence; a 50% risk gives 0%, because the model could go either way. So it is "
+                    "**Low for any risk between 25% and 75%**, and high at both ends. Most appointments "
+                    "here are high-confidence because the model is fairly sure the patient *will* attend."
                 )
-                st.caption(
-                    f"Catches {forecast_recall:.0%} of past DNAs",
-                    help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
-                    f"missed in the past appointments the model was tested on, "
-                    f"{forecast_recall:.0%} had a predicted risk of {FORECAST_MIN:.0%} or more. "
-                    f"Of all those forecast as a DNA, {forecast_precision:.0%} were missed.",
-                )
-        with st.container():
-            pill("Very High", HIGH_RISK_MIN)
-            with st.container(border=True):
-                n_high = int(filtered_data["High_Risk_DNA"].sum())
-                st.metric(
-                    "High-risk flagged",
-                    f"{n_high:,}",
-                    share_of_appointments(n_high),
-                    delta_color="off",
-                    delta_arrow="off",
-                    icon=":material/warning:",
-                    help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
-                    "(the Very High band).",
-                )
-                st.caption(
-                    f"Catches {high_recall:.0%} of past DNAs",
-                    help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
-                    f"missed in the past appointments the model was tested on, "
-                    f"{high_recall:.0%} had a predicted risk of {HIGH_RISK_MIN:.0%} or more. "
-                    f"Of all those flagged, {high_precision:.0%} were missed.",
-                )
-        with st.container(border=True):
-            st.metric(
-                "Expected cost of missed appointments",
-                f"£{costs.expected_dna_cost(filtered_data):,.0f}",
-                icon=":material/payments:",
-                help="Each appointment's predicted risk of not attending times the cost of "
-                "missing it, added up. The costs are assumptions you can change under "
-                "**Cost assumptions** in the sidebar.",
-            )
-            dates = pd.to_datetime(filtered_data["Activity_Date"])
-            days = (dates.max() - dates.min()).days + 1
-            weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
-            length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
-            st.caption(f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})")
 
-    st.info(
-        "**Click a row in the table** to see what made the model give that "
-        "appointment its risk of not attending. Until you do, the chart below shows what the "
-        "model relies on most. The coloured columns are the model's forecast.",
-        icon=":material/touch_app:",
-    )
+        # Summary of the filtered appointments. Every card is a bordered container holding a
+        # metric and a one-line caption, so the four are the same height; the 20%+ and 40%+
+        # pills sit above two of them, so the row is bottom-aligned to keep the boxes level.
+        n_filtered = len(filtered_data)
 
-    # Display filtered data
-    table = st.dataframe(
-        appointment_table(filtered_data),
-        column_config=APPOINTMENT_COLUMNS,
-        hide_index=True,
-        alt="Upcoming appointments with the forecast risk of not attending",
-        on_select="rerun",
-        selection_mode="single-row",
-        key=f"appointments_{filter_key}",
-    )
-
-    # Selected positions refer to the rows as passed in, whatever sorting the user applies
-    selected_rows = [r for r in table.selection.rows if r < len(filtered_data)]
-    if selected_rows:
-        row = filtered_data.iloc[selected_rows[0]]
-        meta = load_model_meta()
-        expl = explain.patient_explanation(
-            row, load_shap().loc[row["row_id"]], meta["base_value_pp"]
-        )
-
-        st.subheader(
-            f"Why patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y} has a "
-            f"{expl['fx']:.0f}% risk of not attending"
-        )
-        st.markdown(
-            f"**The model predicts a {expl['fx']:.0f}% risk that this patient won't attend**, "
-            f"compared with about **{expl['base']:.0f}%** for the average appointment."
-        )
-
-        # Starts open; collapse it once you have the idea (it stays collapsed between patients)
-        with st.expander(
-            "How to read this chart", expanded=True, key="chart_guide", icon=":material/help:"
-        ):
-            # Keyed so style.css stacks the example above the steps on narrower screens
-            example_col, steps_col = st.container(key="reflow_stack_guide").columns(
-                [4, 5], vertical_alignment="center"
-            )
-            example_col.plotly_chart(
-                charts.guide_waterfall(),
-                key="guide_waterfall",
-                width="content",
-                config={"staticPlot": True},
-            )
-            example_col.caption("A made-up example.")
-            steps_col.markdown(
-                "\n".join(
-                    f"<div class='guide-step'><span class='guide-num'>{n}</span><div>{text}</div></div>"
-                    for n, text in enumerate(GUIDE_STEPS, start=1)
-                ),
+        def pill(risk_band, threshold):
+            st.markdown(
+                f'<span class="pill" style="background-color:{RISK_COLOURS[risk_band]};color:#fff">'
+                f"{threshold:.0%}+ risk</span>",
                 unsafe_allow_html=True,
             )
 
-        st.plotly_chart(
-            charts.waterfall(expl),
-            key=f"waterfall_{row['row_id']}",
-            width="stretch",
-            config={"displayModeBar": False},
-        )
+        def share_of_appointments(count):
+            return f"{count / n_filtered:.1%} of upcoming appointments"
 
-        top = expl["shown"][:2]
-        st.markdown(
-            f"The biggest contributions are **{top[0]['label']}** ({top[0]['value']:+.1f} points) and "
-            f"**{top[1]['label']}** ({top[1]['value']:+.1f} points)."
-        )
-        st.info(
-            "A predicted risk is an estimate based on similar appointments in past data, not a "
-            "forecast of what this one person will do. The bars show what the model relied on, "
-            "not what causes missed appointments: changing one of these facts would not "
-            f"necessarily change whether the patient attends. The model is reasonably but not "
-            f"perfectly accurate (AUC {meta['auc_test']:.2f} on past appointments it hadn't seen)."
-        )
-    else:
-        # No row selected: what the model relies on across all upcoming appointments, and,
-        # when the sidebar filters narrow the table enough, for the filtered ones beside it
-        meta = load_model_meta()
-        shap_all = load_shap()
-        n = len(filtered_data)
-        is_filtered = n < len(data)
-        # Not for the forecast filters: they pick appointments by the very pushes being
-        # charted (Very High risk = big pushes up), so the comparison would be circular
-        forecast_filtered = selected_dna_risk != "All" or selected_confidence != "All"
-        show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
-
-        st.subheader("What the model relies on most")
-        st.markdown(
-            "Each bar shows how much a factor moves an appointment's predicted risk of not "
-            "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
-            "the model relies on that factor more. Hover over a bar for the figure."
-        )
-        st.plotly_chart(
-            charts.importance_bars(
-                explain.group_importance(shap_all.loc[data["row_id"]]),
-                f"All {len(data):,} upcoming appointments",
-                explain.group_importance(shap_all.loc[filtered_data["row_id"]]) if show_filtered else None,
-                f"The {n:,} appointments in your filters",
-            ),
-            key=f"importance_{filter_key}",
-            width="stretch",
-            config={"displayModeBar": False},
-        )
-
-        if show_filtered:
-            notes = [
-                (
-                    f"On average the model predicts a **{filtered_data['DNA_Prob_Forecast'].mean():.0%}** "
-                    "risk of not attending for the appointments in your filters, compared with "
-                    f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
+        with st.container(horizontal=True, vertical_alignment="bottom"):
+            with st.container(border=True):
+                st.metric(
+                    "Appointments (filtered)",
+                    f"{n_filtered:,}",
+                    icon=":material/calendar_month:",
                 )
-            ]
-            same_value = [
-                label
-                for label, choice in [
-                    ("site", selected_reporting_site),
-                    ("specialty", selected_specialty),
-                    ("appointment type", selected_appointment_type),
+                st.caption("Matching the filters on the left")
+            with st.container():
+                pill("High", FORECAST_MIN)
+                with st.container(border=True):
+                    n_forecast = int(filtered_data["DNA_Forecast"].sum())
+                    st.metric(
+                        "Forecast DNAs",
+                        f"{n_forecast:,}",
+                        share_of_appointments(n_forecast),
+                        delta_color="off",
+                        delta_arrow="off",
+                        icon=":material/event_busy:",
+                        help=f"Appointments the model forecasts as a DNA: a predicted risk of "
+                        f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them "
+                        "will be missed, and some lower-risk appointments will be.",
+                    )
+                    st.caption(
+                        f"Catches {forecast_recall:.0%} of past DNAs",
+                        help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
+                        f"missed in the past appointments the model was tested on, "
+                        f"{forecast_recall:.0%} had a predicted risk of {FORECAST_MIN:.0%} or more. "
+                        f"Of all those forecast as a DNA, {forecast_precision:.0%} were missed.",
+                    )
+            with st.container():
+                pill("Very High", HIGH_RISK_MIN)
+                with st.container(border=True):
+                    n_high = int(filtered_data["High_Risk_DNA"].sum())
+                    st.metric(
+                        "High-risk flagged",
+                        f"{n_high:,}",
+                        share_of_appointments(n_high),
+                        delta_color="off",
+                        delta_arrow="off",
+                        icon=":material/warning:",
+                        help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
+                        "(the Very High band).",
+                    )
+                    st.caption(
+                        f"Catches {high_recall:.0%} of past DNAs",
+                        help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
+                        f"missed in the past appointments the model was tested on, "
+                        f"{high_recall:.0%} had a predicted risk of {HIGH_RISK_MIN:.0%} or more. "
+                        f"Of all those flagged, {high_precision:.0%} were missed.",
+                    )
+            with st.container(border=True):
+                st.metric(
+                    "Expected cost of missed appointments",
+                    f"£{costs.expected_dna_cost(filtered_data):,.0f}",
+                    icon=":material/payments:",
+                    help="Each appointment's predicted risk of not attending times the cost of "
+                    "missing it, added up. The costs are assumptions you can change under "
+                    "**Cost assumptions** in the sidebar.",
+                )
+                dates = pd.to_datetime(filtered_data["Activity_Date"])
+                days = (dates.max() - dates.min()).days + 1
+                weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
+                length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
+                st.caption(f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})")
+
+        st.subheader("Week by week")
+        measure = st.segmented_control(
+            "Colour the grid by",
+            list(weekly.MEASURES),
+            default=DEFAULT_MEASURE,
+            key="grid_measure",
+            help="  \n".join(f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()),
+        ) or DEFAULT_MEASURE
+        m = weekly.MEASURES[measure]
+        column = m.column
+        h = weekly.headline(filtered_data, column)
+        st.markdown(weekly.summary_sentence(h, measure))
+
+        # Week-by-weekday table: newest week first, weekdays with no appointments left out
+        counts, sums, rates = weekly.weekly_tables(filtered_data, column)
+        low, high = m.thresholds
+        week_index = pd.Index(
+            [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
+        )
+        cell_text = pd.DataFrame(
+            {
+                d: [
+                    f"{c} · {s:.0f} ({r:.0%})" if c else "–"
+                    for c, s, r in zip(counts[d], sums[d], rates[d])
                 ]
-                if choice != "All"
-            ]
-            if same_value:
-                listed = " and ".join(same_value)
-                notes.append(
-                    f"Every appointment in your filters has the same {listed}, so "
-                    f"{'that bar shows' if len(same_value) == 1 else 'those bars show'} how much "
-                    f"that one {listed} moves the risk."
-                )
-            st.markdown("\n".join(f"- {note}" for note in notes))
-        elif forecast_filtered:
-            st.caption(
-                "No chart for your filters while a Model forecast filter (DNA Risk or Confidence) "
-                "is set: those filters pick appointments by the forecast this chart explains, so "
-                "the comparison would go round in circles."
-            )
-        elif is_filtered:
-            st.caption(
-                f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
-                f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
-            )
+                for d in counts.columns
+            },
+            index=week_index,
+        )
+        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(week_index)
+
+        st.caption(
+            f"Each cell: appointments · {m.cell_label} "
+            f"({'rate' if m.flag else 'average predicted risk'}). "
+            f"Green below {low:.0%}, red above {high:.0%}."
+        )
         st.info(
-            "These bars show what the model relied on, not what causes missed appointments: "
-            "changing one of these facts would not necessarily change whether a patient attends. "
-            f"The model is reasonably but not perfectly accurate (AUC {meta['auc_test']:.2f} on "
-            "past appointments it hadn't seen)."
+            "**Click a day in the table** to list just that day's appointments below. Click it again "
+            "to show them all.",
+            icon=":material/touch_app:",
+        )
+        week_table = st.dataframe(
+            cell_text.style.apply(lambda _: cell_styles, axis=None),
+            width="stretch",
+            on_select="rerun",
+            selection_mode="single-cell",
+            key=f"weekly_{filter_key}",
         )
 
-# ---------------------------------------------------------------- tab 2
-with tab_weekly:
-    with intro_columns("intro_weekly"):
-        st.subheader("Weekly Forecast Summary")
-        st.markdown(
-            "How many of the upcoming appointments are forecast to be missed, by week and day, so you "
-            "can see which weeks and days to focus on."
+
+        # The clicked day narrows the appointment list (clicks on the week labels are ignored)
+        picked = [
+            (r, day) for r, day in week_table.selection.cells
+            if r < len(counts) and day in counts.columns
+        ]
+        day_key = "all"
+        table_data = filtered_data
+        if picked:
+            r, day = picked[0]
+            date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
+            table_data = filtered_data[pd.to_datetime(filtered_data["Activity_Date"]) == date]
+            day_key = f"{date:%Y%m%d}"
+            st.subheader(f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments")
+
+        st.info(
+            "**Click a row in the table** to see what made the model give that "
+            "appointment its risk of not attending. Until you do, the chart below shows what the "
+            "model relies on most. The coloured columns are the model's forecast.",
+            icon=":material/touch_app:",
         )
 
-    measure = st.segmented_control(
-        "Count as a missed appointment",
-        list(weekly.MEASURES),
-        default="High-risk flagged",
-        key="weekly_measure",
-        help="  \n".join(f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()),
-    ) or "High-risk flagged"
-    m = weekly.MEASURES[measure]
-    column = m.column
-    h = weekly.headline(filtered_data, column)
-
-    # Headline figures for the appointments in the sidebar filters
-    with st.container(horizontal=True):
-        st.metric(
-            "Appointments",
-            f"{h['n']:,}",
-            icon=":material/calendar_month:",
-            border=True,
-            help=f"Over {h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}, in the sidebar filters.",
-        )
-        st.metric(
-            m.count_label,
-            f"{h['total']:,.0f} ({h['overall']:.0%})",
-            icon=":material/event_busy:",
-            border=True,
-            help=m.help,
-        )
-        # The first week in the filters: usually next week, the one there is still time to act on
-        vs_average = round(h["first_week_total"] - h["weekly_average_total"])
-        st.metric(
-            weekly.week_title(h["first_week"]),
-            f"{h['first_week_total']:,.0f} ({h['first_week_rate']:.0%})",
-            f"{vs_average:+d} vs weekly average",
-            delta_color="inverse",
-            icon=":material/event_upcoming:",
-            border=True,
-            help=f"{m.count_label} in the week ending {weekly.week_label(h['first_week'], year=True)}, "
-            f"from {h['first_week_n']:,} appointments. The weekly average is "
-            f"{h['weekly_average_total']:.0f}.",
-        )
-        st.metric(
-            "Highest-risk weekday",
-            h["top_day"],
-            weekly.pts_vs_average(h["top_day_rate"], h["overall"]),
-            delta_color="inverse",
-            icon=":material/today:",
-            border=True,
-            help=f"{h['top_day_rate']:.0%} on {h['top_day']}s, against {h['overall']:.0%} overall.",
-        )
-        expected_cost = costs.expected_dna_cost(filtered_data)
-        st.metric(
-            "Expected cost a week",
-            f"£{expected_cost / h['n_weeks']:,.0f}",
-            icon=":material/payments:",
-            border=True,
-            help=f"£{expected_cost:,.0f} over {h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}. "
-            "Each appointment's predicted risk of not attending times the cost of missing it, "
-            "whichever count is chosen above. The costs are assumptions you can change under "
-            "**Cost assumptions** in the sidebar.",
-        )
-        rp = weekly.repeat_patients(filtered_data, m)
-        # A bordered container rather than the metric's own border, so the button sits in the card
-        with st.container(border=True, gap="small"):
-            st.metric(
-                m.repeat_label,
-                f"{rp['patients']:,}",
-                f"{rp['appointments']:,} appointments between them"
-                + ("" if m.flag else f", about {rp['expected']:.0f} expected to be missed"),
-                delta_color="off",
-                delta_arrow="off",
-                icon=":material/group:",
-                help="One reminder call could cover several of a patient's appointments. "
-                "Counted over all the weeks in the sidebar filters.",
-            )
-            showing = st.session_state.get("show_repeat_patients", False)
-            st.button(
-                "Hide patients" if showing else "Show patients",
-                icon=":material/visibility_off:" if showing else ":material/visibility:",
-                type="tertiary",
-                disabled=rp["patients"] == 0,
-                on_click=lambda: st.session_state.update(show_repeat_patients=not showing),
-            )
-
-    # The repeat patients, one patient's appointments together, soonest appointment first
-    if st.session_state.get("show_repeat_patients") and rp["patients"]:
-        st.markdown(
-            f"**{m.repeat_label}:** {rp['patients']:,} patients, {rp['appointments']:,} "
-            "appointments. The patient with the soonest appointment comes first, and "
-            "every other patient is shaded."
-        )
-        st.dataframe(
-            appointment_table(rp["rows"], by_patient=True),
+        # Display filtered data
+        table = st.dataframe(
+            appointment_table(table_data),
             column_config=APPOINTMENT_COLUMNS,
             hide_index=True,
-            key=f"repeat_patients_{filter_key}",
+            alt="Upcoming appointments with the forecast risk of not attending",
+            on_select="rerun",
+            selection_mode="single-row",
+            key=f"appointments_{filter_key}_{day_key}",
         )
 
-    st.markdown(weekly.summary_sentence(h, measure))
+        # Selected positions refer to the rows as passed in, whatever sorting the user applies
+        selected_rows = [r for r in table.selection.rows if r < len(table_data)]
+        if selected_rows:
+            row = table_data.iloc[selected_rows[0]]
+            meta = load_model_meta()
+            expl = explain.patient_explanation(
+                row, load_shap().loc[row["row_id"]], meta["base_value_pp"]
+            )
 
-    # Week-by-weekday table: newest week first, weekdays with no appointments left out
-    counts, sums, rates = weekly.weekly_tables(filtered_data, column)
-    low, high = m.thresholds
-    week_index = pd.Index(
-        [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
-    )
-    cell_text = pd.DataFrame(
-        {
-            d: [
-                f"{c} · {s:.0f} ({r:.0%})" if c else "–"
-                for c, s, r in zip(counts[d], sums[d], rates[d])
-            ]
-            for d in counts.columns
-        },
-        index=week_index,
-    )
-    cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(week_index)
-
-    st.caption(
-        f"Each cell: appointments · {m.cell_label} "
-        f"({'rate' if m.flag else 'average predicted risk'}). "
-        f"Green below {low:.0%}, red above {high:.0%}."
-    )
-    st.info(
-        "**Click a day in the table** to see its appointments, highest risk first.",
-        icon=":material/touch_app:",
-    )
-    week_table = st.dataframe(
-        cell_text.style.apply(lambda _: cell_styles, axis=None),
-        width="stretch",
-        on_select="rerun",
-        selection_mode="single-cell",
-        key=f"weekly_{filter_key}",
-    )
-
-    # Drill down into the clicked day (clicks on the week labels are ignored)
-    picked = [
-        (r, day) for r, day in week_table.selection.cells
-        if r < len(counts) and day in counts.columns
-    ]
-    if picked:
-        r, day = picked[0]
-        date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
-        day_appts = filtered_data[pd.to_datetime(filtered_data["Activity_Date"]) == date]
-        day_label = f"{date:%A} {date.day} {date:%B}"
-
-        if m.flag:
-            shown = day_appts[day_appts[column] == 1]
             st.subheader(
-                f"{day_label}: {len(shown)} of {len(day_appts)} appointments {m.day_phrase}"
+                f"Why patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y} has a "
+                f"{expl['fx']:.0f}% risk of not attending"
+            )
+            st.markdown(
+                f"**The model predicts a {expl['fx']:.0f}% risk that this patient won't attend**, "
+                f"compared with about **{expl['base']:.0f}%** for the average appointment."
+            )
+
+            # Starts open; collapse it once you have the idea (it stays collapsed between patients)
+            with st.expander(
+                "How to read this chart", expanded=True, key="chart_guide", icon=":material/help:"
+            ):
+                # Keyed so style.css stacks the example above the steps on narrower screens
+                example_col, steps_col = st.container(key="reflow_stack_guide").columns(
+                    [4, 5], vertical_alignment="center"
+                )
+                example_col.plotly_chart(
+                    charts.guide_waterfall(),
+                    key="guide_waterfall",
+                    width="content",
+                    config={"staticPlot": True},
+                )
+                example_col.caption("A made-up example.")
+                steps_col.markdown(
+                    "\n".join(
+                        f"<div class='guide-step'><span class='guide-num'>{n}</span><div>{text}</div></div>"
+                        for n, text in enumerate(GUIDE_STEPS, start=1)
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            st.plotly_chart(
+                charts.waterfall(expl),
+                key=f"waterfall_{row['row_id']}",
+                width="stretch",
+                config={"displayModeBar": False},
+            )
+
+            top = expl["shown"][:2]
+            st.markdown(
+                f"The biggest contributions are **{top[0]['label']}** ({top[0]['value']:+.1f} points) and "
+                f"**{top[1]['label']}** ({top[1]['value']:+.1f} points)."
+            )
+            st.info(
+                "A predicted risk is an estimate based on similar appointments in past data, not a "
+                "forecast of what this one person will do. The bars show what the model relied on, "
+                "not what causes missed appointments: changing one of these facts would not "
+                f"necessarily change whether the patient attends. The model is reasonably but not "
+                f"perfectly accurate (AUC {meta['auc_test']:.2f} on past appointments it hadn't seen)."
             )
         else:
-            shown = day_appts
-            st.subheader(
-                f"{day_label}: {len(day_appts)} appointments, about "
-                f"{day_appts[column].sum():.0f} expected to be missed"
+            # No row selected: what the model relies on across all upcoming appointments, and,
+            # when the sidebar filters narrow the table enough, for the filtered ones beside it
+            meta = load_model_meta()
+            shap_all = load_shap()
+            n = len(filtered_data)
+            is_filtered = n < len(data)
+            # Not for the forecast filters: they pick appointments by the very pushes being
+            # charted (Very High risk = big pushes up), so the comparison would be circular
+            forecast_filtered = selected_dna_risk != "All" or selected_confidence != "All"
+            show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
+
+            st.subheader("What the model relies on most")
+            st.markdown(
+                "Each bar shows how much a factor moves an appointment's predicted risk of not "
+                "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
+                "the model relies on that factor more. Hover over a bar for the figure."
+            )
+            st.plotly_chart(
+                charts.importance_bars(
+                    explain.group_importance(shap_all.loc[data["row_id"]]),
+                    f"All {len(data):,} upcoming appointments",
+                    explain.group_importance(shap_all.loc[filtered_data["row_id"]]) if show_filtered else None,
+                    f"The {n:,} appointments in your filters",
+                ),
+                key=f"importance_{filter_key}",
+                width="stretch",
+                config={"displayModeBar": False},
             )
 
-        if day_appts.empty:
-            st.info("There are no appointments in the sidebar filters on this day.")
-        elif shown.empty:
-            st.info(f"None of this day's appointments are {m.day_phrase}.")
+            if show_filtered:
+                notes = [
+                    (
+                        f"On average the model predicts a **{filtered_data['DNA_Prob_Forecast'].mean():.0%}** "
+                        "risk of not attending for the appointments in your filters, compared with "
+                        f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
+                    )
+                ]
+                same_value = [
+                    label
+                    for label, choice in [
+                        ("site", selected_reporting_site),
+                        ("specialty", selected_specialty),
+                        ("appointment type", selected_appointment_type),
+                    ]
+                    if choice != "All"
+                ]
+                if same_value:
+                    listed = " and ".join(same_value)
+                    notes.append(
+                        f"Every appointment in your filters has the same {listed}, so "
+                        f"{'that bar shows' if len(same_value) == 1 else 'those bars show'} how much "
+                        f"that one {listed} moves the risk."
+                    )
+                st.markdown("\n".join(f"- {note}" for note in notes))
+            elif forecast_filtered:
+                st.caption(
+                    "No chart for your filters while a Model forecast filter (DNA Risk or Confidence) "
+                    "is set: those filters pick appointments by the forecast this chart explains, so "
+                    "the comparison would go round in circles."
+                )
+            elif is_filtered:
+                st.caption(
+                    f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
+                    f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
+                )
+            st.info(
+                "These bars show what the model relied on, not what causes missed appointments: "
+                "changing one of these facts would not necessarily change whether a patient attends. "
+                f"The model is reasonably but not perfectly accurate (AUC {meta['auc_test']:.2f} on "
+                "past appointments it hadn't seen)."
+            )
+
+        # ---- The way on: a split button, styled like the game tab's (style.css)
+        st.divider()
+        with st.container(key="appts_next"):
+            call_list, plan = st.container(key="reflow_stack_appts_next").columns(2, gap="large")
+            call_list.markdown(
+                "### See the list for the admin team\n"
+                "What the team would actually work from: next week's appointments, highest risk first, "
+                "ready to phone from the top."
+            )
+            call_list.button(
+                "See next week's call list",
+                key="to_call_list",
+                on_click=go_to_call_list,
+                icon=":material/arrow_forward:",
+                type="primary",
+            )
+            plan.markdown(
+                "### Or plan the calls\n"
+                "How many calls should the team make, and would they be worth the staff time?"
+            )
+            plan.button(
+                "Plan the calls",
+                key="to_calls_from_appts",
+                on_click=go_to_tab,
+                args=(TAB_LABELS[2],),
+                icon=":material/arrow_forward:",
+            )
+
+    else:
+        with intro_columns("intro_weekly"):
+            st.title("Prioritised call list")
+            st.markdown(
+                "For the admin team: next week's appointments the model thinks patients are most likely "
+                "to miss, highest risk first, so reminder calls can start at the top. For the week-by-week "
+                "picture, choose **Show all appointments** in the sidebar."
+            )
+
+        measure = st.segmented_control(
+            "Who goes on the list",
+            list(weekly.MEASURES),
+            default=DEFAULT_MEASURE,
+            key="weekly_measure",
+            help="  \n".join(f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()),
+        ) or DEFAULT_MEASURE
+        m = weekly.MEASURES[measure]
+        st.info(
+            "**Where to draw the line is a human decision.** The model gives every appointment a risk "
+            "of not attending, not a yes or no. A higher cut-off gives a shorter list that is "
+            "more likely to reach people who really would have missed their appointment; a lower one catches "
+            "more missed appointments but means more calls, many to people who would have come anyway. "
+            "The right balance depends on how many calls the team can make, so choose a starting point above. "
+            "The **Who would we phone?** tab explores the trade-off.",
+            icon=":material/balance:",
+        )
+        column = m.column
+        h = weekly.headline(filtered_data, column)
+
+        # Headline figures for the first week in the sidebar filters: usually next week, the
+        # one there is still time to act on. The table below covers every week.
+        first_week = h["first_week"]
+        title = weekly.week_title(first_week)
+        when_week = title[0].lower() + title[1:]
+        week_end = pd.to_datetime(filtered_data["Activity_Date"]).dt.to_period("W-SUN").dt.end_time.dt.normalize()
+        next_week = filtered_data[week_end == first_week]
+        hw = weekly.headline(next_week, column)
+        plural = "s" if h["n_weeks"] != 1 else ""
+        st.markdown(
+            f"**{weekly.week_title(first_week)}** (week ending {weekly.week_label(first_week, year=True)})"
+        )
+        with st.container(horizontal=True):
+            st.metric(
+                f"Total appointments {when_week}",
+                f"{hw['n']:,}",
+                f"{hw['n'] - h['n'] / h['n_weeks']:+.0f} vs weekly average",
+                delta_color="off",
+                icon=":material/calendar_month:",
+                border=True,
+                help=f"In the week ending {weekly.week_label(first_week, year=True)}, in the sidebar "
+                f"filters. The average over {h['n_weeks']} week{plural} is {h['n'] / h['n_weeks']:.0f}.",
+            )
+            vs_average = round(hw["total"] - h["weekly_average_total"])
+            st.metric(
+                m.count_label,
+                f"{hw['total']:,.0f} ({hw['overall']:.0%})",
+                f"{vs_average:+d} vs weekly average",
+                delta_color="inverse",
+                icon=":material/event_busy:",
+                border=True,
+                help=f"{m.help} The weekly average is {h['weekly_average_total']:.0f} "
+                f"({h['overall']:.0%}).",
+            )
+            st.metric(
+                "Highest-risk weekday",
+                hw["top_day"],
+                weekly.pts_vs_average(hw["top_day_rate"], hw["overall"]) if hw["n_days"] > 1 else None,
+                delta_color="inverse",
+                icon=":material/today:",
+                border=True,
+                help=f"{hw['top_day_rate']:.0%} on {hw['top_day']}, against {hw['overall']:.0%} "
+                "for the week.",
+            )
+            expected_cost = costs.expected_dna_cost(filtered_data)
+            week_cost = costs.expected_dna_cost(next_week)
+            st.metric(
+                f"Expected cost of missed appointments {when_week}",
+                f"£{week_cost:,.0f}",
+                f"{week_cost - expected_cost / h['n_weeks']:+,.0f} vs weekly average",
+                delta_color="inverse",
+                icon=":material/payments:",
+                border=True,
+                help=f"The average over {h['n_weeks']} week{plural} is £{expected_cost / h['n_weeks']:,.0f}. "
+                "Each appointment's predicted risk of not attending times the cost of missing it, "
+                "whichever count is chosen above. The costs are assumptions you can change under "
+                "**Cost assumptions** in the sidebar.",
+            )
+
+        # The call list covers the first week
+        period = next_week
+        when = when_week
+
+        # The call list itself: the period's counted appointments, highest risk first
+        st.subheader("Calls to make")
+        listed = period[period[column] == 1] if m.flag else period
+        listed = listed.sort_values("DNA_Prob_Forecast", ascending=False)
+        if m.flag:
+            st.markdown(
+                f"**{len(listed)} of {len(period)} appointments {when} are {m.day_phrase}**, highest "
+                "risk first. Phone from the top."
+            )
+        else:
+            st.markdown(
+                f"**All {len(period)} appointments {when}**, highest predicted risk first. "
+                "Phone from the top."
+            )
+        if period.empty:
+            st.info("There are no appointments in the sidebar filters in this period.")
+        elif listed.empty:
+            st.info(f"None of the appointments {when} are {m.day_phrase}.")
         else:
             st.dataframe(
-                appointment_table(shown.sort_values("DNA_Prob_Forecast", ascending=False)),
+                appointment_table(listed),
                 column_config=APPOINTMENT_COLUMNS,
                 hide_index=True,
-                key=f"weekly_day_{filter_key}",
+                key=f"call_list_{filter_key}",
             )
-            st.caption(
-                "To plan reminder calls across the weeks, see the **Who would we phone?** tab. "
-                "To see why the model gave an appointment its risk, click it on the "
-                "**Appointments** tab."
-            )
+        st.caption(
+            "To decide how many calls are worth making, see the **How many people should we phone?** tab. To see why "
+            "the model gave an appointment its risk, choose **Show all appointments** in the sidebar."
+        )
+
 
 # ---------------------------------------------------------------- tab 3
 # Ported from the "Who would we phone?" page of lambda_ml_streamlit_exercise. The counts
@@ -1016,7 +1043,7 @@ with tab_calls:
     p_past = past["DNA_Prob_Forecast"].to_numpy()
 
     with intro_columns("intro_calls"):
-        st.subheader("Who would we phone?")
+        st.subheader("How many people should we phone?")
         st.markdown(
             "This tab helps weigh up how many reminder calls to make, and who should get them. "
             "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
@@ -1560,7 +1587,7 @@ with tab_game:
             with right:
                 st.markdown("**How much say each clue gets**")
                 st.plotly_chart(
-                    charts.say_bars(say_order, rule_game.CLUE_SHORT, f["say"], best["clues"]),
+                    charts.say_bars(say_order, rule_game.CLUE_SHORT, f["say"], clues or best["clues"]),
                     width="stretch",
                     config={"displayModeBar": False},
                     key=f"game_say_{phase}_{i}",
@@ -1664,25 +1691,32 @@ with tab_game:
 
         say = final["say"]
         top_two = say_order[:2]
-        st.markdown(
-            "**Why did the model win here?** Your rule gave each of its clues an equal say. The model gives "
-            f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of the say and "
-            f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. With only "
-            "a few hundred appointments to learn from it did worse than you: it had to work out which way "
-            "each clue points, too.\n\n"
-            f"**Accuracy is the wrong score.** Phoning nobody is the most accurate rule in the table "
-            f"({none['accuracy']:.0%}), because most patients attend, so \"everyone will come\" is usually "
-            "right. It just puts nobody on the call list. What matters is how many of the people who missed "
-            "are on the list, and how many places on it go to people who attended.\n\n"
-            f"**Nobody gets them all.** Even a perfect model, which knew each patient's true chance of "
-            f"missing, would have put only {perfect['outcomes']['called_dna']} of the {n_missed} on its "
-            "list. Many missed appointments come down to things no data records."
-        )
-        st.caption(
-            "The model here is the simplest kind (logistic regression). The one on the other tabs is a "
-            f"more complex kind (XGBoost); on these appointments its list would have reached "
-            f"{learning['app_model']['outcomes']['called_dna']} of {n_missed} too."
-        )
+        st.markdown("#### Reading the results")
+        c1, c2, c3 = st.container(key="reflow_stack_game_verdict_cards").columns(3, gap="small")
+        with c1.container(border=True, key="title_card_game_why", height="stretch"):
+            st.markdown(":material/psychology: **Why did the model win here?**")
+            st.markdown(
+                "Your rule gave each of its clues an equal say. The model gives "
+                f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of the say and "
+                f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. "
+                "With only a few hundred appointments to learn from it did worse than you: it had to "
+                "work out which way each clue points, too."
+            )
+        with c2.container(border=True, key="title_card_game_accuracy", height="stretch"):
+            st.markdown(":material/percent: **Accuracy is the wrong score.**")
+            st.markdown(
+                f"Phoning nobody is the most accurate rule in the table ({none['accuracy']:.0%}), because "
+                "most patients attend, so \"everyone will come\" is usually right. It just puts nobody on "
+                "the call list. What matters is how many of the people who missed are on the list, and how "
+                "many places on it go to people who attended."
+            )
+        with c3.container(border=True, key="title_card_game_limit", height="stretch"):
+            st.markdown(":material/visibility_off: **Nobody gets them all.**")
+            st.markdown(
+                "Even a perfect model, which knew each patient's true chance of missing, would have put "
+                f"only {perfect['outcomes']['called_dna']} of the {n_missed} on its list. Many missed "
+                "appointments come down to things no data records."
+            )
 
     # ---- The way on: styled like the geographic mini's next-step boxes (style.css)
     st.divider()
@@ -1709,7 +1743,7 @@ with tab_game:
             "Plan the calls",
             key="to_calls",
             on_click=go_to_tab,
-            args=(TAB_LABELS[3],),
+            args=(TAB_LABELS[2],),
             icon=":material/arrow_forward:",
         )
 

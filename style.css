@@ -181,39 +181,39 @@ section[data-testid="stSidebar"] hr {
 	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or
 	above the second when they stack below 1300px. Both halves are full height with the
 	buttons pinned to the bottom, so the buttons line up if one heading wraps. */
-.st-key-game_next {
+:is(.st-key-game_next, .st-key-appts_next) {
 	padding: 1.25rem 1.5rem;
 	border: 2px solid rgba(31, 177, 185, 0.55);
 	border-radius: 0.75rem;
 	background-color: rgba(31, 177, 185, 0.06);
 }
-.st-key-game_next h3 {
+:is(.st-key-game_next, .st-key-appts_next) h3 {
 	padding-top: 0;
 }
-.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
+:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] + [data-testid="stColumn"] {
 	border-left: 1px solid rgba(31, 177, 185, 0.35);
 	padding-left: 2rem;
 }
-.st-key-reflow_stack_game_next [data-testid="stHorizontalBlock"] { align-items: stretch; }
-.st-key-reflow_stack_game_next [data-testid="stColumn"] { display: flex; flex-direction: column; }
-.st-key-reflow_stack_game_next [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
-.st-key-to_appts,
-.st-key-to_calls {
+:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stHorizontalBlock"] { align-items: stretch; }
+:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] { display: flex; flex-direction: column; }
+:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
+:is(.st-key-to_appts, .st-key-to_call_list),
+:is(.st-key-to_calls, .st-key-to_calls_from_appts) {
 	margin: auto 0 0;
 }
-.st-key-to_appts button,
-.st-key-to_calls button {
+:is(.st-key-to_appts, .st-key-to_call_list) button,
+:is(.st-key-to_calls, .st-key-to_calls_from_appts) button {
 	min-height: 3.5rem;
 	padding: 0 1.5rem;
 }
-.st-key-to_appts button p,
-.st-key-to_calls button p {
+:is(.st-key-to_appts, .st-key-to_call_list) button p,
+:is(.st-key-to_calls, .st-key-to_calls_from_appts) button p {
 	font-family: "HSMA Display", sans-serif;
 	font-size: 1.1rem;
 	letter-spacing: 0.05em;
 }
 @media (max-width: 1299.98px) {
-	.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
+	:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] + [data-testid="stColumn"] {
 		border-left: none;
 		padding-left: 0;
 		border-top: 1px solid rgba(31, 177, 185, 0.35);
@@ -221,7 +221,7 @@ section[data-testid="stSidebar"] hr {
 	}
 }
 @media (max-width: 767.98px) {
-	.st-key-game_next {
+	:is(.st-key-game_next, .st-key-appts_next) {
 		padding: 1rem;
 	}
 }
@@ -460,4 +460,46 @@ select.mobile-nav,
 	select.mobile-nav {
 		font-size: 0.95rem;
 	}
+}
+
+/* ---- The sidebar's View switch: big, stacked, full-width choices ---- */
+.st-key-appt_view [data-testid="stButtonGroup"] {
+	flex-direction: column;
+	align-items: stretch;
+	width: 100%;
+	gap: 0.5rem;
+}
+.st-key-appt_view button {
+	width: 100%;
+	min-height: 3.25rem;
+	justify-content: center;
+	text-align: center;
+	white-space: normal;
+}
+.st-key-appt_view button p {
+	font-size: 1.1rem;
+	font-weight: 600;
+}
+
+/* Result cards (from tab 2 of the geographic playground mini): the title as a tinted band
+	across the top of the card, divided from the rest. The negative margins undo the
+	card's own padding (17px in Streamlit 1.66.1), so the band reaches its edges. */
+[class*="st-key-title_card_"] { --card-pad: 17px; }
+[class*="st-key-title_card_"] > [data-testid="stElementContainer"]:first-child {
+	width: calc(100% + 2 * var(--card-pad)) !important;
+	max-width: none;
+	margin: calc(-1 * var(--card-pad)) calc(-1 * var(--card-pad)) 0;
+	/* Restores the gap below the band that the markdown wrapper's pull-up removes */
+	padding-bottom: 0.8rem;
+}
+/* Padding and tint on the markdown itself: Streamlit's wrapper pulls its own bottom edge up,
+	so padding on the outer container left the band too short and cut through the title */
+[class*="st-key-title_card_"] > [data-testid="stElementContainer"]:first-child [data-testid="stMarkdownContainer"] {
+	padding: 0.6rem var(--card-pad);
+	background-color: rgba(31, 177, 185, 0.18);
+	border-bottom: 1px solid rgba(250, 250, 250, 0.2);
+	border-radius: 8px 8px 0 0;
+}
+[class*="st-key-title_card_"] > [data-testid="stElementContainer"]:first-child p {
+	font-size: 1rem; font-weight: 600; line-height: 1.35; margin: 0;
 }

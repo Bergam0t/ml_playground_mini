@@ -169,7 +169,7 @@ def say_bars(order: list, labels: dict, model_say: dict, your_clues) -> go.Figur
     animation frames."""
     yours = {f: (1 / len(your_clues) if f in your_clues else 0) for f in order}
     fig = go.Figure()
-    for name, say, colour in (("Your rule", yours, YOU), ("The model", model_say, MODEL)):
+    for name, say, colour in (("Your currently selected rule", yours, YOU), ("The model", model_say, MODEL)):
         fig.add_trace(
             go.Bar(
                 orientation="h",
