@@ -159,17 +159,17 @@ def guide_waterfall() -> go.Figure:
 
 
 YOU = FILTERED  # the visitor's rule on the "Your rule vs the model" tab
-COMPUTER = TOTAL  # the computer learning the points
+MODEL = TOTAL  # the model learning the points
 GRID = "rgba(255,255,255,0.1)"
 
 
-def say_bars(order: list, labels: dict, computer_say: dict, your_clues) -> go.Figure:
+def say_bars(order: list, labels: dict, model_say: dict, your_clues) -> go.Figure:
     """How much say each clue gets: an equal share for each clue in the visitor's rule, and
-    what the computer has learnt. `order` is fixed by the caller so bars don't jump between
+    what the model has learnt. `order` is fixed by the caller so bars don't jump between
     animation frames."""
     yours = {f: (1 / len(your_clues) if f in your_clues else 0) for f in order}
     fig = go.Figure()
-    for name, say, colour in (("Your rule", yours, YOU), ("The computer", computer_say, COMPUTER)):
+    for name, say, colour in (("Your rule", yours, YOU), ("The model", model_say, MODEL)):
         fig.add_trace(
             go.Bar(
                 orientation="h",
@@ -201,7 +201,7 @@ def say_bars(order: list, labels: dict, computer_say: dict, your_clues) -> go.Fi
 
 
 def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int, n_missed: int) -> go.Figure:
-    """Missed appointments (per 1,000 past appointments) the computer's calls reach, by how
+    """Missed appointments (per 1,000 past appointments) on the model's call list, by how
     many past appointments it has learnt from, drawn up to frame `upto`. The x axis is the
     full set of sizes from the start (evenly spaced, as each roughly doubles), so it doesn't
     move while it draws. `your_best` and `perfect` are counts on the same scale."""
@@ -212,10 +212,10 @@ def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int,
             x=sizes[: upto + 1],
             y=[f["outcomes"]["called_dna"] for f in shown],
             mode="lines+markers",
-            line=dict(color=COMPUTER, width=3),
-            marker=dict(size=9, color=COMPUTER),
-            name="The computer",
-            hovertemplate=f"After %{{x}} past appointments: reaches %{{y}} of {n_missed}<extra></extra>",
+            line=dict(color=MODEL, width=3),
+            marker=dict(size=9, color=MODEL),
+            name="The model",
+            hovertemplate=f"After %{{x}} past appointments: %{{y}} of the {n_missed} who missed on its list<extra></extra>",
         )
     )
     lines = [(perfect, "A perfect model", MUTED, "dot")]
@@ -240,7 +240,7 @@ def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int,
             range=[-0.5, len(sizes) - 0.5], gridcolor=GRID, fixedrange=True,
         ),
         yaxis=dict(
-            title=f"Misses reached (of {n_missed})", range=[0, n_missed * 0.65],
+            title=f"Missed, and on the list (of {n_missed})", range=[0, n_missed * 0.65],
             gridcolor=GRID, zeroline=False, fixedrange=True,
         ),
     )
@@ -260,7 +260,7 @@ _ICON_STYLE = {
 _COLS = 40
 
 
-def icon_array(outcomes: dict, height: int = 560) -> go.Figure:
+def icon_array(outcomes: dict) -> go.Figure:
     """1,000 markers (40 x 25), one per 1,000 past appointments, grouped by outcome."""
     fig = go.Figure()
     start = 0
@@ -280,12 +280,77 @@ def icon_array(outcomes: dict, height: int = 560) -> go.Figure:
         )
         start += count
     fig.update_layout(
-        height=height,
+        height=560,
         margin=dict(l=0, r=0, t=10, b=0),
         xaxis=dict(visible=False, range=[-1, _COLS], fixedrange=True),
         yaxis=dict(visible=False, scaleanchor="x", range=[-25, 1], fixedrange=True),
         # Above the grid, so the key is read before the markers. The labels are too long for the side.
         legend=dict(orientation="v", yanchor="bottom", y=1.01, x=0, itemclick=False, itemdoubleclick=False),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=FONT,
+    )
+    return fig
+
+
+# call_block(): the two blocks' heading, the groups in each and the width in markers. 100 calls
+# fill the phoned block's 10 x 10 square, and the other 900 the not-phoned block's 30 x 30.
+_BLOCKS = {
+    True: ("On the call list", ["called_dna", "called_attended"], 10),
+    False: ("Not on the list", ["not_called_dna", "not_called_attended"], 30),
+}
+# Short names for the key above each block (the hover keeps the full GROUPS label), with the
+# marker's look as a character so the key matches the markers
+_BLOCK_KEY = {
+    "called_dna": ("●", "Missed"),
+    "called_attended": ("■", "Attended"),
+    "not_called_dna": ("✕", "Missed"),
+    "not_called_attended": ("○", "Attended"),
+}
+# Room above each block for its heading and two key lines
+BLOCK_HEADER = 78
+
+
+def call_block(outcomes: dict, phoned: bool, height: int) -> go.Figure:
+    """One of two headed blocks that split icon_array()'s 1,000 markers: the appointments that
+    would be on the call list, or those that wouldn't. The heading and key sit right above the markers,
+    in place of a legend. Used on the Your rule vs the model tab, where the calls are always
+    100 per 1,000. The markers keep to the top left of the chart, so two blocks of different
+    sizes side by side line up at the top."""
+    title, keys, cols = _BLOCKS[phoned]
+    labels = dict(GROUPS)
+    fig = go.Figure()
+    start = 0
+    for key in keys:
+        idx = range(start, start + outcomes[key])
+        colour, symbol = _ICON_STYLE[key]
+        fig.add_trace(
+            go.Scatter(
+                x=[i % cols for i in idx],
+                y=[-(i // cols) for i in idx],
+                mode="markers",
+                marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
+                hovertemplate=f"{labels[key]}<extra></extra>",
+            )
+        )
+        start += outcomes[key]
+    rows = max(1, -(-start // cols))
+    key_lines = "<br>".join(
+        f"<span style='color:{_ICON_STYLE[k][0]}'>{_BLOCK_KEY[k][0]}</span> {_BLOCK_KEY[k][1]}: {outcomes[k]}"
+        for k in keys
+    )
+    fig.add_annotation(
+        x=0, xref="paper", xanchor="left", y=1, yref="paper", yanchor="bottom", align="left",
+        text=f"<b>{title}: {start}</b><br>{key_lines}", showarrow=False, font=dict(size=14, color=TEXT),
+    )
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=0, t=BLOCK_HEADER, b=0),
+        showlegend=False,
+        xaxis=dict(visible=False, range=[-0.6, cols - 0.4], fixedrange=True,
+                   constrain="domain", constraintoward="left"),
+        yaxis=dict(visible=False, scaleanchor="x", range=[-rows + 0.4, 0.6], fixedrange=True,
+                   constrain="domain", constraintoward="top"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=FONT,

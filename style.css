@@ -135,6 +135,20 @@ section[data-testid="stSidebar"] hr {
 [data-testid="stExpandSidebarButton"] {
 	transform: translateY(2.15rem);
 }
+/* ---- No sidebar on the first tab ---- */
+/* The filters and cost assumptions don't apply to "Your rule vs the model", so while that
+	tab is open, hide the sidebar and (when it's shut) its re-expand button, and give the title
+	its usual padding back. Done in CSS because Streamlit draws every tab in one run, so the
+	script can't tell which tab is open; hiding also keeps the filters' settings for the
+	other tabs. */
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:first-child[data-selected="true"])
+	:is([data-testid="stSidebar"], [data-testid="stExpandSidebarButton"]) {
+	display: none;
+}
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:first-child[data-selected="true"])
+	[role="tablist"]:not([data-testid="stTabPanel"] *) {
+	padding-left: 2rem;
+}
 [data-testid="stSidebarLogo"],
 [data-testid="stSidebar"] img.stLogo {
 	height: 11rem !important;

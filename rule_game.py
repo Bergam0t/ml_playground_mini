@@ -2,7 +2,7 @@
 
 A visitor picks clues to phone by; each clue they pick gets an equal say. Their rule is
 scored on the 4,500 past appointments the model didn't learn from, at the same number of
-calls as the computer gets. The computer's results, learning from more and more past
+calls as the model gets. The model's results, learning from more and more past
 appointments, are precomputed by build/rule_game_data.py (the app needs no ML packages).
 """
 import json
@@ -83,7 +83,7 @@ def nobody(past: pd.DataFrame) -> dict:
 
 
 def overtook_at(frames: list, score: float):
-    """The fewest past appointments after which the computer beat `score`, or None."""
+    """The fewest past appointments after which the model beat `score`, or None."""
     for f in frames:
         if f["reached"] > score:
             return f["n"]

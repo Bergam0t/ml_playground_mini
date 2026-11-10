@@ -11,11 +11,11 @@ streamlit run streamlit_app.py
 
 ## What's in the app
 
-- **Your rule vs the model** tab: a short game to show why a computer can beat a person at
+- **Your rule vs the model** tab: a short game to show why a machine learning model can beat a person at
   this.
   - Using 1,000 past appointments (79 missed) and 100 calls, the visitor builds a rule for who
     to phone from the eight clues the model sees, with each chosen clue getting an equal say.
-  - They then watch a computer learn its own weighting from 0 to 22,500 past appointments,
+  - They then watch a model learn its own weighting from 0 to 22,500 past appointments,
     overtaking their rule after a few hundred.
   - It ends with a table where "phone nobody" has the best accuracy and reaches nobody, and a
     perfect model reaches only 42 of 79.
@@ -40,8 +40,9 @@ The Appointments and Weekly summary tabs also show the expected cost of missed a
 (each predicted risk times that appointment's cost).
 
 The sidebar filters apply to the Appointments and Weekly summary tabs. On Who would we phone? they
-change only the upcoming calls-per-week figures, since the chart uses past appointments. They don't
-apply on Your rule vs the model, which uses past appointments only.
+change only the upcoming calls-per-week figures, since the chart uses past appointments. Your rule vs the
+model uses past appointments only, so the sidebar is hidden while that tab is open (a CSS rule
+in `style.css` keyed on the selected tab, so the filters keep their settings for the other tabs).
 
 ## Screen size
 
@@ -126,10 +127,10 @@ split as the main build, and checks that its test appointments match `past_predi
 - `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a
   sensible person would use it. Numbers point the way that goes with more missed appointments,
   and categories are scored by last year's miss rate.
-- `rule_game_learning.json`: the computer's results after learning from 0, 25, 50, ... 22,500 past
+- `rule_game_learning.json`: the model's results after learning from 0, 25, 50, ... 22,500 past
   appointments.
 
-The computer is a logistic regression on raw inputs, so it has to learn which way each clue
+The model on this tab is a logistic regression on raw inputs, so it has to learn which way each clue
 points as well as how much it counts. That's why it starts out worse than a person. With all the
 data it reaches the same share of misses as the XGBoost model (the build checks this). The demo
 data has no interactions between clues (`demo_data.py` adds their effects together), so the

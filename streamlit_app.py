@@ -69,7 +69,7 @@ def load_model_meta():
 
 
 # The "Your rule vs the model" tab: past appointments with a score per clue, and the
-# computer's results as it learns (both precomputed by build/rule_game_data.py)
+# model's results as it learns (both precomputed by build/rule_game_data.py)
 @st.cache_data
 def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
@@ -238,15 +238,43 @@ def demo_notice_full():
     )
 
 
-def intro_columns(key):
+def demo_notice_synthetic():
+    """A shorter notice for the Your rule vs the model tab, which is about the method, not
+    the real tool: just that the data is made up."""
+    st.warning(
+        "**DEMONSTRATION VERSION**\n\n"
+        "All the appointments here are synthetic. No real patients or Trust data are displayed.",
+        icon=":material/science:",
+    )
+
+
+def intro_columns(key, notice=demo_notice_full):
     """Columns for a tab's opening text (left) beside the demonstration notice (right).
 
     Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
     """
     left, right = st.container(key=f"reflow_stack_{key}").columns([0.65, 0.35], gap="large")
     with right:
-        demo_notice_full()
+        notice()
     return left
+
+
+def call_blocks(outcomes, key, height):
+    """The Your rule vs the model tab's two blocks of past appointments, phoned (10 wide) and
+    not phoned (30 wide), side by side, or one above the other on narrower screens. The phoned
+    block is a third as tall, so both draw their markers at the same size."""
+    phoned, not_phoned = st.columns([1, 3], gap="small")
+    rows_height = height - charts.BLOCK_HEADER
+    for column, is_phoned, block_height in (
+        (phoned, True, charts.BLOCK_HEADER + round(rows_height / 3)),
+        (not_phoned, False, height),
+    ):
+        column.plotly_chart(
+            charts.call_block(outcomes, is_phoned, block_height),
+            width="stretch",
+            config={"displayModeBar": False},
+            key=f"{key}_{'phoned' if is_phoned else 'not_phoned'}",
+        )
 
 
 # Streamlit app
@@ -1341,7 +1369,7 @@ with tab_calls:
 # ---------------------------------------------------------------- tab 0: Your rule vs the model
 # First on the bar but last in the script: the training animation pauses between frames, so
 # the other tabs are drawn before it starts. The visitor builds a rule from the clues the model
-# sees, each with an equal say; then a computer learns its own weighting from more and more
+# sees, each with an equal say; then a machine learning model learns its own weighting from more and more
 # past appointments. Everything is scored on the same past appointments as tab 3, scaled to
 # 1,000, at the same number of calls (rule_game.CALL_SHARE).
 with tab_game:
@@ -1350,30 +1378,52 @@ with tab_game:
     n_missed = round(game_past["Did_Not_Attend"].mean() * 1000)
     n_calls = round(rule_game.CALL_SHARE * 1000)
 
-    with intro_columns("intro_game"):
+    with intro_columns("intro_game", notice=demo_notice_synthetic):
         st.subheader("Can you beat the model?")
         st.markdown(
-            f"Here are 1,000 past appointments, and **{n_missed} of them were missed**. Suppose the team "
-            f"had time for **{n_calls} reminder calls** beforehand. Who should have got them?\n\n"
-            "First make your own rule from the clues the model sees. Then watch a computer learn its own "
-            "rule from past appointments, and see whose calls would have reached more of the people who "
-            "missed. (The sidebar filters don't apply on this tab.)"
+            f"A clinic team has time for **{n_calls} reminder calls** for every 1,000 appointments. They "
+            "need a **rule for putting the call list in order**, so the people most likely to miss their "
+            "appointment are phoned first.\n\n"
+            f"We'll test every rule on the same 1,000 past appointments. Nobody was phoned for them, "
+            f"and we know who really missed: **{n_missed} of them**. So we can ask of any rule: if it "
+            f"had made the call list back then, how many of those {n_missed} would have been on it?\n\n"
+            "1. **Make your rule** from the clues the model sees.\n"
+            "2. **Watch a machine learning model learn its own rule** from past appointments.\n"
+            f"3. **See whose list did best – yours or the model's:** whose {n_calls} calls would have "
+            f"reached more of the {n_missed} people who missed?"
         )
 
     # ---- 1. The visitor's rule
     st.markdown("#### 1. Make your rule")
+    st.markdown(
+        "Pick one clue or several. Each clue you pick gets an equal say in who goes first on the list.",
+        # Worked example from the real scores in data/rule_game_past.csv (rule_game.rule_score)
+        help=(
+            "**How an equal say works.** Each clue gives every patient a score from 0 to 1, by where "
+            "they rank on that clue: 1 is the top of the ranking. Your rule adds up the scores for the "
+            "clues you picked, and the highest totals are phoned first.\n\n"
+            "**Example:** you pick *most missed appointments before* and *the youngest*.\n\n"
+            "- **Patient A** has missed 3 appointments before; only 5% of patients have missed more, "
+            "so A scores 0.95. A is 70, younger than only about 16% of patients: 0.17. "
+            "**Total 1.12.**\n"
+            "- **Patient B** has never missed one. Two-thirds of patients haven't, and they share the "
+            "bottom of that ranking: 0.33. B is 25, younger than about 93% of patients: 0.94. "
+            "**Total 1.27.**\n\n"
+            "So B goes above A on the list, even though A has missed 3 appointments: with an equal say, "
+            "being young counts as much as having missed before."
+        ),
+    )
     clues = st.pills(
-        "Phone first:",
+        "Put these patients first on the call list:",
         options=list(rule_game.CLUES),
-        format_func=rule_game.CLUES.get,
+        format_func=lambda clue: rule_game.CLUES[clue],
         selection_mode="multi",
         key="game_clues",
-        help="Pick one clue or several. Each clue you pick gets an equal say in who is phoned.",
     )
 
     mine = None
     if not clues:
-        st.info("Pick at least one clue to see who your rule would phone.", icon=":material/touch_app:")
+        st.info("Pick at least one clue to see who your rule would put on the call list.", icon=":material/touch_app:")
     else:
         mine = rule_game.results(game_past, rule_game.rule_score(game_past, clues))
         caught = mine["outcomes"]["called_dna"]
@@ -1390,44 +1440,42 @@ with tab_game:
 
         left, right = st.container(key="reflow_stack_game_rule").columns([0.62, 0.38], gap="large")
         with left:
-            st.plotly_chart(
-                charts.icon_array(mine["outcomes"], height=500),
-                width="stretch",
-                config={"displayModeBar": False},
-                key="game_rule_icons",
-            )
+            call_blocks(mine["outcomes"], "game_rule_icons", 520)
             st.caption(
-                "Each marker is one of 1,000 past appointments. \"Would get a call\" means your rule would "
-                "have picked them (nobody was really phoned)."
+                f"Each marker is one of the 1,000 past appointments the rules are tested on. Nobody was "
+                f"phoned: \"On the call list\" means your rule would have put them in the first {n_calls}. "
+                "\"Missed\" and \"Attended\" are what really happened."
             )
         with right:
             st.metric(
-                "Missed appointments your calls reach",
+                "Missed appointments on your list",
                 f"{caught} of {n_missed}",
                 f"{caught - prev['caught']:+d} since your last rule" if prev else None,
                 border=True,
                 icon=":material/call:",
             )
             st.metric(
-                "Calls to people who came anyway",
+                "People on your list who attended",
                 f"{mine['outcomes']['called_attended']} of {n_calls}",
                 border=True,
                 icon=":material/call_end:",
             )
             best = st.session_state["game_best"]
             st.markdown(
-                f"**Your best rule so far** reaches {best['outcomes']['called_dna']} of {n_missed}: "
+                f"**Your best rule so far** would have reached {best['outcomes']['called_dna']} of {n_missed}: "
                 + ", ".join(f"*{rule_game.CLUES[c].lower()}*" for c in best["clues"])
                 + "."
             )
             st.caption("Try adding or taking away a clue. Does more information always help?")
 
-    # ---- 2. The computer learns
-    st.markdown("#### 2. Let a computer learn its own rule")
+    # ---- 2. The model learns
+    st.markdown("#### 2. Watch a machine learning model learn its own rule")
     st.markdown(
-        f"The computer gets the same eight clues and **{learning['n_train']:,} past appointments**, with who "
-        "missed them. Nobody tells it which way a clue points or how much it matters: it works that out from "
-        "the appointments. Watch what happens as it learns from more of them."
+        f"The model gets the same eight clues, and **{learning['n_train']:,} other past appointments** to "
+        "learn from, with who missed them. Nobody tells it which way a clue points or how much it matters: "
+        "it works that out from those appointments. Then it makes its own call list for the 1,000 test "
+        "appointments above, which it has never seen, so it's tested exactly like your rule. Watch what "
+        "happens as it learns from more of them."
     )
     best = st.session_state.get("game_best")
     run = st.button(
@@ -1438,17 +1486,17 @@ with tab_game:
         help=None if best else "Make a rule first, so there is something to beat.",
         key="game_run",
     )
-    # Bars in the order of the computer's final say, so they don't jump between frames
+    # Bars in the order of the model's final say, so they don't jump between frames
     say_order = sorted(rule_game.CLUES, key=lambda f: -frames[-1]["say"][f])
     slot = st.empty()
 
-    def draw_computer(i, phase):
+    def draw_model(i, phase, best):
         f = frames[i]
         with slot.container():
             m1, m2, m3 = st.container(key=f"reflow_halves_game_{phase}_{i}").columns(3)
             m1.metric("Past appointments learnt from", f"{f['n']:,}", border=True, icon=":material/school:")
             m2.metric(
-                "Missed appointments its calls reach",
+                "Missed appointments on its list",
                 f"{f['outcomes']['called_dna']} of {n_missed}",
                 border=True,
                 icon=":material/smart_toy:",
@@ -1461,13 +1509,8 @@ with tab_game:
             )
             left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns(2, gap="large")
             with left:
-                st.markdown("**Who the computer would phone**")
-                st.plotly_chart(
-                    charts.icon_array(f["outcomes"], height=430),
-                    width="stretch",
-                    config={"displayModeBar": False},
-                    key=f"game_icons_{phase}_{i}",
-                )
+                st.markdown("**The model's call list**")
+                call_blocks(f["outcomes"], f"game_icons_{phase}_{i}", 450)
             with right:
                 st.markdown("**How much say each clue gets**")
                 st.plotly_chart(
@@ -1489,36 +1532,36 @@ with tab_game:
                 key=f"game_curve_{phase}_{i}",
             )
 
-    if run:
+    if run and best:
         for i in range(len(frames)):
-            draw_computer(i, "run")
+            draw_model(i, "run", best)
             if i < len(frames) - 1:
                 time.sleep(0.9)
         st.session_state["game_trained"] = True
     elif st.session_state.get("game_trained") and best:
-        draw_computer(len(frames) - 1, "done")
+        draw_model(len(frames) - 1, "done", best)
 
     # ---- 3. The verdict
     if st.session_state.get("game_trained") and best:
-        st.markdown("#### 3. Whose calls did best?")
+        st.markdown("#### 3. See whose list did best")
         final, perfect, none = frames[-1], learning["perfect"], rule_game.nobody(game_past)
         at = rule_game.overtook_at(frames, best["reached"])
         if at is not None:
             st.success(
-                f"**The computer overtook your best rule after learning from {at:,} past appointments.** "
-                f"With all {learning['n_train']:,}, its calls reach {final['outcomes']['called_dna']} of the "
+                f"**The model overtook your best rule after learning from {at:,} past appointments.** "
+                f"With all {learning['n_train']:,}, its list would have reached {final['outcomes']['called_dna']} of the "
                 f"{n_missed} missed appointments, against your {best['outcomes']['called_dna']}.",
                 icon=":material/emoji_events:",
             )
         else:
             st.success(
-                "**Your rule held its own against the computer.** Few rules do.",
+                "**Your rule held its own against the model.** Few rules do.",
                 icon=":material/emoji_events:",
             )
 
         rows = [
             ("Your best rule", best),
-            ("The computer", final),
+            ("The model", final),
             ("A perfect model", perfect),
             ("Phone nobody", none),
         ]
@@ -1526,8 +1569,10 @@ with tab_game:
             pd.DataFrame(
                 {
                     "Rule": [name for name, _ in rows],
-                    f"Misses reached (of {n_missed})": [r["outcomes"]["called_dna"] for _, r in rows],
-                    f"Came anyway (of {n_calls})": [r["outcomes"]["called_attended"] for _, r in rows],
+                    f"Missed, and on the list (of {n_missed})": [r["outcomes"]["called_dna"] for _, r in rows],
+                    f"Attended, but on the list (of {n_calls})": [
+                        r["outcomes"]["called_attended"] for _, r in rows
+                    ],
                     "Accuracy": [f"{r['accuracy']:.0%}" for _, r in rows],
                 }
             ).set_index("Rule")
@@ -1536,23 +1581,24 @@ with tab_game:
         say = final["say"]
         top_two = say_order[:2]
         st.markdown(
-            "**Why did the computer win?** It weighs all eight clues at once, and it learnt how much each "
+            "**Why did the model win?** It weighs all eight clues at once, and it learnt how much each "
             "should count from what happened at past appointments. Your rule gave each of its clues an equal "
-            f"say. The computer gives *{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of "
+            f"say. The model gives *{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of "
             f"the say and *{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest "
             "less. With only a few hundred appointments to learn from it did worse than you: it had to work "
             "out which way each clue points, too.\n\n"
             f"**Accuracy is the wrong score.** Phoning nobody is the most accurate rule in the table "
-            f"({none['accuracy']:.0%}), because most patients attend anyway, so \"everyone will come\" is "
-            "usually right. It just reaches nobody. What matters is how many missed appointments the calls "
-            "reach, and how many calls go to people who would have come anyway.\n\n"
+            f"({none['accuracy']:.0%}), because most patients attend, so \"everyone will come\" is usually "
+            "right. It just puts nobody on the call list. What matters is how many of the people who missed "
+            "are on the list, and how many places on it go to people who attended.\n\n"
             f"**Nobody gets them all.** Even a perfect model, which knew each patient's true chance of "
-            f"missing, would reach only {perfect['outcomes']['called_dna']} of {n_missed}. Many missed "
+            f"missing, would have put only {perfect['outcomes']['called_dna']} of the {n_missed} on its "
+            "list. Many missed "
             "appointments come down to things no data records."
         )
         st.caption(
-            "The computer here is the simplest kind of model (logistic regression). The model on the other "
-            f"tabs is a more complex kind (XGBoost); on these appointments it reaches "
+            "The model here is the simplest kind (logistic regression). The one on the other tabs is a "
+            f"more complex kind (XGBoost); on these appointments its list would have reached "
             f"{learning['app_model']['outcomes']['called_dna']} of {n_missed} too."
         )
         st.markdown(
