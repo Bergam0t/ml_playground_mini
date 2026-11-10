@@ -11,6 +11,14 @@ streamlit run streamlit_app.py
 
 ## What's in the app
 
+- **Your rule vs the model** tab: a short game to show why a computer can beat a person at
+  this.
+  - Using 1,000 past appointments (79 missed) and 100 calls, the visitor builds a rule for who
+    to phone from the eight clues the model sees, with each chosen clue getting an equal say.
+  - They then watch a computer learn its own weighting from 0 to 22,500 past appointments,
+    overtaking their rule after a few hundred.
+  - It ends with a table where "phone nobody" has the best accuracy and reaches nobody, and a
+    perfect model reaches only 42 of 79.
 - **Appointments** tab: a short introduction to the app, then the filterable appointment list.
   Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
   attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
@@ -31,20 +39,27 @@ streamlit run streamlit_app.py
 The Appointments and Weekly summary tabs also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
 
-The sidebar filters apply to the first two tabs. On the third they change only the upcoming
-calls-per-week figures, since the chart uses past appointments.
+The sidebar filters apply to the Appointments and Weekly summary tabs. On Who would we phone? they
+change only the upcoming calls-per-week figures, since the chart uses past appointments. They don't
+apply on Your rule vs the model, which uses past appointments only.
 
 ## Screen size
 
-The page names in the top bar show as three buttons when there is room. When the bar is narrower
-than about 1100px, they become a dropdown instead. The sidebar is Streamlit's default 300px
+The page names in the top bar show as four buttons when there is room. When the bar is narrower
+than about 1400px, they become a dropdown instead. The sidebar is Streamlit's default 300px
 (narrower than the other minis', to leave the page more room), so with it open the browser window
-needs to be about 1475px wide for the buttons (about 1175px with it shut).
+needs to be about 1775px wide for the buttons (about 1475px with it shut).
 
-Windows display scaling reduces the width the browser sees. On a 1920x1080 screen, 100% scaling gives
-1920px and 125% gives 1536px (both get the buttons), and 150% gives 1280px (you get the dropdown). To
-get the buttons back at 150%, zoom the browser out (Ctrl and minus; 80% gives 1600px). Everything
-still works with the dropdown; it just takes one more click to change page.
+Windows display scaling reduces the width the browser sees. On a 1920x1080 screen:
+
+| Scaling | Width the browser sees | Top bar |
+|---|---|---|
+| 100% | 1920px | the buttons |
+| 125% | 1536px | the buttons with the sidebar shut, the dropdown with it open |
+| 150% | 1280px | the dropdown |
+
+To get the buttons back, zoom the browser out (Ctrl and minus). Everything still works with the
+dropdown; it just takes one more click to change page.
 
 Below 1300px wide, some side-by-side rows wrap onto more lines (the keyed `reflow_*` containers in
 `streamlit_app.py`, styled at the end of `style.css`). On phones the sidebar opens over the page and
@@ -72,7 +87,8 @@ staff time only.
 
 ## Where the data and explanations come from
 
-The app reads four precomputed files in `data/`:
+The app reads precomputed files in `data/`: these four, plus the two for the Your rule vs the
+model tab (described below).
 
 - `forecast.csv`: the future appointments with the model's predicted DNA risk
 - `shap_values.csv`: each appointment's SHAP contributions, in percentage points
@@ -101,7 +117,23 @@ To rebuild (for example after changing `SEED` in `build/train_and_explain.py` or
 ```
 pip install -r build/requirements-build.txt
 python build/train_and_explain.py
+python build/rule_game_data.py
 ```
+
+`build/rule_game_data.py` makes the two files for the Your rule vs the model tab. It uses the same
+split as the main build, and checks that its test appointments match `past_predictions.csv`.
+
+- `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a
+  sensible person would use it. Numbers point the way that goes with more missed appointments,
+  and categories are scored by last year's miss rate.
+- `rule_game_learning.json`: the computer's results after learning from 0, 25, 50, ... 22,500 past
+  appointments.
+
+The computer is a logistic regression on raw inputs, so it has to learn which way each clue
+points as well as how much it counts. That's why it starts out worse than a person. With all the
+data it reaches the same share of misses as the XGBoost model (the build checks this). The demo
+data has no interactions between clues (`demo_data.py` adds their effects together), so the
+simpler model loses nothing.
 
 The build checks that the SHAP values add up to each prediction, that the past DNA rate is
 within a point of `DNA_RATE` and that every risk band has some appointments. It prints how the

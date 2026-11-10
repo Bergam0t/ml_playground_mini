@@ -67,15 +67,21 @@ def build_matrix(df):
     return X, group
 
 
-def main():
+def load_history():
+    """Past appointments, with outcomes drawn from the hidden true chance, split 75/10/15
+    into train / validation / test. Also used by build/rule_game_data.py, so both use one split."""
     rng = np.random.default_rng(SEED)
-
-    # ---- Past appointments, with outcomes drawn from the hidden true chance
     hist = generate_appointments(N_HISTORY, HISTORY_SEED, WEEKS)
     y = pd.Series(rng.binomial(1, hist["p_true"]), index=hist.index)
-    X, group = build_matrix(hist)
     idx_train, idx_temp = train_test_split(hist.index, train_size=0.75, stratify=y, random_state=SEED)
     idx_val, idx_test = train_test_split(idx_temp, test_size=0.6, stratify=y[idx_temp], random_state=SEED)
+    return hist, y, idx_train, idx_val, idx_test
+
+
+def main():
+    # ---- Past appointments, with outcomes drawn from the hidden true chance
+    hist, y, idx_train, idx_val, idx_test = load_history()
+    X, group = build_matrix(hist)
 
     model = XGBClassifier(n_estimators=1000, learning_rate=0.05, max_depth=3, early_stopping_rounds=50,
                           eval_metric="logloss", enable_categorical=False, random_state=SEED)

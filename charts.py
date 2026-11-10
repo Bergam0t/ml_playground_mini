@@ -158,6 +158,95 @@ def guide_waterfall() -> go.Figure:
     )
 
 
+YOU = FILTERED  # the visitor's rule on the "Your rule vs the model" tab
+COMPUTER = TOTAL  # the computer learning the points
+GRID = "rgba(255,255,255,0.1)"
+
+
+def say_bars(order: list, labels: dict, computer_say: dict, your_clues) -> go.Figure:
+    """How much say each clue gets: an equal share for each clue in the visitor's rule, and
+    what the computer has learnt. `order` is fixed by the caller so bars don't jump between
+    animation frames."""
+    yours = {f: (1 / len(your_clues) if f in your_clues else 0) for f in order}
+    fig = go.Figure()
+    for name, say, colour in (("Your rule", yours, YOU), ("The computer", computer_say, COMPUTER)):
+        fig.add_trace(
+            go.Bar(
+                orientation="h",
+                name=name,
+                y=[labels[f] for f in order],
+                x=[say[f] for f in order],
+                marker=dict(color=colour),
+                text=[f"{say[f]:.0%}" if say[f] >= 0.005 else "" for f in order],
+                textposition="outside",
+                textfont=dict(color=TEXT, size=13),
+                cliponaxis=False,
+                hovertemplate=f"{name}: %{{y}} has %{{x:.0%}} of the say<extra></extra>",
+            )
+        )
+    _layout(
+        fig,
+        110 + 46 * len(order),
+        barmode="group",
+        bargap=0.25,
+        bargroupgap=0.05,
+        legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0, itemclick=False, itemdoubleclick=False),
+        margin=dict(l=0, r=40, t=30, b=10),
+        xaxis=dict(range=[0, 1.05], tickformat=".0%", gridcolor=GRID, zeroline=False, fixedrange=True),
+    )
+    # _layout hides the legend; this chart needs it to tell the two bars apart
+    fig.update_layout(showlegend=True)
+    fig.update_yaxes(fixedrange=True)
+    return fig
+
+
+def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int, n_missed: int) -> go.Figure:
+    """Missed appointments (per 1,000 past appointments) the computer's calls reach, by how
+    many past appointments it has learnt from, drawn up to frame `upto`. The x axis is the
+    full set of sizes from the start (evenly spaced, as each roughly doubles), so it doesn't
+    move while it draws. `your_best` and `perfect` are counts on the same scale."""
+    sizes = [f"{f['n']:,}" for f in frames]
+    shown = frames[: upto + 1]
+    fig = go.Figure(
+        go.Scatter(
+            x=sizes[: upto + 1],
+            y=[f["outcomes"]["called_dna"] for f in shown],
+            mode="lines+markers",
+            line=dict(color=COMPUTER, width=3),
+            marker=dict(size=9, color=COMPUTER),
+            name="The computer",
+            hovertemplate=f"After %{{x}} past appointments: reaches %{{y}} of {n_missed}<extra></extra>",
+        )
+    )
+    lines = [(perfect, "A perfect model", MUTED, "dot")]
+    if your_best is not None:
+        lines.append((your_best, "Your best rule", YOU, "dash"))
+    for value, label, colour, dash in lines:
+        fig.add_hline(y=value, line=dict(color=colour, dash=dash, width=2))
+        fig.add_annotation(
+            x=0, xref="paper", xanchor="left", y=value, yanchor="bottom",
+            text=f"{label}: {value} of {n_missed}", showarrow=False, font=dict(color=colour, size=13),
+        )
+    fig.update_layout(
+        height=330,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=FONT,
+        showlegend=False,
+        margin=dict(l=0, r=10, t=10, b=10),
+        xaxis=dict(
+            title="Past appointments learnt from",
+            type="category", categoryorder="array", categoryarray=sizes,
+            range=[-0.5, len(sizes) - 0.5], gridcolor=GRID, fixedrange=True,
+        ),
+        yaxis=dict(
+            title=f"Misses reached (of {n_missed})", range=[0, n_missed * 0.65],
+            gridcolor=GRID, zeroline=False, fixedrange=True,
+        ),
+    )
+    return fig
+
+
 # The dataviz skill's fixed status steps (good / warning / critical), plus a recessive
 # grey for the large "nothing happens" group. Green and red are close for deuteranopes,
 # so every group also has its own marker shape, a legend label with its count, a hover
@@ -171,7 +260,7 @@ _ICON_STYLE = {
 _COLS = 40
 
 
-def icon_array(outcomes: dict) -> go.Figure:
+def icon_array(outcomes: dict, height: int = 560) -> go.Figure:
     """1,000 markers (40 x 25), one per 1,000 past appointments, grouped by outcome."""
     fig = go.Figure()
     start = 0
@@ -191,7 +280,7 @@ def icon_array(outcomes: dict) -> go.Figure:
         )
         start += count
     fig.update_layout(
-        height=560,
+        height=height,
         margin=dict(l=0, r=0, t=10, b=0),
         xaxis=dict(visible=False, range=[-1, _COLS], fixedrange=True),
         yaxis=dict(visible=False, scaleanchor="x", range=[-25, 1], fixedrange=True),
