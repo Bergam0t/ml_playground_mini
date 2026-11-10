@@ -246,6 +246,16 @@ data["High_Risk_DNA"] = (data["DNA_Prob_Forecast"] >= HIGH_RISK_MIN).astype(int)
 data["Probabilty"] = data["DNA_Prob_Forecast"] * 100
 
 
+# NIHR logo, directly under the HSMA logo in the sidebar header (ported from the
+# geographic playground mini). Keyed so style.css can size it and hide the image's
+# hover "fullscreen" button.
+with st.sidebar.container(key="nihr_logo"):
+    st.image(
+        "resources/NIHR_APPLIED_RESEARCH_COLLABORATION_Logo_Horizontal_RGB_WHITE.png",
+        width="stretch",
+        link="https://arc-sw.nihr.ac.uk/",
+    )
+
 # Filters
 st.sidebar.header("Filters")
 st.sidebar.caption("Choose which upcoming appointments the app shows.")

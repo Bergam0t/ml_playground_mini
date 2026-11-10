@@ -147,6 +147,18 @@ section[data-testid="stSidebar"][data-collapsed="false"] {
 	max-width: 100%;
 }
 
+/* ---- NIHR logo, under the HSMA logo (ported from the geographic playground mini) ---- */
+/* No hover "fullscreen" button (it is a link, not a picture to inspect) */
+.st-key-nihr_logo [data-testid="stElementToolbar"] { display: none; }
+/* Smaller, centred, and pulled up towards the HSMA logo, leaving more room for the
+	filters. A third of the image's height is clear space above the mark, and a third
+	below, so the negative margins only trim that. */
+.st-key-nihr_logo {
+	width: 15rem !important;
+	align-self: center;
+	margin: -1.9rem auto 0.4rem;
+}
+
 /* Title in the HSMA display font */
 h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-adjust: none; }
 [data-testid="stIconMaterial"] { font-size-adjust: none; }
