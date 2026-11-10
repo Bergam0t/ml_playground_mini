@@ -97,13 +97,10 @@ section[data-testid="stSidebar"] hr {
 	margin-bottom: 1.6rem;
 }
 
-/* Sidebar width. This Streamlit marks an open sidebar with data-collapsed, not
-	aria-expanded (an aria-expanded rule here never matched, leaving Streamlit's 300px).
-	On phones Streamlit's own cap wins instead (see the end of this file). */
-section[data-testid="stSidebar"][data-collapsed="false"] {
-	width: 22rem !important;
-	min-width: 22rem !important;
-}
+/* Sidebar width: Streamlit's own 300px, which leaves the page more room than the
+	other minis' wider sidebars. (If it is ever widened, this Streamlit marks an open
+	sidebar with data-collapsed="false", not aria-expanded, and phones need
+	min-width: 0 so Streamlit's ~90% cap still wins.) */
 
 /* ---- Sidebar logo (st.logo) ---- */
 /* st.logo caps the height even at size="large"; the HSMA asset is a square
@@ -195,7 +192,7 @@ h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-
 }
 /* ---- Page dropdown in place of the tab pills ---- */
 /* Too narrow for the title and three pills side by side (they need about 1090px, so a
-	window under about 1570px with the sidebar open, a tablet, a phone): swap the pills for
+	window under about 1475px with the sidebar open, a tablet, a phone): swap the pills for
 	a dropdown, added by add_mobile_nav in mobile_nav.py. The container holding its script
 	never takes up space. On a phone the dropdown drops below the title (the bar wraps).
 	Ported from the geographic playground mini. */
@@ -307,8 +304,8 @@ select.mobile-nav,
 	more lines; below 640px Streamlit's own stacking takes over again. Rows opt in
 	through the key of the container they sit in (set in streamlit_app.py):
 	- reflow_stack_*: one item per line
-	- reflow_halves_*: two per line (one per line from 768 to 1000px, see below)
-	- reflow_docked_*: one per line from 768 to 1000px only */
+	- reflow_halves_*: two per line (one per line from 768 to 900px, see below)
+	- reflow_docked_*: one per line from 768 to 900px only */
 @media (max-width: 1299.98px) {
 	[class*="st-key-reflow_"] [data-testid="stHorizontalBlock"] {
 		flex-wrap: wrap;
@@ -324,9 +321,9 @@ select.mobile-nav,
 	}
 }
 /* From 768px the sidebar sits beside the page instead of over it, so up to about
-	1000px the main area is under 600px wide: one per line there, for the halves rows
+	900px the main area is under 600px wide: one per line there, for the halves rows
 	and for rows that are only cramped there (reflow_docked_*). */
-@media (min-width: 768px) and (max-width: 999.98px) {
+@media (min-width: 768px) and (max-width: 899.98px) {
 	[class*="st-key-reflow_halves_"] [data-testid="stColumn"],
 	[class*="st-key-reflow_docked_"] [data-testid="stColumn"] {
 		min-width: calc(100% - 2rem);
@@ -349,11 +346,6 @@ select.mobile-nav,
 
 /* ---- Phones (Streamlit's own breakpoint: under 768px the sidebar is an overlay) ---- */
 @media (max-width: 767.98px) {
-	/* The sidebar is an overlay here: let Streamlit's own cap (about 90% of the
-		screen) win over the 22rem width, or it runs off the edge of a phone. */
-	section[data-testid="stSidebar"][data-collapsed="false"] {
-		min-width: 0 !important;
-	}
 	/* A smaller navbar title and dropdown. The title has to fit beside the
 		expand button on a 360px-wide phone, so the bar's right padding is trimmed too. */
 	[role="tablist"]:not([data-testid="stTabPanel"] *) {

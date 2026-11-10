@@ -37,13 +37,14 @@ calls-per-week figures, since the chart uses past appointments.
 ## Screen size
 
 The page names in the top bar show as three buttons when there is room. When the bar is narrower
-than about 1100px, they become a dropdown instead. The sidebar takes 22rem (396px), so with it open
-the browser window needs to be about 1570px wide for the buttons (about 1170px with it shut).
+than about 1100px, they become a dropdown instead. The sidebar is Streamlit's default 300px
+(narrower than the other minis', to leave the page more room), so with it open the browser window
+needs to be about 1475px wide for the buttons (about 1175px with it shut).
 
 Windows display scaling reduces the width the browser sees. On a 1920x1080 screen, 100% scaling gives
-1920px (buttons), 125% gives 1536px and 150% gives 1280px (both get the dropdown). To get the buttons
-back, set scaling to 100% or zoom the browser out (Ctrl and minus; 90% at 125% scaling gives about
-1700px). Everything still works with the dropdown; it just takes one more click to change page.
+1920px and 125% gives 1536px (both get the buttons), and 150% gives 1280px (you get the dropdown). To
+get the buttons back at 150%, zoom the browser out (Ctrl and minus; 80% gives 1600px). Everything
+still works with the dropdown; it just takes one more click to change page.
 
 Below 1300px wide, some side-by-side rows wrap onto more lines (the keyed `reflow_*` containers in
 `streamlit_app.py`, styled at the end of `style.css`). On phones the sidebar opens over the page and
