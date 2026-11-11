@@ -37,7 +37,9 @@ streamlit run streamlit_app.py
   attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
   what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
   chart beside it for the filtered appointments when the appointment-detail filters leave at
-  least 30 (not shown for the DNA Risk and Confidence filters, which select by the forecast).
+  least 30. The DNA Risk and Confidence filters sit above the appointment list and narrow only
+  that list: in the sidebar they would fight the tab's own forecast cards, grid and call list,
+  and the chart would go round in circles (they select by the forecast it explains).
 - **Weekly summary** tab: appointments and forecast DNAs by week and day.
 - **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart

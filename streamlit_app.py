@@ -134,6 +134,26 @@ def Confidence_Score_Txt(confidence):
         return "Very High"
 
 
+# The table's forecast filters (above the appointments table): the bands from DNA_Risk()
+# and Confidence_Score_Txt()
+BANDS = ["Low", "Medium", "High", "Very High"]
+RISK_HELP = (
+    "The model's predicted risk that the patient won't attend.  \n"
+    "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 40%  \n"
+    "**Very High:** 40% or more  \n"
+    "About 8% of appointments are missed. High and Very High (20% or more, about two and a half "
+    "times the average) are forecast as DNAs; Very High is also flagged high-risk."
+)
+CONFIDENCE_HELP = (
+    "How clear-cut the model's yes-or-no call is: how far the risk is from 20%, where the "
+    "forecast changes from No to Yes. It follows from the risk.  \n"
+    "**Low:** under 50% (risk 8% to 43%)  \n"
+    "**Medium:** 50% to 80% (risk 3% to 8% or 43% to 69%)  \n"
+    "**High:** 80% to 90% (risk 1.3% to 3% or 69% to 83%)  \n"
+    "**Very High:** 90% or more (risk under 1.3% or over 83%)"
+)
+
+
 # Cell colours for the model's forecast columns on the appointments table. Dark shades
 # with white text so they read on the dark theme; the patient columns stay uncoloured.
 EXPECTED_DNA_COLOURS = {"Yes": "#8b1e2d", "No": "#1e5631"}
@@ -161,7 +181,7 @@ def forecast_cell_styles(df):
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
     styles["Expected DNA"] = df["Expected DNA"].map(EXPECTED_DNA_COLOURS).map(css)
     styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
-    # Same bands as the sidebar's "DNA Risk" filter
+    # Same bands as the table's "DNA Risk" filter
     styles["Probabilty"] = (
         (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
     )
@@ -204,7 +224,8 @@ APPOINTMENT_COLUMNS = {
     ),
     "Confidence": st.column_config.TextColumn(
         width=105,
-        help="Model forecast: how clear-cut the yes-or-no call is. Low for risks near 50%. "
+        help="Model forecast: how clear-cut the yes-or-no call is. Low for risks near "
+        f"{FORECAST_MIN:.0%}, where the forecast changes from No to Yes. "
         "Darker teal is less clear-cut.",
     ),
     "Probabilty": st.column_config.NumberColumn(
@@ -455,50 +476,14 @@ if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
     st.info("No appointments match the selected filters.")
     st.stop()
 
-if show_filters:
-    st.sidebar.divider()
-    st.sidebar.subheader("Model forecast")
-
-# DNA Risk options (from filtered data)
-risk_options = ["Low", "Medium", "High", "Very High"]
-available_risks = [r for r in risk_options if r in filtered_data["Risk"].unique()]
-selected_dna_risk = filter_select(
-    "Select DNA Risk",
-    ["All"] + available_risks,
-    "filter_risk",
-    # Bands from DNA_Risk()
-    help="The model's predicted risk that the patient won't attend.  \n"
-    "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 40%  \n"
-    "**Very High:** 40% or more  \n"
-    "About 8% of appointments are missed. High and Very High (20% or more, about two and a half "
-    "times the average) are forecast as DNAs; Very High is also flagged high-risk.",
-)
-
-if selected_dna_risk != "All":
-    filtered_data = filtered_data[filtered_data["Risk"] == selected_dna_risk]
-
-
-# --- NEW: Filter for Confidence Level ---
-confidence_options = ["Low", "Medium", "High", "Very High"]
-available_confidences = [
-    c for c in confidence_options if c in filtered_data["Confidence"].unique()
-]
-selected_confidence = filter_select(
-    "Select Confidence Level",
-    ["All"] + available_confidences,
-    "filter_confidence",
-    # Bands from Confidence_Score_Txt()
-    help="How clear-cut the model's yes-or-no call is: how far the risk is from 20%, where the "
-    "forecast changes from No to Yes. It follows from the risk.  \n"
-    "**Low:** under 50% (risk 8% to 43%)  \n"
-    "**Medium:** 50% to 80% (risk 3% to 8% or 43% to 69%)  \n"
-    "**High:** 80% to 90% (risk 1.3% to 3% or 69% to 83%)  \n"
-    "**Very High:** 90% or more (risk under 1.3% or over 83%)",
-)
-
-if selected_confidence != "All":
-    filtered_data = filtered_data[filtered_data["Confidence"] == selected_confidence]
-# --- END of new filter ---
+# The model's forecast (DNA Risk, Confidence) is filtered above the appointments table
+# instead, for that table only: here it would fight the tab's own forecast cards, grid and
+# call list. Its choices are kept while the table isn't drawn (Streamlit forgets a widget's
+# value on a run that doesn't draw it).
+for key in ("filter_risk", "filter_confidence"):
+    if st.session_state.get(key) not in ["All", *BANDS]:
+        st.session_state[key] = "All"
+    st.session_state[key] = st.session_state[key]
 
 # The How many people should we phone? tab's own controls, only on that tab. Filled in from
 # that tab's code below, which works out the slider range; None on the other tabs.
@@ -606,8 +591,6 @@ filter_key = hashlib.md5(
             selected_specialty,
             selected_appointment_type,
             selected_appointment_location,
-            selected_dna_risk,
-            selected_confidence,
         )
     ).encode()
 ).hexdigest()[:10]
@@ -921,23 +904,45 @@ with tab_appts:
             icon=":material/touch_app:",
         )
 
+        # The model's forecast filters, for this table only (the cards, grid and chart above
+        # and below follow just the sidebar's filters)
+        risk_col, confidence_col = st.columns(2)
+        selected_dna_risk = risk_col.selectbox(
+            "DNA Risk", ["All", *BANDS], key="filter_risk", help=RISK_HELP
+        )
+        selected_confidence = confidence_col.selectbox(
+            "Confidence", ["All", *BANDS], key="filter_confidence", help=CONFIDENCE_HELP
+        )
+        if selected_dna_risk != "All":
+            table_data = table_data[table_data["Risk"] == selected_dna_risk]
+        if selected_confidence != "All":
+            table_data = table_data[table_data["Confidence"] == selected_confidence]
+
         # Highest risk first, so the first rows are the red ones worth clicking. Sorted here
         # rather than in the grid, so the selected position still matches table_data.
         table_data = table_data.sort_values(
             "DNA_Prob_Forecast", ascending=False, kind="stable"
         )
-        table = st.dataframe(
-            appointment_table(table_data),
-            column_config=APPOINTMENT_COLUMNS,
-            hide_index=True,
-            alt="Upcoming appointments with the forecast risk of not attending",
-            on_select="rerun",
-            selection_mode="single-row",
-            key=f"appointments_{filter_key}_{day_key}",
-        )
-
-        # Selected positions refer to the rows as passed in, whatever sorting the user applies
-        selected_rows = [r for r in table.selection.rows if r < len(table_data)]
+        selected_rows = []
+        if table_data.empty:
+            st.info(
+                "No appointments match the DNA Risk and Confidence chosen above. Choose **All** "
+                "in either to see more."
+            )
+        else:
+            table = st.dataframe(
+                appointment_table(table_data),
+                column_config=APPOINTMENT_COLUMNS,
+                hide_index=True,
+                alt="Upcoming appointments with the forecast risk of not attending",
+                on_select="rerun",
+                selection_mode="single-row",
+                # A new key when any filter or the day changes, so an old selection never
+                # points at a different appointment
+                key=f"appointments_{filter_key}_{day_key}_{selected_dna_risk}_{selected_confidence}",
+            )
+            # Selected positions refer to the rows as passed in, whatever sorting the user applies
+            selected_rows = [r for r in table.selection.rows if r < len(table_data)]
         if selected_rows:
             row = table_data.iloc[selected_rows[0]]
             meta = load_model_meta()
@@ -1008,14 +1013,10 @@ with tab_appts:
             shap_all = load_shap()
             n = len(filtered_data)
             is_filtered = n < len(data)
-            # Not for the forecast filters: they pick appointments by the very pushes being
-            # charted (Very High risk = big pushes up), so the comparison would be circular
-            forecast_filtered = (
-                selected_dna_risk != "All" or selected_confidence != "All"
-            )
-            show_filtered = (
-                is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
-            )
+            # filtered_data leaves out the table's forecast filters: they pick appointments by
+            # the very pushes being charted (Very High risk = big pushes up), so the comparison
+            # would be circular
+            show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART
 
             st.subheader("What the model relies on most")
             st.markdown(
@@ -1062,12 +1063,6 @@ with tab_appts:
                         f"that one {listed} moves the risk."
                     )
                 st.markdown("\n".join(f"- {note}" for note in notes))
-            elif forecast_filtered:
-                st.caption(
-                    "No chart for your filters while a Model forecast filter (DNA Risk or Confidence) "
-                    "is set: those filters pick appointments by the forecast this chart explains, so "
-                    "the comparison would go round in circles."
-                )
             elif is_filtered:
                 st.caption(
                     f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
