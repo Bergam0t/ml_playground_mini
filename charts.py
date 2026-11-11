@@ -213,7 +213,8 @@ def learning_curve(
     many past appointments it has learnt from, drawn up to frame `upto`. The x axis is the
     full set of sizes from the start (evenly spaced, as each roughly doubles), so it doesn't
     move while it draws. `your_best` and `perfect` are counts on the same scale. `overtook`
-    is the frame where the model first beats your best: marked once the line reaches it."""
+    is the frame where the model first beats your best: marked once the line reaches it. The
+    newest point is labelled with the model's score."""
     sizes = [f"{f['n']:,}" for f in frames]
     shown = frames[: upto + 1]
     fig = go.Figure(
@@ -224,7 +225,7 @@ def learning_curve(
             line=dict(color=MODEL, width=3),
             marker=dict(size=9, color=MODEL),
             name="The model",
-            hovertemplate=f"After %{{x}} past appointments: %{{y}} of the {n_missed} who missed on its list<extra></extra>",
+            hovertemplate=f"After %{{x}} past appointments: %{{y}} of the {n_missed} missed appointments correctly predicted<extra></extra>",
         )
     )
     lines = [(perfect, "Best possible list", MUTED, "dot")]
@@ -236,6 +237,16 @@ def learning_curve(
             x=0, xref="paper", xanchor="left", y=value, yanchor="bottom",
             text=f"{label}: {value} of {n_missed}", showarrow=False, font=dict(color=colour, size=13),
         )
+    # The model's latest score, beside its newest point: to the right while there is room, under
+    # it for the last two points (the line is flat there, so nothing is in the way)
+    latest = shown[-1]["outcomes"]["called_dna"]
+    near_end = upto >= len(sizes) - 2
+    fig.add_annotation(
+        x=upto, y=latest, text=f"<b>Computer: {latest} of {n_missed}</b>", showarrow=False,
+        xanchor="right" if near_end else "left", yanchor="top" if near_end else "middle",
+        xshift=0 if near_end else 12, yshift=-12 if near_end else 0,
+        font=dict(color=MODEL, size=13),
+    )
     if overtook is not None and overtook <= upto:
         fig.add_annotation(
             # By position on the category axis: plotly reads a label such as "400" as a number
@@ -256,7 +267,7 @@ def learning_curve(
             range=[-0.5, len(sizes) - 0.5], gridcolor=GRID, fixedrange=True,
         ),
         yaxis=dict(
-            title=f"Missed, and on the list (of {n_missed})", range=[0, n_missed * 0.65],
+            title=f"Correctly predicted (of {n_missed})", range=[0, n_missed * 0.65],
             gridcolor=GRID, zeroline=False, fixedrange=True,
         ),
     )

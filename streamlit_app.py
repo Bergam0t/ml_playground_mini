@@ -1651,7 +1651,7 @@ with tab_game:
             )
         with right:
             st.metric(
-                "Missed appointments on your list",
+                "Missed appointments correctly predicted by your rule",
                 f"{caught} of {n_missed}",
                 f"{caught - prev['caught']:+d} since your last rule" if prev else None,
                 border=True,
@@ -1744,25 +1744,28 @@ with tab_game:
                 "Past appointments learnt from",
                 f"{f['n']:,}",
                 border=True,
+                height="stretch",
                 icon=":material/school:",
             )
             m2.metric(
-                "Missed appointments on its list",
+                "Missed appointments correctly predicted by the computer",
                 f"{f['outcomes']['called_dna']} of {n_missed}",
                 border=True,
+                height="stretch",
                 icon=":material/smart_toy:",
             )
             m3.metric(
-                "Your best rule",
+                "Missed appointments correctly predicted by your best rule",
                 f"{best['outcomes']['called_dna']} of {n_missed}",
                 border=True,
+                height="stretch",
                 icon=":material/person:",
             )
             left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns(
                 [0.55, 0.45], gap="large"
             )
             with left:
-                st.markdown("**The race: missed appointments on each list**")
+                st.markdown("**The race: missed appointments correctly predicted**")
                 st.plotly_chart(
                     charts.learning_curve(
                         frames,
@@ -1822,8 +1825,8 @@ with tab_game:
                 if at is not None
                 else ""
             )
-            + f"With all {learning['n_train']:,}, its list would have reached {theirs} of the {n_missed} "
-            f"missed appointments, against your {yours}.",
+            + f"With all {learning['n_train']:,}, the computer would have correctly predicted {theirs} of "
+            f"the {n_missed} missed appointments, against your {yours}.",
             icon=":material/emoji_events:",
         )
 
