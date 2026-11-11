@@ -244,12 +244,12 @@ def demo_notice_full():
     )
 
 
-def intro_columns(key, notice=demo_notice_full):
+def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
     """Columns for a tab's opening text (left) beside the demonstration notice (right).
 
     Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
     """
-    left, right = st.container(key=f"reflow_stack_{key}").columns([0.65, 0.35], gap="large")
+    left, right = st.container(key=f"reflow_stack_{key}").columns(list(widths), gap="large")
     with right:
         notice()
     return left
@@ -330,21 +330,40 @@ if st.session_state.get("page") == TAB_LABELS[1]:
     )
 view = st.session_state.get("appt_view") or VIEW_ALL
 
-# Filters
-st.sidebar.header("Filters")
-st.sidebar.caption("Choose which upcoming appointments the app shows.")
+# Filters. Hidden on the How many people should we phone? tab, which uses all the upcoming
+# appointments and only shows the cost assumptions. The choices made on the other tabs are
+# kept, and still applied to them, while it is open.
+show_filters = st.session_state.get("page") != TAB_LABELS[2]
+
+
+def filter_select(label, options, key, **kwargs):
+    """A sidebar filter; while the filters are hidden, the choice kept from the other tabs."""
+    if show_filters:
+        return st.sidebar.selectbox(label, options=options, key=key, **kwargs)
+    kept = st.session_state.get(key, "All")
+    if kept not in options:
+        kept = "All"
+    # Streamlit forgets a widget's value on a run that doesn't draw it, unless it is set again
+    st.session_state[key] = kept
+    return kept
+
+
+if show_filters:
+    st.sidebar.header("Filters")
+    st.sidebar.caption("Choose which upcoming appointments the app shows.")
 # Start with the full data
 filtered_data = data.copy()
 
 # Facts about the appointment first, then the model's forecast for it
-st.sidebar.subheader("Appointment details")
+if show_filters:
+    st.sidebar.subheader("Appointment details")
 
 # Allow the user to filter by Site
 reporting_site_options = sorted(
     filtered_data["Reporting_Site"].dropna().unique()
 )
-selected_reporting_site = st.sidebar.selectbox(
-    "Select Reporting Site", options=["All"] + list(reporting_site_options)
+selected_reporting_site = filter_select(
+    "Select Reporting Site", ["All"] + list(reporting_site_options), "filter_site"
 )
 
 if selected_reporting_site != "All":
@@ -355,8 +374,8 @@ if selected_reporting_site != "All":
 
 # Specialty filter options (always from full data)
 specialty_options = sorted(filtered_data["Specialty"].dropna().unique())
-selected_specialty = st.sidebar.selectbox(
-    "Select Specialty", options=["All"] + list(specialty_options)
+selected_specialty = filter_select(
+    "Select Specialty", ["All"] + list(specialty_options), "filter_specialty"
 )
 
 if selected_specialty != "All":
@@ -368,8 +387,8 @@ if selected_specialty != "All":
 appointment_type_options = sorted(
     filtered_data["Appointment Type"].dropna().unique()
 )
-selected_appointment_type = st.sidebar.selectbox(
-    "Select Appointment Type", options=["All"] + list(appointment_type_options)
+selected_appointment_type = filter_select(
+    "Select Appointment Type", ["All"] + list(appointment_type_options), "filter_type"
 )
 
 if selected_appointment_type != "All":
@@ -381,9 +400,10 @@ if selected_appointment_type != "All":
 appointment_location_options = sorted(
     filtered_data["Appointment Location Text"].dropna().unique()
 )
-selected_appointment_location = st.sidebar.selectbox(
+selected_appointment_location = filter_select(
     "Select Appointment Location",
-    options=["All"] + list(appointment_location_options),
+    ["All"] + list(appointment_location_options),
+    "filter_location",
 )
 
 if selected_appointment_location != "All":
@@ -396,17 +416,19 @@ if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
     st.info("No appointments match the selected filters.")
     st.stop()
 
-st.sidebar.divider()
-st.sidebar.subheader("Model forecast")
+if show_filters:
+    st.sidebar.divider()
+    st.sidebar.subheader("Model forecast")
 
 # DNA Risk options (from filtered data)
 risk_options = ["Low", "Medium", "High", "Very High"]
 available_risks = [
     r for r in risk_options if r in filtered_data["Risk"].unique()
 ]
-selected_dna_risk = st.sidebar.selectbox(
+selected_dna_risk = filter_select(
     "Select DNA Risk",
-    options=["All"] + available_risks,
+    ["All"] + available_risks,
+    "filter_risk",
     # Bands from DNA_Risk()
     help="The model's predicted risk that the patient won't attend.  \n"
     "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 40%  \n"
@@ -424,9 +446,10 @@ confidence_options = ["Low", "Medium", "High", "Very High"]
 available_confidences = [
     c for c in confidence_options if c in filtered_data["Confidence"].unique()
 ]
-selected_confidence = st.sidebar.selectbox(
+selected_confidence = filter_select(
     "Select Confidence Level",
-    options=["All"] + available_confidences,
+    ["All"] + available_confidences,
+    "filter_confidence",
     # Bands from Confidence_Score_Txt()
     help="How clear-cut the model's yes-or-no call is: the gap between its chance that the "
     "patient won't attend and its chance that they will. It follows from the risk.  \n"
@@ -444,7 +467,8 @@ if selected_confidence != "All":
 
 # Cost assumptions: not filters, so they stay out of filter_key below and editing them
 # never clears a table selection
-st.sidebar.divider()
+if show_filters:
+    st.sidebar.divider()
 st.sidebar.subheader("Cost assumptions")
 band5 = costs.admin_hourly_cost(**costs.BAND5)
 with st.sidebar.expander("Calls and missed appointments", icon=":material/payments:"):
@@ -1024,14 +1048,16 @@ with tab_appts:
 
 # ---------------------------------------------------------------- tab 3
 # Ported from the "Who would we phone?" page of lambda_ml_streamlit_exercise. The counts
-# come from past appointments with known outcomes; the upcoming appointments (which follow
-# the sidebar filters) only turn the chosen setting into calls per week.
+# come from past appointments with known outcomes; the upcoming appointments (all of them:
+# the sidebar hides the filters on this tab) only turn the chosen setting into calls per week.
 with tab_calls:
     meta = load_model_meta()
     past = load_past()
     p_past = past["DNA_Prob_Forecast"].to_numpy()
 
-    with intro_columns("intro_calls"):
+    # The thought-experiment box sits under the opening text and the notice column is wider than
+    # on the other tabs, so the short opening text and the long notice come out about as tall
+    with intro_columns("intro_calls", widths=(0.55, 0.45)):
         st.subheader("How many people should we phone?")
         st.markdown(
             "This tab helps weigh up how many reminder calls to make, and who should get them. "
@@ -1039,15 +1065,16 @@ with tab_calls:
             "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
             "calls the team can make**, or by **how high the predicted risk must be**."
         )
-    st.info(
-        "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
-        f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
-        "in them was phoned. Imagine the model had made its list for them: we can check who it would have "
-        "picked against who really did not attend."
-    )
+        st.info(
+            "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
+            f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
+            "in them was phoned. Imagine the model had made its list for them: we can check who it would have "
+            "picked against who really did not attend."
+        )
 
-    # Upcoming appointments in the sidebar filters, by week
-    upcoming_week = pd.to_datetime(filtered_data["Activity_Date"]).dt.to_period("W-SUN")
+    # All the upcoming appointments, by week: the filters are hidden on this tab
+    upcoming = data.assign(DNA_Cost=costs.appointment_costs(data, dna_costs, share_lost))
+    upcoming_week = pd.to_datetime(upcoming["Activity_Date"]).dt.to_period("W-SUN")
     per_week = upcoming_week.value_counts()
     n_weeks = len(per_week)
 
@@ -1064,8 +1091,8 @@ with tab_calls:
     ctrl_left, ctrl_right = st.container(key="reflow_docked_controls").columns(2, gap="large")
 
     if mode == "Calls the team can make":
-        # Slider runs up to the busiest filtered week, rounded up to a multiple of 10. Clamp
-        # the kept value first, so changing the filters never leaves it out of range.
+        # Slider runs up to the busiest upcoming week, rounded up to a multiple of 10. Clamp
+        # the kept value first, so it is never out of range.
         busiest = max(10, int(-(-per_week.max() // 10) * 10))
         if st.session_state.get("calls_per_week", 0) > busiest:
             st.session_state["calls_per_week"] = busiest
@@ -1077,11 +1104,11 @@ with tab_calls:
             step=10,
             key="calls_per_week",
             help="Each week, the team phones this many of that week's highest-risk appointments "
-            "(from the appointments in the sidebar filters).",
+            "(from all the upcoming appointments).",
         )
         # Each week, phone that week's highest-risk appointments, up to capacity. The past
         # appointments then get the same share of calls, highest risk first.
-        rank_in_week = filtered_data["DNA_Prob_Forecast"].groupby(upcoming_week).rank(
+        rank_in_week = upcoming["DNA_Prob_Forecast"].groupby(upcoming_week).rank(
             method="first", ascending=False
         )
         upcoming_called = rank_in_week <= cap
@@ -1106,8 +1133,8 @@ with tab_calls:
         ) / 100
         called = calls.called_by_threshold(p_past, risk_min)
         upcoming_called = pd.Series(
-            calls.called_by_threshold(filtered_data["DNA_Prob_Forecast"], risk_min),
-            index=filtered_data.index,
+            calls.called_by_threshold(upcoming["DNA_Prob_Forecast"], risk_min),
+            index=upcoming.index,
         )
         how = (
             "**Here you set the bar, and the number of calls follows from it.** A lower bar means more calls, "
@@ -1132,10 +1159,10 @@ with tab_calls:
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
 
-    # Weekly figures for the upcoming appointments in the sidebar filters. Precision is None
+    # Weekly figures for all the upcoming appointments. Precision is None
     # when the setting phones nobody, and dna_cost is None when nobody upcoming is phoned.
     weekly_calls = upcoming_called.sum() / n_weeks
-    dna_cost = costs.cost_per_dna_reached(filtered_data[upcoming_called])
+    dna_cost = costs.cost_per_dna_reached(upcoming[upcoming_called])
     has_costs = out["calls"] > 0 and weekly_calls > 0 and dna_cost is not None
     if out["calls"] > 0:
         weekly_reached = weekly_calls * out["precision"]
@@ -1164,7 +1191,7 @@ with tab_calls:
         with st.container(border=True):
             st.markdown(
                 f"**What this setting costs and might save, per week** (about {weekly_calls:.0f} calls, "
-                "for the upcoming appointments in your filters)"
+                "for all the upcoming appointments)"
             )
             # Fixed columns rather than a horizontal container, so the four cards never wrap
             # three and one. Keyed so style.css shows them two per line on narrower screens.
@@ -1222,8 +1249,8 @@ with tab_calls:
             )
     elif out["calls"] > 0:
         st.info(
-            "None of the upcoming appointments in your filters would get a call with this setting, so "
-            "there is nothing to cost. Widen the sidebar filters or lower the bar."
+            "None of the upcoming appointments would get a call with this setting, so there is "
+            "nothing to cost. Lower the bar."
         )
 
     if out["calls"] == 0:
@@ -1320,32 +1347,31 @@ with tab_calls:
         m3.metric(
             "Possibly avoided, per week",
             f"{weekly_avoided:.0f}",
-            help="For the upcoming appointments in the sidebar filters, if the assumption above holds.",
+            help="For all the upcoming appointments, if the assumption above holds.",
         )
 
         st.markdown(
-            f"**For the upcoming appointments in your filters** ({len(filtered_data):,} over {n_weeks} "
+            f"**For all the upcoming appointments** ({len(upcoming):,} over {n_weeks} "
             f"week{'s' if n_weeks != 1 else ''}), this setting means about **{weekly_calls:.0f} calls a week**. "
             f"Going by the past appointments, about **{weekly_reached:.0f}** of them would reach someone who "
             f"would otherwise miss their appointment, and if a call gets {effect}% of them to come, about "
             f"**{weekly_avoided:.0f}** fewer missed appointments a week."
         )
         st.caption(
-            "Only this paragraph and the last figure above follow the sidebar filters, including the risk and "
-            "confidence filters: filter to high-risk appointments only and there are fewer to phone. The chart "
-            "uses all past appointments. Weekly figures use the past precision, so they are rough."
+            "Only this paragraph and the last figure above use the upcoming appointments; the chart uses "
+            "the past ones. Weekly figures use the past precision, so they are rough."
         )
 
         st.divider()
         st.subheader("How the cost is worked out")
         if not has_costs:
             st.info(
-                "None of the upcoming appointments in your filters would get a call with this "
-                "setting, so there is nothing to cost. Widen the sidebar filters or lower the bar."
+                "None of the upcoming appointments would get a call with this "
+                "setting, so there is nothing to cost. Lower the bar."
             )
         else:
             st.markdown(
-                f"Per week, for the upcoming appointments in your filters. A call costs about "
+                f"Per week, for all the upcoming appointments. A call costs about "
                 f"**£{cost_per_call:.2f}** of staff time, and a missed appointment among the patients "
                 f"these calls would reach costs about **£{dna_cost:,.0f}** on average (more for new "
                 "appointments and some specialties). Change these under **Cost assumptions** in the "
@@ -1616,7 +1642,7 @@ with tab_game:
     # ---- 3. The verdict, straight after the race
     if st.session_state.get("game_trained") and best:
         st.markdown("#### 3. See whose list did best")
-        final, perfect, none = frames[-1], learning["perfect"], rule_game.nobody(game_past)
+        final, perfect = frames[-1], learning["perfect"]
         yours, theirs = best["outcomes"]["called_dna"], final["outcomes"]["called_dna"]
         st.success(
             (
@@ -1630,59 +1656,28 @@ with tab_game:
             icon=":material/emoji_events:",
         )
 
-        rows = [
-            ("Your best rule", best),
-            ("The model", final),
-            ("A perfect model", perfect),
-            ("Phone nobody", none),
-        ]
-        table_col, why_col = st.container(key="reflow_stack_game_verdict").columns([0.45, 0.55], gap="large")
-        table_col.table(
-            pd.DataFrame(
-                {
-                    "Rule": [name for name, _ in rows],
-                    f"Missed, and on the list (of {n_missed})": [r["outcomes"]["called_dna"] for _, r in rows],
-                    "Accuracy": [f"{r['accuracy']:.0%}" for _, r in rows],
-                }
-            ).set_index("Rule")
-        )
         say = final["say"]
         top_two = say_order[:2]
         found = (
-            f"You found the best of all {n_rules} rules you could make ({best_possible} of {n_missed}), "
-            "and the model still beat it."
+            "You found the best rule the buttons can make, and it still won."
             if yours >= best_possible
-            else f"Even the best of all {n_rules} rules you could make reaches only {best_possible} of {n_missed}."
-        )
-        why_col.markdown(
-            f"**Your rule and the model add up the same clues. The difference is how much say each gets.** {found}\n\n"
-            "Your rule gives each clue an equal say. The model learnt how much say each one should get: "
-            f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%}, "
-            f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. "
-            "Learning that from many past appointments, then being tested on ones it hadn't seen, is what "
-            "the computer adds."
-            + (
-                f" With {frames[at - 1]['n']:,} or fewer appointments to learn from it did no better than "
-                "you: it had to work out which way each clue points, too."
-                if at
-                else ""
-            )
+            else f"No rule from the buttons can match it: the best reaches {best_possible} of {n_missed}."
         )
 
         c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(2, gap="small")
-        with c1.container(border=True, key="title_card_game_accuracy", height="stretch"):
-            st.markdown(":material/percent: **Accuracy is the wrong score.**")
+        with c1.container(border=True, key="title_card_game_say", height="stretch"):
+            st.markdown(":material/balance: **Same clues. The model learnt which matter most.**")
             st.markdown(
-                f"Phoning nobody is the most accurate rule in the table ({none['accuracy']:.0%}), because "
-                "most patients attend, so \"everyone will come\" is usually right. It just puts nobody on "
-                "the call list. Ask how many of the people who missed are on the list instead."
+                "Your rule gives every clue an equal say. The model gives "
+                f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
+                f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. {found}"
             )
         with c2.container(border=True, key="title_card_game_limit", height="stretch"):
             st.markdown(":material/visibility_off: **Nobody gets them all.**")
             st.markdown(
-                "Even a perfect model, which knew each patient's true chance of missing, would have put "
-                f"only {perfect['outcomes']['called_dna']} of the {n_missed} on its list. Many missed "
-                "appointments come down to things no data records."
+                "Even a perfect list, one that knows each patient's true chance of missing, reaches only "
+                f"{perfect['outcomes']['called_dna']} of {n_missed}. A chance isn't a certainty, and many "
+                "misses come down to things no data records."
             )
 
         # ---- Why a computer? (like the geographic mini's "Why computers?")

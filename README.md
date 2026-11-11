@@ -23,10 +23,10 @@ streamlit run streamlit_app.py
   - They then watch a model learn its own weighting from 0 to 22,500 past appointments: the
     race against their best rule beside how much say each clue gets. A toast and an
     "Overtook you" marker show where the model passes them (400 for the best rule).
-  - The verdict follows at once: a table where "phone nobody" has the best accuracy and reaches
-    nobody, the note that no rule from the buttons can win (the model reaches 40), and two
-    cards: accuracy is the wrong score, and a perfect model reaches only 42 of 79. A short "Why
-    a computer?" section comes last.
+  - The verdict follows at once: a banner saying where the model overtook them, then two short
+    cards: same clues but the model learnt which matter most (no rule from the buttons can match
+    its 40), and even the best possible list (knowing each patient's true chance) reaches only
+    42 of 79. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
   - Two buttons lead on to the Upcoming appointments and How many people should we phone? tabs, as in the

@@ -71,18 +71,6 @@ def results(past: pd.DataFrame, score) -> dict:
     }
 
 
-def nobody(past: pd.DataFrame) -> dict:
-    """Phone nobody: the 'everyone attends' rule, with the best accuracy of all."""
-    y = past["Did_Not_Attend"].to_numpy()
-    n_miss = round(y.mean() * 1000)
-    return {
-        "outcomes": {"called_dna": 0, "called_attended": 0, "not_called_dna": n_miss,
-                     "not_called_attended": 1000 - n_miss},
-        "reached": 0.0,
-        "accuracy": float((y == 0).mean()),
-    }
-
-
 def all_rule_catches(past: pd.DataFrame) -> dict:
     """Missed appointments on the list (per 1,000) for every rule the visitor can make:
     each combination of one or more clues, keyed by its sorted clues. 255 for 8 clues."""
