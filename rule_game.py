@@ -1,4 +1,4 @@
-"""Your rule vs the model: the logic behind the first tab.
+"""Bonus: beat the model: the logic behind the game on the last tab.
 
 A visitor picks clues to phone by; each clue they pick gets an equal say. Their rule is
 scored on the 4,500 past appointments the model didn't learn from, at the same number of
@@ -72,6 +72,31 @@ def results(past: pd.DataFrame, score) -> dict:
         "outcomes": {k: out[k] for k, _ in calls.GROUPS},
         "reached": float((called & (y == 1)).sum() / y.sum()),
         "accuracy": float(((called & (y == 1)) | (~called & (y == 0))).mean()),
+    }
+
+
+# The simple rule a manager would reach for first: phone the people who've missed most before.
+# It is also the best rule the game's buttons can make.
+SIMPLE_RULE = ("Previous_DNAs",)
+
+
+def precision_at_share(past: pd.DataFrame, score, share: float) -> float:
+    """Share of calls that reach someone who then missed, phoning the top `share` by score."""
+    called = calls.called_by_share(score, share)
+    return float(past["Did_Not_Attend"].to_numpy()[called].mean()) if called.any() else 0.0
+
+
+def three_ways(past: pd.DataFrame, model_risk) -> dict:
+    """Missed appointments reached per 1,000 past appointments with CALL_SHARE calls: at
+    random, by SIMPLE_RULE and by the model. `model_risk` is the live model's predicted risk
+    for the same appointments, in the same order (data/past_predictions.csv)."""
+    n_missed = round(past["Did_Not_Attend"].mean() * 1000)
+    return {
+        "n_missed": n_missed,
+        "n_calls": round(CALL_SHARE * 1000),
+        "random": n_missed * CALL_SHARE,
+        "rule": results(past, rule_score(past, SIMPLE_RULE))["outcomes"]["called_dna"],
+        "model": results(past, np.asarray(model_risk, dtype=float))["outcomes"]["called_dna"],
     }
 
 

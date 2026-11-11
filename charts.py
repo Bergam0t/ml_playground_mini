@@ -51,8 +51,11 @@ def _layout(fig, height, **kwargs):
     return fig
 
 
-def waterfall(expl: dict) -> go.Figure:
-    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away."""
+def waterfall(expl: dict, compact: bool = False) -> go.Figure:
+    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away.
+
+    `compact` makes it shorter, with a shorter axis title, for the example at the top of the
+    appointments tab."""
     steps = list(expl["shown"])
     if expl["other"]:
         steps.append(expl["other"])
@@ -68,10 +71,12 @@ def waterfall(expl: dict) -> go.Figure:
     x_max = max(running) * 1.15 + 3
     return _layout(
         fig,
-        120 + 40 * len(labels),
+        (70 + 34 * len(labels)) if compact else (120 + 40 * len(labels)),
         margin=dict(l=0, r=50, t=10, b=40),
         xaxis=dict(
-            title="Predicted risk of not attending (%). Red raises it, blue lowers it. Changes in percentage points.",
+            title="Predicted risk of not attending (%)"
+            if compact
+            else "Predicted risk of not attending (%). Red raises it, blue lowers it. Changes in percentage points.",
             ticksuffix="%",
             gridcolor="rgba(255,255,255,0.1)",
             zeroline=False,

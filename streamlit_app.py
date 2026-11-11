@@ -58,7 +58,7 @@ def load_shap():
     return pd.read_csv(DATA_DIR / "shap_values.csv").set_index("row_id")
 
 
-# Past appointments the model didn't train on, with what really happened (for tab 3)
+# Past appointments the model didn't train on, with what really happened (for the phone tab)
 @st.cache_data
 def load_past():
     return pd.read_csv(DATA_DIR / "past_predictions.csv")
@@ -69,11 +69,24 @@ def load_model_meta():
     return json.loads((DATA_DIR / "model_meta.json").read_text(encoding="utf-8"))
 
 
-# The "Your rule vs the model" tab: past appointments with a score per clue, and the
+# The bonus game tab: past appointments with a score per clue, and the
 # model's results as it learns (both precomputed by build/rule_game_data.py)
 @st.cache_data
 def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
+
+
+# The same calls three ways (at random, by the simple rule, by the model), for the top of the
+# appointments tab; and the simple rule's score for each past appointment, for the savings box.
+# The rule game's past appointments are the same rows as past_predictions.csv, in the same order
+# (build/rule_game_data.py checks this).
+@st.cache_data
+def load_comparison():
+    game_past = rule_game.load_past()
+    risk = load_past()["DNA_Prob_Forecast"].to_numpy()
+    assert len(game_past) == len(risk), "rule game and past predictions don't line up"
+    rule = rule_game.rule_score(game_past, rule_game.SIMPLE_RULE)
+    return rule_game.three_ways(game_past, risk), game_past, rule
 
 
 # What every rule the visitor can make would catch, for "Your rule ranks #N of 1,023"
@@ -347,7 +360,7 @@ def go_to_tab(label):
     st.session_state.scroll_to_top = True
 
 
-# Everything the Your rule vs the model tab remembers about a visitor's go
+# Everything the bonus game tab remembers about a visitor's go
 GAME_KEYS = ("game_clues", "game_best", "game_last", "game_prev", "game_trained")
 
 
@@ -371,7 +384,7 @@ def go_to_forecast_calls(risk_min):
     st.session_state.call_mode = "Predicted risk"
     st.session_state.risk_min = round(risk_min * 100)
     st.session_state.call_effect = DEFAULT_CALL_EFFECT
-    go_to_tab(TAB_LABELS[2])
+    go_to_tab(TAB_CALLS)
 
 
 # Streamlit app
@@ -379,13 +392,16 @@ def go_to_forecast_calls(risk_min):
 # is drawn at the left of that bar by style.css.
 # Dropdown in place of the tab pills on narrower screens (shown by style.css)
 add_mobile_nav()
-# Keyed and rerun on change, so buttons can switch tab (go_to_tab), as in the geographic mini
-TAB_LABELS = [
-    "Your rule vs the model",
-    "Upcoming appointments",
-    "How many people should we phone?",
-]
-tab_game, tab_appts, tab_calls = st.tabs(TAB_LABELS, key="page", on_change="rerun")
+# Keyed and rerun on change, so buttons can switch tab (go_to_tab), as in the geographic mini.
+# The real tool comes first: a visitor who sees only one page sees what it does and why it
+# helps. The game is a bonus at the end for those who stay (style.css hides the sidebar on it).
+TAB_APPTS = "Upcoming appointments"
+TAB_CALLS = "How many people should we phone?"
+TAB_GAME = "Bonus: beat the model"
+TAB_LABELS = [TAB_APPTS, TAB_CALLS, TAB_GAME]
+tab_appts, tab_calls, tab_game = st.tabs(TAB_LABELS, key="page", on_change="rerun")
+# The open tab. Before the first click the session state may not hold one yet: the first tab
+page = st.session_state.get("page") or TAB_APPTS
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
 # Load data
@@ -427,7 +443,7 @@ DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
 # state rather than default=, as go_to_call_list sets it; set again on every run, as Streamlit
 # forgets a widget's value on a run that doesn't draw it (the other tabs).
 st.session_state["appt_view"] = st.session_state.get("appt_view") or VIEW_ALL
-if st.session_state.get("page") == TAB_LABELS[1]:
+if page == TAB_APPTS:
     st.sidebar.segmented_control(
         "Click the buttons below to change the view",
         [VIEW_ALL, VIEW_WEEK],
@@ -440,7 +456,7 @@ view = st.session_state.get("appt_view") or VIEW_ALL
 # Filters. Hidden on the How many people should we phone? tab, which uses all the upcoming
 # appointments and shows its own controls and the cost assumptions. The choices made on the other tabs are
 # kept, and still applied to them, while it is open.
-show_filters = st.session_state.get("page") != TAB_LABELS[2]
+show_filters = page != TAB_CALLS
 
 
 def filter_select(label, options, key, **kwargs):
@@ -676,6 +692,17 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
         """One decimal place under 10, as on the phone tab"""
         return f"{x:.1f}" if x < 10 else f"{x:,.0f}"
 
+    # The same number of calls made another way, with the same effect and value per missed
+    # appointment: by the simple rule (phone those who missed most before) and at random.
+    # Like the model's figure, from the past appointments, phoning the same share of them.
+    _, game_past, rule = load_comparison()
+    share = float((past["DNA_Prob_Forecast"] >= risk_min).mean())
+    rule_reached = n_calls * rule_game.precision_at_share(game_past, rule, share)
+    random_reached = n_calls * past["Did_Not_Attend"].mean()
+
+    def kept(n_reached):
+        return n_reached * effect * dna_cost
+
     with st.container(border=True):
         saving_col, cta_col = st.container(key=f"reflow_stack_{key}").columns(
             2, gap="large", vertical_alignment="center"
@@ -695,6 +722,16 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
             f"£{dna_cost:,.0f}.{per_week} The costs come from **Cost assumptions** in the sidebar.",
         )
         saving_col.caption(caption)
+        saving_col.markdown(
+            f"**The same {n_calls:,} calls made another way:** about £{kept(rule_reached):,.0f} "
+            f"phoning those who missed most before, and £{kept(random_reached):,.0f} at random.",
+            help=f"In past appointments, the same share of calls would have reached someone who "
+            f"then missed {precision:.0%} of the time with the model's list, "
+            f"{rule_reached / n_calls:.0%} phoning those who missed most before and "
+            f"{random_reached / n_calls:.0%} at random. Each is valued the same way. This is the "
+            "value of the clinic slots kept, not cash: a Trust may not be paid more when a patient "
+            "attends.",
+        )
         cta_col.markdown(
             f"**{DEFAULT_CALL_EFFECT}% is what the {pilot.SERVICE.lower()} pilot saw**, for patients at "
             "very high risk, without a comparison group. Calls may change fewer people in other "
@@ -711,7 +748,7 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
         )
 
 
-# ---------------------------------------------------------------- tab 1
+# ---------------------------------------------------------------- tab 1: Upcoming appointments (the landing page)
 # One tab, two views picked by the switch at the top of the sidebar
 with tab_appts:
     if view == VIEW_ALL:
@@ -728,39 +765,100 @@ with tab_appts:
         forecast_recall, forecast_precision = catch_rates(FORECAST_MIN)
         high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
 
-        # Opening text beside the demonstration notice (stacked on narrower screens, see style.css)
+        # Opening text beside the demonstration notice (stacked on narrower screens, see style.css),
+        # with the case for the model under it: the same calls three ways. For a visitor who sees
+        # only this page, so it is near the top and needs no clicks.
+        ways, _, _ = load_comparison()
         with intro_columns("intro"):
             st.markdown(
-                f"""
+                """
                 ### Which appointments are patients most likely to miss?
 
                 A machine-learning model, trained on past appointments, gives each upcoming one a
-                predicted **risk of not attending** (a DNA, or 'did not attend') and a **confidence
-                score**, so outpatient teams can plan where reminder calls might help most. The
-                forecasts are <span class="highlight">estimates to support staff judgement, not
-                decisions</span>.
-
-                <div class="threshold-pills">
-                <span class="pill">About {past_dna_rate:.0%} of past appointments were missed</span>
-                </div>
+                predicted **risk of not attending** (a DNA, or 'did not attend'), so outpatient
+                teams can phone the patients most likely to miss. The forecasts are
+                <span class="highlight">estimates to support staff judgement, not decisions</span>.
                 """,
                 unsafe_allow_html=True,
             )
-            st.markdown(
-                f"That is the recorded outcome in {len(past):,} past appointments the model was tested on, "
-                "so most predicted risks are low."
-            )
-            with st.expander(
-                "What does the confidence score mean?", icon=":material/help:"
-            ):
-                st.markdown(
-                    f"Confidence is how clear-cut the model's yes-or-no call is: how far the risk is "
-                    f"from {FORECAST_MIN:.0%}, where the forecast changes from No to Yes. A "
-                    f"{FORECAST_MIN:.0%} risk gives 0% confidence, because the model could go either "
-                    "way. A 70% risk gives about 80% confidence that the patient won't attend, and a 2% "
-                    "risk about 85% confidence that they will. So it is **Low for any risk between 8% "
-                    "and 43%**, and rises towards both ends."
+            with st.container(border=True, key="landing_compare"):
+                st.markdown("#### Same calls, three ways")
+                st.caption(
+                    f"Of {1000:,} past appointments the model didn't learn from, {ways['n_missed']} "
+                    f"({past_dna_rate:.0%}) were missed. If the team had made {ways['n_calls']} calls, "
+                    "how many would have reached someone who then missed?"
                 )
+                with st.container(horizontal=True, key="landing_ways"):
+                    st.metric(
+                        "At random",
+                        f"{ways['random']:.0f}",
+                        border=True,
+                        icon=":material/casino:",
+                        help="Phoning 100 appointments picked at random.",
+                    )
+                    st.metric(
+                        "Missed before",
+                        f"{ways['rule']}",
+                        border=True,
+                        icon=":material/history:",
+                        help="Phoning the 100 patients who had missed the most appointments before: "
+                        "the simple rule most people would choose.",
+                    )
+                    st.metric(
+                        "The model",
+                        f"{ways['model']}",
+                        border=True,
+                        icon=":material/smart_toy:",
+                        help="Phoning the 100 appointments with the highest predicted risk.",
+                    )
+                st.markdown(
+                    "**A simple rule does most of the work.** The model reaches a few more, and adds "
+                    "a risk for every patient, so the list fits the calls the team can make, and the "
+                    "reasons behind each one (below)."
+                )
+
+        # ---- The reasons for one patient. The highest-risk appointment in the sidebar's
+        # filters: an honest example, not a picked one. Clicking a row in the table further
+        # down explains that appointment instead.
+        example = filtered_data.sort_values(
+            "DNA_Prob_Forecast", ascending=False, kind="stable"
+        ).iloc[0]
+        example_expl = explain.patient_explanation(
+            example,
+            load_shap().loc[example["row_id"]],
+            load_model_meta()["base_value_pp"],
+            top=4,
+        )
+        with st.container(border=True, key="landing_why"):
+            why_text, why_chart = st.container(key="reflow_stack_landing_why").columns(
+                [0.4, 0.6], gap="large", vertical_alignment="center"
+            )
+            with why_text:
+                st.markdown("#### Why is this patient flagged?")
+                st.markdown(
+                    f"The highest-risk upcoming appointment ({example['Specialty']}, "
+                    f"{example['Activity_Date']:%A %d %B}). The model starts from the average "
+                    f"risk, **{example_expl['base']:.0f}%**. Each bar is one fact about this "
+                    "appointment: red pushes the risk up, blue pushes it down. Together they make "
+                    f"this patient's **{example_expl['fx']:.0f}%**."
+                )
+                st.caption(
+                    "The reasons can shape the call, such as offering help with a long journey. They "
+                    "show what the model relied on, not what causes a missed appointment."
+                )
+                st.button(
+                    "Bonus: can you beat the model?",
+                    key="to_game_from_appts",
+                    on_click=go_to_tab,
+                    args=(TAB_GAME,),
+                    icon=":material/sports_esports:",
+                )
+            why_chart.plotly_chart(
+                charts.waterfall(example_expl, compact=True),
+                key="landing_waterfall",
+                width="stretch",
+                config={"displayModeBar": False},
+            )
 
         # Summary of the filtered appointments. Every card is a bordered container holding a
         # metric and a one-line caption, so the four are the same height; the 20%+ and 70%+
@@ -853,7 +951,7 @@ with tab_appts:
         savings_box(
             filtered_data[filtered_data["DNA_Forecast"] == 1],
             FORECAST_MIN,
-            f"Predicted savings over the next {length} if we phone every forecast DNA",
+            f"Value of appointments kept over the next {length} if we phone every forecast DNA",
             f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
             f"pilot, with {n_forecast:,} calls "
             f"between {dates.min():%d %b} and {dates.max():%d %b}.",
@@ -946,6 +1044,17 @@ with tab_appts:
             "model relies on most. The coloured columns are the model's forecast.",
             icon=":material/touch_app:",
         )
+
+        # Moved down from the opening text: only the table's Confidence column and filter use it
+        with st.expander("What does the confidence score mean?", icon=":material/help:"):
+            st.markdown(
+                f"Confidence is how clear-cut the model's yes-or-no call is: how far the risk is "
+                f"from {FORECAST_MIN:.0%}, where the forecast changes from No to Yes. A "
+                f"{FORECAST_MIN:.0%} risk gives 0% confidence, because the model could go either "
+                "way. A 70% risk gives about 80% confidence that the patient won't attend, and a 2% "
+                "risk about 85% confidence that they will. So it is **Low for any risk between 8% "
+                "and 43%**, and rises towards both ends."
+            )
 
         # The model's forecast filters, for this table only (the cards, grid and chart above
         # and below follow just the sidebar's filters)
@@ -1145,7 +1254,7 @@ with tab_appts:
                 "Plan the calls",
                 key="to_calls_from_appts",
                 on_click=go_to_tab,
-                args=(TAB_LABELS[2],),
+                args=(TAB_CALLS,),
                 icon=":material/arrow_forward:",
             )
 
@@ -1263,7 +1372,7 @@ with tab_appts:
         savings_box(
             listed,
             MEASURE_RISK_MIN[column],
-            f"Predicted savings {when} if we phone everyone on this list",
+            f"Value of appointments kept {when} if we phone everyone on this list",
             f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
             f"pilot, with {len(listed):,} calls "
             f"in the week ending {weekly.week_label(first_week, year=True)}.",
@@ -1296,7 +1405,7 @@ with tab_appts:
         )
 
 
-# ---------------------------------------------------------------- tab 3
+# ---------------------------------------------------------------- tab 2: How many people should we phone?
 # Ported from the "Who would we phone?" page of lambda_ml_streamlit_exercise. The counts
 # come from past appointments with known outcomes; the upcoming appointments (all of them:
 # the sidebar hides the filters on this tab) only turn the chosen setting into calls per week.
@@ -1744,11 +1853,11 @@ with tab_calls:
         )
 
 
-# ---------------------------------------------------------------- tab 0: Your rule vs the model
+# ---------------------------------------------------------------- tab 3: Bonus: beat the model
 # First on the bar but last in the script: the training animation pauses between frames, so
 # the other tabs are drawn before it starts. The visitor builds a rule from the clues the model
 # sees, each with an equal say; then a machine learning model learns its own weighting from more and more
-# past appointments. Everything is scored on the same past appointments as tab 3, scaled to
+# past appointments. Everything is scored on the same past appointments as the phone tab, scaled to
 # 1,000, at the same number of calls (rule_game.CALL_SHARE). Built for a 2-5 minute visit at a
 # stand: the clues are on screen without scrolling, and "Start again" clears it for the next person.
 with tab_game:
@@ -2040,10 +2149,22 @@ with tab_game:
 
         say = final["say"]
         top_two = say_order[:2]
+        # The best rule the buttons can make, named, so the verdict is honest about how close
+        # it gets (the same comparison as "Same calls, three ways" on the appointments tab)
+        best_rule = max(all_catches, key=lambda rule: all_catches[rule])
+        best_rule_text = " and ".join(
+            f"*{rule_game.CLUES[c].lower()}*" for c in best_rule
+        )
         found = (
-            "\n\nYou found the best rule the buttons can make, and it still won."
+            "You found the best rule the buttons can make, and the model still won."
             if yours >= best_possible
-            else f"\n\nNo rule from the buttons can match it: the best reaches {best_possible} of {n_missed}."
+            else f"No rule from the buttons can match it: the best, {best_rule_text}"
+            f"{' on its own' if len(best_rule) == 1 else ''}, reaches {best_possible} of {n_missed}."
+        )
+        equal_say = (
+            "Your rule gives every clue an equal say: tuning the weights by hand is hard."
+            if len(best["clues"]) > 1
+            else "Your rule uses one clue on its own."
         )
 
         c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(
@@ -2054,12 +2175,11 @@ with tab_game:
                 ":material/balance: **Same clues, but the model can learn which matter most as it goes.**"
             )
             st.markdown(
-                "Your rule gives every clue an equal say - tuning it more by hand is too hard. "
-                ""
-                "\n\nThe model gives "
+                f"{equal_say} The model gives "
                 f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
                 f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less."
-                # " {found}"
+                f"\n\n{found} **So a simple rule does most of the work.** The model adds the last "
+                "few, plus a risk for every patient (to size the call list) and the reasons behind it."
             )
         with c2.container(border=True, key="title_card_game_limit", height="stretch"):
             st.markdown(":material/visibility_off: **Nobody gets them all.**")
@@ -2108,7 +2228,7 @@ with tab_game:
             2, gap="large"
         )
         onward.markdown(
-            "### See the model at work\n"
+            "### Back to the real tool\n"
             "The tool this demo is based on gives every upcoming appointment a predicted risk. See which "
             "ones it flags for staff to call, and why."
         )
@@ -2116,7 +2236,7 @@ with tab_game:
             "See upcoming appointments",
             key="to_appts",
             on_click=go_to_tab,
-            args=(TAB_LABELS[1],),
+            args=(TAB_APPTS,),
             icon=":material/arrow_forward:",
             type="primary",
         )
@@ -2128,7 +2248,7 @@ with tab_game:
             "Plan the calls",
             key="to_calls",
             on_click=go_to_tab,
-            args=(TAB_LABELS[2],),
+            args=(TAB_CALLS,),
             icon=":material/arrow_forward:",
         )
 

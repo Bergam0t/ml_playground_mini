@@ -11,8 +11,48 @@ streamlit run streamlit_app.py
 
 ## What's in the app
 
-- **Your rule vs the model** tab: a short game to show why a machine learning model can beat a person at
-  this.
+The tabs are in the order a senior visitor with a couple of minutes needs them: the real tool and
+why it helps first, then how many calls to make, then a game as a bonus for those who stay.
+
+- **Upcoming appointments** tab (the landing page): a short introduction beside the demonstration
+  notice (which gives the real pilot's result), then the case for the model, with no clicks needed:
+  - **Same calls, three ways**, under the introduction: of 1,000 past appointments (80 missed),
+    how many would 100 calls have reached who then missed, phoning at random (8), phoning those
+    who missed most before (43, the best rule in the game) and phoning the model's list (46). It
+    says plainly that the simple rule does most of the work, and that the model adds a risk for
+    every patient (to fit the list to the calls the team can make) and the reasons behind it.
+    Worked out by `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv`
+    (the same rows).
+  - **Why is this patient flagged?**: the SHAP waterfall for the highest-risk appointment in the
+    sidebar's filters (not a picked example), with a button to the bonus game.
+  - The forecast cards, then the value of appointments kept if every forecast DNA is phoned,
+    beside the same number of calls made by the simple rule and at random (valued the same way;
+    the value of clinic slots, not cash).
+  - Then the weekly grid and the filterable appointment list, highest risk first.
+    Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
+    attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
+    what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
+    chart beside it for the filtered appointments when the appointment-detail filters leave at
+    least 30. The DNA Risk and Confidence filters sit above the appointment list and narrow only
+    that list: in the sidebar they would fight the tab's own forecast cards, grid and call list,
+    and the chart would go round in circles (they select by the forecast it explains).
+- **Weekly summary** tab: appointments and forecast DNAs by week and day.
+- **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
+  the team can make each week or by minimum predicted risk. A 1,000-marker chart
+  (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
+  reach someone who then did not attend, and how many such patients would get no call. A panel
+  near the top shows what happened in the real Physiotherapy pilot (see **The real pilot**,
+  below). An effect slider, starting at the pilot's 80%, shows how many missed appointments the
+  calls might avoid; the tab says the pilot had no comparison group, so other settings may see
+  less. A "What this setting costs and might save" section turns the weekly figures into staff
+  hours, the cost of the calls, the value of the missed appointments they reach and might avoid,
+  and the **break-even effect**: the share of people reached a call would need to get to attend
+  to cover its own staff time. It also compares appointments saved per 3 calls with the pilot's
+  2, and estimates the early cancellations (slots freed for other patients) at the pilot's rate.
+  Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
+  per 3 calls, as in the pilot.
+- **Bonus: beat the model** tab (last): a short game to show how a machine learning model learns to
+  beat a person's rule, and by how little the obvious rule loses.
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
   - Using 1,000 past appointments (80 missed) and 100 calls, the visitor builds a rule for who
@@ -30,31 +70,10 @@ streamlit run streamlit_app.py
     56 of 80. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
-  - Two buttons lead on to the Upcoming appointments and How many people should we phone? tabs, as in the
+  - The verdict names the best rule the buttons can make and says the simple rule does most of
+    the work, matching the landing page.
+  - Two buttons lead back to the Upcoming appointments and How many people should we phone? tabs, as in the
     geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
-- **Appointments** tab: a short introduction to the app, then the filterable appointment list, highest risk first.
-  Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
-  attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
-  what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
-  chart beside it for the filtered appointments when the appointment-detail filters leave at
-  least 30. The DNA Risk and Confidence filters sit above the appointment list and narrow only
-  that list: in the sidebar they would fight the tab's own forecast cards, grid and call list,
-  and the chart would go round in circles (they select by the forecast it explains).
-- **Weekly summary** tab: appointments and forecast DNAs by week and day.
-- **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
-  the team can make each week or by minimum predicted risk. A 1,000-marker chart
-  (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
-  reach someone who then did not attend, and how many such patients would get no call. A panel
-  near the top shows what happened in the real Physiotherapy pilot (see **The real pilot**,
-  below). An effect slider, starting at the pilot's 80%, shows how many missed appointments the
-  calls might avoid; the tab says the pilot had no comparison group, so other settings may see
-  less. A "What this setting costs and might save" section turns the weekly figures into staff
-  hours, the cost of the calls, the value of the missed appointments they reach and might avoid,
-  and the **break-even effect**: the share of people reached a call would need to get to attend
-  to cover its own staff time. It also compares appointments saved per 3 calls with the pilot's
-  2, and estimates the early cancellations (slots freed for other patients) at the pilot's rate.
-  Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
-  per 3 calls, as in the pilot.
 
 Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
@@ -62,8 +81,8 @@ Both views also show the expected cost of missed appointments
 The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). How many people should we phone?
 hides them and shows its own controls (who to phone, and the assumed effect of a call) and the cost assumptions: its calls-per-week figures use all the upcoming
 appointments, and the chart uses past appointments. The filters keep their settings for the other
-tabs (the script checks the open tab, which it can since the tabs are keyed). Your rule vs the
-model uses past appointments only, so the sidebar is hidden while that tab is open (a CSS rule
+tabs (the script checks the open tab, which it can since the tabs are keyed). The bonus game
+uses past appointments only, so the sidebar is hidden while that tab (the last) is open (a CSS rule
 in `style.css` keyed on the selected tab, so the filters keep their settings for the other tabs).
 
 ## Screen size
@@ -171,7 +190,7 @@ python build/train_and_explain.py
 python build/rule_game_data.py
 ```
 
-`build/rule_game_data.py` makes the two files for the Your rule vs the model tab. It uses the same
+`build/rule_game_data.py` makes the two files for the bonus game tab (and the landing page's "Same calls, three ways"). It uses the same
 split as the main build, and checks that its test appointments match `past_predictions.csv`.
 
 - `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a

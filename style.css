@@ -138,22 +138,22 @@ section[data-testid="stSidebar"] hr {
 [data-testid="stExpandSidebarButton"] {
 	transform: translateY(2.15rem);
 }
-/* ---- No sidebar on the first tab ---- */
-/* The filters and cost assumptions don't apply to "Your rule vs the model", so while that
-	tab is open, hide the sidebar and (when it's shut) its re-expand button, and give the title
-	its usual padding back. Done in CSS because Streamlit draws every tab in one run, so the
-	script can't tell which tab is open; hiding also keeps the filters' settings for the
-	other tabs. */
-[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:first-child[data-selected="true"])
+/* ---- No sidebar on the last tab ---- */
+/* The filters and cost assumptions don't apply to the bonus game ("Bonus: beat the model",
+	the last tab), so while that tab is open, hide the sidebar and (when it's shut) its
+	re-expand button, and give the title its usual padding back. Done in CSS because Streamlit
+	draws every tab in one run, so the script can't tell which tab is open; hiding also keeps
+	the filters' settings for the other tabs. */
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-last-child(1 of [data-testid="stTab"])[data-selected="true"])
 	:is([data-testid="stSidebar"], [data-testid="stExpandSidebarButton"]) {
 	display: none;
 }
-[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:first-child[data-selected="true"])
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-last-child(1 of [data-testid="stTab"])[data-selected="true"])
 	[role="tablist"]:not([data-testid="stTabPanel"] *) {
 	padding-left: 2rem;
 }
 
-/* ---- The setup at the top of "Your rule vs the model" ---- */
+/* ---- The setup at the top of the bonus game ---- */
 /* Kept short so the clue buttons are on screen without scrolling: three big numbers in a
 	row (wrapping on narrow screens), then the question. */
 .st-key-game_title { justify-content: space-between; }
@@ -181,7 +181,7 @@ section[data-testid="stSidebar"] hr {
 	line-height: 1.45;
 }
 
-/* ---- "Pick one clue or several", the first thing to do on "Your rule vs the model" ---- */
+/* ---- "Pick one clue or several", the first thing to do in the bonus game ---- */
 /* Tinted in the primary teal so it stands out, like st.info but able to carry a help tooltip */
 .st-key-game_instruction {
 	padding: 0.9rem 1.25rem;
@@ -193,7 +193,7 @@ section[data-testid="stSidebar"] hr {
 	font-size: 1.1rem;
 }
 
-/* ---- The way on from "Your rule vs the model" ---- */
+/* ---- The way on from the bonus game ---- */
 /* Ported from the geographic mini's next-step boxes: a lightly outlined box, split in two
 	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or
 	above the second when they stack below 1300px. Both halves are full height with the
