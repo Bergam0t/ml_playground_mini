@@ -280,8 +280,29 @@ def patient_bands(df):
     return styles
 
 
-def demo_notice_full():
-    """The fuller version of the notice, beside tab 1's opening text."""
+POSTER_URL = "https://hsma.co.uk/impact_posters/Outpatient%20non%20attendance.png"
+VIDEO_URL = "https://youtu.be/tWcLIMTQb8A"
+
+
+@st.dialog("Impact poster", width="large")
+def show_poster():
+    """The HSMA impact poster, in a pop-up so the visitor stays in the app."""
+    st.image(POSTER_URL)
+    st.caption(f"[Open full size in a new tab]({POSTER_URL})")
+
+
+@st.dialog("Hear from the associate", width="large")
+def show_video():
+    """The associate's video about the project, in a pop-up."""
+    st.video(VIDEO_URL)
+
+
+def demo_notice_full(key):
+    """The fuller version of the notice, beside tab 1's opening text.
+
+    Its poster and video open in pop-ups (show_poster, show_video). The notice is drawn
+    on several tabs, so key keeps each tab's buttons apart.
+    """
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
         "This is a demonstration of a :red[**real tool**], currently being piloted by "
@@ -290,12 +311,14 @@ def demo_notice_full():
         f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
         "Here, all the data for training and display is synthetic: "
         "no real patients or Trust data are displayed.\n\n"
-        "Read the story behind this HSMA project in this "
-        "[impact poster](https://hsma.co.uk/impact_posters/Outpatient%20non%20attendance.png), "
-        "or hear more directly from the associate "
-        "[here](https://youtu.be/tWcLIMTQb8A).",
+        "Read the story behind this HSMA project, or hear more directly from the associate:",
         icon=":material/science:",
     )
+    with st.container(horizontal=True, key=f"demo_links_{key}"):
+        if st.button(":material/image: Impact poster", key=f"poster_{key}"):
+            show_poster()
+        if st.button(":material/play_circle: Watch the video", key=f"video_{key}"):
+            show_video()
 
 
 def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
@@ -307,7 +330,7 @@ def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
         list(widths), gap="large"
     )
     with right:
-        notice()
+        notice(key)
     return left
 
 
