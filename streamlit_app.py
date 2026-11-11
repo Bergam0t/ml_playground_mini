@@ -1563,7 +1563,9 @@ with tab_game:
 
     # ---- The setup: the title, the three numbers that matter, and the question
     with st.container(horizontal=True, vertical_alignment="center", key="game_title"):
-        st.subheader("Can you beat a computer?")
+        st.subheader(
+            "Can you beat a computer at predicting who won't attend their appointment?"
+        )
         if playing:
             st.button(
                 "Start again",
@@ -1836,9 +1838,9 @@ with tab_game:
         say = final["say"]
         top_two = say_order[:2]
         found = (
-            "You found the best rule the buttons can make, and it still won."
+            "\n\nYou found the best rule the buttons can make, and it still won."
             if yours >= best_possible
-            else f"No rule from the buttons can match it: the best reaches {best_possible} of {n_missed}."
+            else f"\n\nNo rule from the buttons can match it: the best reaches {best_possible} of {n_missed}."
         )
 
         c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(
@@ -1846,52 +1848,55 @@ with tab_game:
         )
         with c1.container(border=True, key="title_card_game_say", height="stretch"):
             st.markdown(
-                ":material/balance: **Same clues. The model learnt which matter most.**"
+                ":material/balance: **Same clues, but the model can learn which matter most as it goes.**"
             )
             st.markdown(
-                "Your rule gives every clue an equal say. The model gives "
+                "Your rule gives every clue an equal say - tuning it more by hand is too hard. "
+                ""
+                "\n\nThe model gives "
                 f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
-                f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. {found}"
+                f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less."
+                # " {found}"
             )
         with c2.container(border=True, key="title_card_game_limit", height="stretch"):
             st.markdown(":material/visibility_off: **Nobody gets them all.**")
             st.markdown(
                 "Even a perfect list, one that knows each patient's true chance of missing, reaches only "
-                f"{perfect['outcomes']['called_dna']} of {n_missed}. A chance isn't a certainty, and many "
-                "misses come down to things no data records."
+                f"{perfect['outcomes']['called_dna']} of {n_missed}."
+                "\n\nMany misses come down to things no data records, like bad weather or bus delays."
             )
 
         # ---- Why a computer? (like the geographic mini's "Why computers?")
-        st.markdown("#### Why a computer?")
+        st.markdown("#### Why use a computer instead of a human here?")
         n_clues = len(rule_game.CLUES)
         w1, w2 = st.container(key="reflow_halves_game_why").columns(2, gap="small")
         w1.metric(
-            f"Ways to give {n_clues} clues 0 to 10 points each",
-            f"{11**n_clues:,}",
-            border=True,
-            height="stretch",
-            help="The model doesn't try these one by one: it works out the best points straight from the "
-            "past appointments.",
-        )
-        w2.metric(
-            "Past appointments the model learnt from",
-            f"{learning['n_train']:,}",
+            "Computers can learn from **huge** amounts of past data - here it learnt from",
+            f"{learning['n_train']:,} past appointments",
             border=True,
             height="stretch",
         )
-        st.markdown(
-            "- **It learns how much each clue counts, and which way it points,** from what really happened, "
-            f"not from a hunch, and weighs all {n_clues} the same way for every patient.\n"
-            "- **But it only knows what's in the data.** It can't see a new job or a bus strike, and it "
-            "learns past patterns, unfair ones included. That's why its forecasts support staff judgement "
-            "rather than replace it."
+        w2.markdown(
+            "- Computers can re-learn when things change, like a new site or new booking habits. "
+            "\n- Some models can also spot clues that matter more in combination, like a long gap mattering more "
+            "before a first appointment, or Monday mornings being worse than other days.",
         )
-        st.button(
-            "Start again for the next person",
-            key="game_reset_end",
-            on_click=reset_game,
-            icon=":material/restart_alt:",
-        )
+
+        # st.markdown(
+        #     "- **It learns how much each clue counts, and which way it points,** from what really happened, "
+        #     f"not from a hunch, and weighs all {n_clues} the same way for every patient.\n"
+        #     "Remeber - it can only go by what's in the data.** It can't see a bus strike, or bad weather, "
+        #     "or whether patients are parents who can't make 9am appointments, and it "
+        #     "learns past patterns, unfair ones included. "
+        #     ""
+        #     "Predictions support staff judgement rather than replace it."
+        # )
+        # st.button(
+        #     "Start again for the next person",
+        #     key="game_reset_end",
+        #     on_click=reset_game,
+        #     icon=":material/restart_alt:",
+        # )
 
     # ---- The way on: styled like the geographic mini's next-step boxes (style.css)
     st.divider()
@@ -1902,7 +1907,7 @@ with tab_game:
         onward.markdown(
             "### See the model at work\n"
             "The tool this demo is based on gives every upcoming appointment a predicted risk. See which "
-            "ones it flags, and what it relied on."
+            "ones it flags for staff to call, and why."
         )
         onward.button(
             "See upcoming appointments",
