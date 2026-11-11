@@ -616,7 +616,6 @@ filter_key = hashlib.md5(
 MEASURE_RISK_MIN = {
     "High_Risk_DNA": HIGH_RISK_MIN,
     "DNA_Forecast": FORECAST_MIN,
-    "DNA_Prob_Forecast": 0.0,
 }
 
 
@@ -840,16 +839,14 @@ with tab_appts:
         )
 
         st.subheader("Predicted Non-Attender Summary - Weekly")
-        # Only the cut-off lists: "ranked by risk" describes a call list, not a colouring
-        grid_measures = {n: mm for n, mm in weekly.MEASURES.items() if mm.flag}
         measure = (
             st.segmented_control(
                 "Colour the grid by",
-                list(grid_measures),
+                list(weekly.MEASURES),
                 default=DEFAULT_MEASURE,
                 key="grid_measure",
                 help="  \n".join(
-                    f"**{name}:** {mm.help}" for name, mm in grid_measures.items()
+                    f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
                 ),
             )
             or DEFAULT_MEASURE
@@ -880,8 +877,7 @@ with tab_appts:
         )
 
         st.caption(
-            f"Each cell: appointments · {m.cell_label} "
-            f"({'rate' if m.flag else 'average predicted risk'}). "
+            f"Each cell: appointments · {m.cell_label} (rate). "
             f"Green below {low:.0%}, red above {high:.0%}."
         )
         st.info(
@@ -1133,6 +1129,9 @@ with tab_appts:
                 icon=":material/balance:",
             )
 
+        # A choice kept from before "All appointments, ranked by risk" was removed
+        if st.session_state.get("weekly_measure") not in weekly.MEASURES:
+            st.session_state.pop("weekly_measure", None)
         measure = (
             st.segmented_control(
                 "Who goes on the list",
@@ -1179,14 +1178,16 @@ with tab_appts:
             )
             vs_average = round(hw["total"] - h["weekly_average_total"])
             st.metric(
-                m.count_label,
+                f"On the call list {when_week}",
                 f"{hw['total']:,.0f} ({hw['overall']:.0%})",
                 f"{vs_average:+d} vs weekly average",
                 delta_color="inverse",
-                icon=":material/event_busy:",
+                icon=":material/call:",
                 border=True,
-                help=f"{m.help} The weekly average is {h['weekly_average_total']:.0f} "
-                f"({h['overall']:.0%}).",
+                help=f"How many appointments {when_week} are on the list chosen above. This is not "
+                "how many will be missed: some of these patients would come anyway, and some "
+                f"lower-risk ones won't. {m.help} The weekly average is "
+                f"{h['weekly_average_total']:.0f} ({h['overall']:.0%}).",
             )
             st.metric(
                 "Highest-risk weekday",
@@ -1218,7 +1219,7 @@ with tab_appts:
         # The call list covers the first week: the period's counted appointments
         period = next_week
         when = when_week
-        listed = period[period[column] == 1] if m.flag else period
+        listed = period[period[column] == 1]
 
         # Predicted savings from phoning everyone on the list
         savings_box(
@@ -1235,16 +1236,10 @@ with tab_appts:
         # The call list itself, highest risk first
         st.subheader("Calls to make")
         listed = listed.sort_values("DNA_Prob_Forecast", ascending=False)
-        if m.flag:
-            st.markdown(
-                f"**{len(listed)} of {len(period)} appointments {when} are {m.day_phrase}**, highest "
-                "risk first. Phone from the top."
-            )
-        else:
-            st.markdown(
-                f"**All {len(period)} appointments {when}**, highest predicted risk first. "
-                "Phone from the top."
-            )
+        st.markdown(
+            f"**{len(listed)} of {len(period)} appointments {when} are on the call list**: those "
+            f"{m.day_phrase}, highest risk first. Phone from the top."
+        )
         if period.empty:
             st.info("There are no appointments in the sidebar filters in this period.")
         elif listed.empty:

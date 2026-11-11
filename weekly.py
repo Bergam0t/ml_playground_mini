@@ -1,8 +1,7 @@
 """Weekly summary view: appointments and forecast missed appointments by week and weekday.
 
-Pure pandas, so the Streamlit tab only lays things out. Each measure is a column of
-the forecast data whose mean is a rate: a 0/1 flag (high-risk flag, yes/no forecast)
-or the predicted risk itself, whose sum is the expected number of missed appointments.
+Pure pandas, so the Streamlit tab only lays things out. Each measure is a 0/1 column of
+the forecast data (high-risk flag, yes/no forecast) whose mean is a rate.
 """
 
 from dataclasses import dataclass
@@ -16,54 +15,37 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 
 @dataclass(frozen=True)
 class Measure:
-    column: str  # forecast column; its mean is the rate
-    count_label: str  # metric card label for its total
+    column: str  # 0/1 forecast column; its mean is the rate
     cell_label: str  # what the table cells count
+    day_phrase: str  # drill-down heading wording
     rate_phrase: str  # summary sentence wording, with {rate}
     thresholds: tuple  # (green below, red above)
-    flag: bool  # a 0/1 flag (else a probability)
     help: str
     repeat_label: str  # metric card label for patients counted more than once
-    day_phrase: str = ""  # drill-down heading wording (flags only)
 
 
 MEASURES = {
     "Very high risk (40% risk or more)": Measure(
         column="High_Risk_DNA",
-        count_label="Very high risk (40% risk or more)",
         cell_label="at very high risk",
         day_phrase="at very high risk of being missed (40% risk or more)",
         rate_phrase="{rate} of appointments are at very high risk of being missed (40% or more)",
         thresholds=(0.02, 0.06),
-        flag=True,
         help="Only appointments with a predicted risk of not attending of 40% or more (the Very High risk band). "
         "A short, strict list: it catches the fewest missed appointments but wastes the fewest calls.",
         repeat_label="Patients flagged more than once",
     ),
     "Likely to be missed (20% risk or more)": Measure(
         column="DNA_Forecast",
-        count_label="Likely to be missed (20% risk or more)",
-        cell_label="likely to be missed",
-        day_phrase="likely to be missed (20% risk or more)",
-        rate_phrase="{rate} of appointments are likely to be missed (a predicted risk of 20% or more)",
+        cell_label="at 20% risk or more",
+        day_phrase="at 20% risk or more of being missed",
+        rate_phrase="{rate} of appointments have a predicted risk of being missed of 20% or more",
         thresholds=(0.05, 0.15),
-        flag=True,
         help="Every appointment with a predicted risk of not attending of 20% or more (about two and a half "
         "times the average): the model's yes/no forecast, as in the 'Expected DNA' column in the "
         "appointment list. A longer list that catches more missed appointments but takes more calls, "
         "many to people who would have come anyway.",
         repeat_label="Patients forecast to miss more than one",
-    ),
-    "All appointments, ranked by risk": Measure(
-        column="DNA_Prob_Forecast",
-        count_label="Expected missed appointments",
-        cell_label="expected DNAs",
-        rate_phrase="the average predicted risk of not attending is {rate}",
-        thresholds=(0.05, 0.10),
-        flag=False,
-        help="No cut-off: every appointment is on the list, highest predicted risk first, and the team phones "
-        "as far down as time allows. The risks add up to the expected number of missed appointments.",
-        repeat_label="Patients with more than one appointment",
     ),
 }
 
@@ -127,9 +109,8 @@ def headline(df, column):
 
 
 def repeat_patients(df, m):
-    """Patients with more than one counted appointment: more than one flagged one for a
-    0/1 measure, or more than one appointment of any kind for the predicted risk."""
-    counted = df[df[m.column] == 1] if m.flag else df
+    """Patients with more than one flagged appointment."""
+    counted = df[df[m.column] == 1]
     per_patient = counted.groupby("MRN").size()
     repeat = counted[counted["MRN"].isin(per_patient.index[per_patient > 1])]
     # One patient's appointments together, the patient with the soonest appointment first

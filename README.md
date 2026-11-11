@@ -190,7 +190,7 @@ high-risk flag, risk over 70% and confidence over 70%, would catch almost nobody
   the forecast as in the live app. About 3% of appointments; about 58% of those past patients
   missed.
 - **Weekly summary colours** (`weekly.MEASURES`): green below and red above 2% and 6% for the
-  flag, 5% and 15% for the yes/no forecast, and 5% and 10% for the average predicted risk.
+  flag, and 5% and 15% for the yes/no forecast.
 
 To go back to live data, replace `load_forecast()` in `demo_data.py` with a read of the combined
 forecast view. You would also need SHAP values from the live model for the waterfalls.
