@@ -4,6 +4,7 @@ Pure pandas, so the Streamlit tab only lays things out. Each measure is a column
 the forecast data whose mean is a rate: a 0/1 flag (high-risk flag, yes/no forecast)
 or the predicted risk itself, whose sum is the expected number of missed appointments.
 """
+
 from dataclasses import dataclass
 
 import matplotlib
@@ -11,7 +12,6 @@ import pandas as pd
 from matplotlib.colors import to_hex
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
 
 
 @dataclass(frozen=True)
@@ -28,11 +28,11 @@ class Measure:
 
 
 MEASURES = {
-    "Very high risk (40% or more)": Measure(
+    "Very high risk (40% risk or more)": Measure(
         column="High_Risk_DNA",
-        count_label="Very high risk (40% or more)",
+        count_label="Very high risk (40% risk or more)",
         cell_label="at very high risk",
-        day_phrase="at very high risk of being missed (40% or more)",
+        day_phrase="at very high risk of being missed (40% risk or more)",
         rate_phrase="{rate} of appointments are at very high risk of being missed (40% or more)",
         thresholds=(0.02, 0.06),
         flag=True,
@@ -40,11 +40,11 @@ MEASURES = {
         "A short, strict list: it catches the fewest missed appointments but wastes the fewest calls.",
         repeat_label="Patients flagged more than once",
     ),
-    "Likely to be missed (20% or more)": Measure(
+    "Likely to be missed (20% risk or more)": Measure(
         column="DNA_Forecast",
-        count_label="Likely to be missed (20% or more)",
+        count_label="Likely to be missed (20% risk or more)",
         cell_label="likely to be missed",
-        day_phrase="likely to be missed (20% or more)",
+        day_phrase="likely to be missed (20% risk or more)",
         rate_phrase="{rate} of appointments are likely to be missed (a predicted risk of 20% or more)",
         thresholds=(0.05, 0.15),
         flag=True,
@@ -70,7 +70,9 @@ MEASURES = {
 
 def _week_and_day(df):
     dates = pd.to_datetime(df["Activity_Date"])
-    week_end = dates.dt.to_period("W-SUN").dt.end_time.dt.normalize().rename("Week ending")
+    week_end = (
+        dates.dt.to_period("W-SUN").dt.end_time.dt.normalize().rename("Week ending")
+    )
     day = dates.dt.day_name().rename("Day")
     return week_end, day
 
@@ -85,8 +87,12 @@ def weekly_tables(df, column):
     days = [d for d in DAYS if d in set(day)]
     counts = pd.crosstab(week_end, day).reindex(columns=days, fill_value=0)
     sums = (
-        df[column].groupby([week_end, day]).sum().unstack()
-        .reindex(index=counts.index, columns=days).fillna(0)
+        df[column]
+        .groupby([week_end, day])
+        .sum()
+        .unstack()
+        .reindex(index=counts.index, columns=days)
+        .fillna(0)
     )
     rates = sums / counts.where(counts > 0)
     order = counts.index.sort_values(ascending=False)
@@ -165,7 +171,9 @@ def summary_sentence(h, measure):
     """Plain-English summary; comparisons that don't apply under the filters are left out."""
     m = MEASURES[measure]
     weeks = f"{h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}"
-    parts = [f"Across {weeks}, " + m.rate_phrase.format(rate=f"**{h['overall']:.0%}**") + "."]
+    parts = [
+        f"Across {weeks}, " + m.rate_phrase.format(rate=f"**{h['overall']:.0%}**") + "."
+    ]
 
     if h["n_days"] > 1:
         top, low = h["top_day_rate"], h["low_day_rate"]

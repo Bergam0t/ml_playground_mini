@@ -804,7 +804,7 @@ with tab_appts:
                 "calls to cost."
             )
 
-        st.subheader("Week by week")
+        st.subheader("Predicted Non-Attender Summary - Weekly")
         # Only the cut-off lists: "ranked by risk" describes a call list, not a colouring
         grid_measures = {n: mm for n, mm in weekly.MEASURES.items() if mm.flag}
         measure = (
@@ -1335,9 +1335,7 @@ with tab_calls:
         key="call_effect",
         help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
     )
-    ctrl_right.caption(
-        "A guess: nobody knows yet how many a call would change."
-    )
+    ctrl_right.caption("A guess: nobody knows yet how many a call would change.")
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
 
