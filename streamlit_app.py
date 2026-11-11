@@ -205,7 +205,7 @@ def forecast_cell_styles(df):
     return styles
 
 
-# Appointment tables (the all-appointments view, and a day's list in the next-week summary):
+# Appointment tables (the all-appointments view, a day's list in the weekly summary, and the call list):
 # source column -> display name, in display order
 APPOINTMENT_FIELDS = {
     "Activity_Date": "Appointment Date",
@@ -435,18 +435,26 @@ with st.sidebar.container(key="nihr_logo"):
 
 # Which view the Upcoming appointments tab shows. Only offered on that tab; the tabs are
 # keyed, so the page state says which one is open.
-VIEW_ALL = "Show all appointments"
-VIEW_WEEK = "Show next week's call list"
-VIEW_ICONS = {VIEW_ALL: ":material/table_rows:", VIEW_WEEK: ":material/call:"}
+VIEW_ALL = "All appointments"
+VIEW_SUMMARY = "Weekly summary"
+VIEW_WEEK = "Next week's call list"
+VIEW_ICONS = {
+    VIEW_ALL: ":material/table_rows:",
+    VIEW_SUMMARY: ":material/calendar_view_week:",
+    VIEW_WEEK: ":material/call:",
+}
 DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
 # Start on all appointments, so one button is always shown as chosen. Set through the session
 # state rather than default=, as go_to_call_list sets it; set again on every run, as Streamlit
-# forgets a widget's value on a run that doesn't draw it (the other tabs).
-st.session_state["appt_view"] = st.session_state.get("appt_view") or VIEW_ALL
+# forgets a widget's value on a run that doesn't draw it (the other tabs). A value that isn't
+# one of the views (say, a label from before they were renamed) goes back to the first.
+if st.session_state.get("appt_view") not in VIEW_ICONS:
+    st.session_state["appt_view"] = VIEW_ALL
+st.session_state["appt_view"] = st.session_state["appt_view"]
 if page == TAB_APPTS:
     st.sidebar.segmented_control(
         "Click the buttons below to change the view",
-        [VIEW_ALL, VIEW_WEEK],
+        list(VIEW_ICONS),
         key="appt_view",
         format_func=lambda v: f"{VIEW_ICONS[v]} {v}",
         required=True,  # clicking the chosen view again doesn't clear it
@@ -747,7 +755,7 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
 
 
 # ---------------------------------------------------------------- tab 1: Upcoming appointments (the landing page)
-# One tab, two views picked by the switch at the top of the sidebar
+# One tab, three views picked by the switch at the top of the sidebar
 with tab_appts:
     if view == VIEW_ALL:
         # What really happened to past appointments the model did not train on
@@ -929,79 +937,10 @@ with tab_appts:
             weeks=weeks,
         )
 
-        st.subheader("Predicted Non-Attender Summary - Weekly")
-        measure = (
-            st.segmented_control(
-                "Colour the grid by",
-                list(weekly.MEASURES),
-                default=DEFAULT_MEASURE,
-                key="grid_measure",
-                help="  \n".join(
-                    f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
-                ),
-            )
-            or DEFAULT_MEASURE
-        )
-        m = weekly.MEASURES[measure]
-        column = m.column
-        h = weekly.headline(filtered_data, column)
-        st.markdown(weekly.summary_sentence(h, measure))
-
-        # Week-by-weekday table: newest week first, weekdays with no appointments left out
-        counts, sums, rates = weekly.weekly_tables(filtered_data, column)
-        low, high = m.thresholds
-        week_index = pd.Index(
-            [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
-        )
-        cell_text = pd.DataFrame(
-            {
-                d: [
-                    f"{c} · {s:.0f} ({r:.0%})" if c else "–"
-                    for c, s, r in zip(counts[d], sums[d], rates[d])
-                ]
-                for d in counts.columns
-            },
-            index=week_index,
-        )
-        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(
-            week_index
-        )
-
-        st.caption(
-            f"Each cell: appointments · {m.cell_label} (rate). "
-            f"Green below {low:.0%}, red above {high:.0%}."
-        )
-        st.info(
-            "**Click a day in the table** to list just that day's appointments below. Click it again "
-            "to show them all.",
-            icon=":material/touch_app:",
-        )
-        week_table = st.dataframe(
-            cell_text.style.apply(lambda _: cell_styles, axis=None),
-            width="stretch",
-            on_select="rerun",
-            selection_mode="single-cell",
-            key=f"weekly_{filter_key}",
-        )
-
-        # The clicked day narrows the appointment list (clicks on the week labels are ignored)
-        picked = [
-            (r, day)
-            for r, day in week_table.selection.cells
-            if r < len(counts) and day in counts.columns
-        ]
-        day_key = "all"
+        # The weekly grid has its own view (VIEW_SUMMARY), so the table shows every appointment
+        # in the sidebar's filters
         table_data = filtered_data
-        if picked:
-            r, day = picked[0]
-            date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
-            table_data = filtered_data[
-                pd.to_datetime(filtered_data["Activity_Date"]) == date
-            ]
-            day_key = f"{date:%Y%m%d}"
-            st.subheader(
-                f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments"
-            )
+        day_key = "all"
 
         st.subheader("Appointment Details")
 
@@ -1023,7 +962,7 @@ with tab_appts:
                 "and 43%**, and rises towards both ends."
             )
 
-        # The model's forecast filters, for this table only (the cards, grid and chart above
+        # The model's forecast filters, for this table only (the cards and chart above
         # and below follow just the sidebar's filters)
         risk_col, confidence_col = st.columns(2)
         selected_dna_risk = risk_col.selectbox(
@@ -1225,6 +1164,97 @@ with tab_appts:
                 icon=":material/arrow_forward:",
             )
 
+    elif view == VIEW_SUMMARY:
+        # The forecast for every upcoming week, by weekday. Clicking a day lists its appointments
+        # under the grid (the call list view covers just next week, ready to phone).
+        with intro_columns("intro_summary"):
+            st.markdown(
+                "### Predicted non-attenders, week by week\n\n"
+                "Which days have the most appointments the model expects to be missed? Each row is "
+                "one week of the upcoming appointments in the sidebar's filters. For next week only, "
+                "ready to phone, choose **Next week's call list** in the sidebar."
+            )
+            # In the intro column, beside the tall notice, so the grid starts higher
+            measure = (
+                st.segmented_control(
+                    "Colour the grid by",
+                    list(weekly.MEASURES),
+                    default=DEFAULT_MEASURE,
+                    key="grid_measure",
+                    help="  \n".join(
+                        f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
+                    ),
+                )
+                or DEFAULT_MEASURE
+            )
+            m = weekly.MEASURES[measure]
+            column = m.column
+            h = weekly.headline(filtered_data, column)
+            st.markdown(weekly.summary_sentence(h, measure))
+            low, high = m.thresholds
+            st.caption(
+                f"Each cell: appointments · {m.cell_label} (rate). "
+                f"Green below {low:.0%}, red above {high:.0%}."
+            )
+            st.info(
+                "**Click a day in the table** to list that day's appointments below, highest risk "
+                "first. Click it again to hide the list.",
+                icon=":material/touch_app:",
+            )
+
+        # Week-by-weekday table: newest week first, weekdays with no appointments left out
+        counts, sums, rates = weekly.weekly_tables(filtered_data, column)
+        week_index = pd.Index(
+            [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
+        )
+        cell_text = pd.DataFrame(
+            {
+                d: [
+                    f"{c} · {s:.0f} ({r:.0%})" if c else "–"
+                    for c, s, r in zip(counts[d], sums[d], rates[d])
+                ]
+                for d in counts.columns
+            },
+            index=week_index,
+        )
+        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(
+            week_index
+        )
+
+        week_table = st.dataframe(
+            cell_text.style.apply(lambda _: cell_styles, axis=None),
+            width="stretch",
+            on_select="rerun",
+            selection_mode="single-cell",
+            key=f"weekly_{filter_key}",
+        )
+
+        # The clicked day's appointments, highest risk first (clicks on the week labels are ignored)
+        picked = [
+            (r, day)
+            for r, day in week_table.selection.cells
+            if r < len(counts) and day in counts.columns
+        ]
+        if picked:
+            r, day = picked[0]
+            date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
+            day_data = filtered_data[
+                pd.to_datetime(filtered_data["Activity_Date"]) == date
+            ].sort_values("DNA_Prob_Forecast", ascending=False, kind="stable")
+            st.subheader(
+                f"{date:%A} {date.day} {date:%B}: {len(day_data)} appointments"
+            )
+            st.dataframe(
+                appointment_table(day_data),
+                column_config=APPOINTMENT_COLUMNS,
+                hide_index=True,
+                alt=f"Appointments on {date:%A} {date.day} {date:%B}, highest risk first",
+            )
+            st.caption(
+                "To see why the model gave an appointment its risk, choose **All appointments** "
+                "in the sidebar and click its row."
+            )
+
     else:
         with intro_columns("intro_weekly", widths=(0.70, 0.3)):
             st.title("Prioritised call list for admin team")
@@ -1367,7 +1397,7 @@ with tab_appts:
             )
         st.caption(
             "To decide how many calls are worth making, see the **How many people should we phone?** tab. To see why "
-            "the model gave an appointment its risk, choose **Show all appointments** in the sidebar."
+            "the model gave an appointment its risk, choose **All appointments** in the sidebar."
         )
 
 

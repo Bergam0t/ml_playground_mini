@@ -14,7 +14,9 @@ streamlit run streamlit_app.py
 The tabs are in the order a senior visitor with a couple of minutes needs them: the real tool and
 why it helps first, then how many calls to make, then a game as a bonus for those who stay.
 
-- **Upcoming appointments** tab (the landing page): a short introduction beside the demonstration
+- **Upcoming appointments** tab (the landing page), with three views picked by the stacked switch at
+  the top of the sidebar: **All appointments**, **Weekly summary** and **Next week's call list**.
+  All appointments opens with a short introduction beside the demonstration
   notice (which gives the real pilot's result), then the case for the model, with no clicks needed:
   - **Same calls, three ways**, under the introduction: of 1,000 past appointments (80 missed),
     how many would 100 calls have reached who then missed, phoning at random (8), phoning those
@@ -28,7 +30,7 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
   - The forecast cards, then the value of appointments kept if every forecast DNA is phoned,
     beside the same number of calls made by the simple rule and at random (valued the same way;
     the value of clinic slots, not cash).
-  - Then the weekly grid and the filterable appointment list, highest risk first.
+  - Then the filterable appointment list, highest risk first.
     Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
     attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
     what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
@@ -36,7 +38,9 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     least 30. The DNA Risk and Confidence filters sit above the appointment list and narrow only
     that list: in the sidebar they would fight the tab's own forecast cards, grid and call list,
     and the chart would go round in circles (they select by the forecast it explains).
-- **Weekly summary** tab: appointments and forecast DNAs by week and day.
+- **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
+  every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
+  under the grid, highest risk first. The call list view covers just next week.
 - **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
@@ -78,7 +82,7 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
 Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
 
-The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). How many people should we phone?
+The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the Weekly summary view instead). How many people should we phone?
 hides them and shows its own controls (who to phone, and the assumed effect of a call) and the cost assumptions: its calls-per-week figures use all the upcoming
 appointments, and the chart uses past appointments. The filters keep their settings for the other
 tabs (the script checks the open tab, which it can since the tabs are keyed). The bonus game
@@ -161,7 +165,7 @@ lambda_ml_streamlit_exercise:
 **Patient name and appointment time.** Each patient has a made-up name (the same on all their
 appointments), and each appointment a clinic time from 08:30 to 16:45 in 15-minute steps (fewer over
 lunch). Both come from a separate random stream, so adding them left every other column unchanged. The
-name is shown only on the call list (Show next week's call list), with the appointment time. The model sees
+name is shown only on the call list (Next week's call list), with the appointment time. The model sees
 the hour (`Time_Slot`, 08:00 to 16:00) as a clue: appointments starting 10-12 or 15-17 miss more
 (`TIME_EFFECT` in `demo_data.py`), and Monday before midday gets an extra push
 (`MONDAY_MORNING_EFFECT`) on top of Monday's own, so it is the worst slot of the week (about 15%
