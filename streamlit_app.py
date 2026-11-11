@@ -284,7 +284,7 @@ def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a :blue[**real tool**], currently being piloted by "
+        "This is a demonstration of a :violet[**real tool**], currently being piloted by "
         "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
         f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
         f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
@@ -1452,14 +1452,14 @@ with tab_calls:
             **kwargs,
         )
 
-    # Keyed so style.css gives it smaller numbers: "about 100" is cut short at the full size
+    # Keyed so style.css gives it smaller numbers. The two cards are stacked, not side by side:
+    # "about 100" is cut short in half of this narrow box
     with summary_left.container(border=True, height="stretch", key="phone_who"):
         # Per week, like the slider and the costs beside it: the one switch to per 1,000 past
         # appointments comes with the chart below, which says how the two connect
         section_title("Who are we calling?", "per week")
-        k1, k2 = st.columns(2, gap="small")
         share_called = upcoming_called.mean()
-        k1.metric(
+        st.metric(
             "Calls",
             f"about {weekly_calls:.0f}" if weekly_calls > 0 else "0",
             # The share links this to the 1,000 past appointments below; neutral, not good or bad
@@ -1472,7 +1472,7 @@ with tab_calls:
             help=f"On average over the {n_weeks} upcoming weeks. Quieter weeks have fewer "
             "appointments to call, so this can be a little under the slider.",
         )
-        k2.metric(
+        st.metric(
             "Cut-off risk" if mode == "Calls the team can make" else "Lowest risk phoned",
             f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody",
             help=how,
