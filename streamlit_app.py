@@ -310,14 +310,20 @@ def demo_notice_full(key):
         f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
         f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
         "Here, all the data for training and display is synthetic: "
-        "no real patients or Trust data are displayed.\n\n"
-        "Read the story behind this HSMA project, or hear more directly from the associate:",
+        "no real patients or Trust data are displayed.",
         icon=":material/science:",
     )
-    with st.container(horizontal=True, key=f"demo_links_{key}"):
-        if st.button(":material/image: Impact poster", key=f"poster_{key}"):
+    # One per line: the labels are too long to sit side by side in the narrow column
+    with st.container(key=f"demo_links_{key}"):
+        if st.button(
+            ":material/image: Read the story behind this HSMA project",
+            key=f"poster_{key}",
+        ):
             show_poster()
-        if st.button(":material/play_circle: Watch the video", key=f"video_{key}"):
+        if st.button(
+            ":material/play_circle: Hear more directly from the associate",
+            key=f"video_{key}",
+        ):
             show_video()
 
 
