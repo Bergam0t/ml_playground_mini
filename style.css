@@ -474,6 +474,25 @@ select.mobile-nav,
 }
 .st-key-phone_rates [data-testid="stMetricLabel"] { flex-basis: 100%; }
 
+/* The phone tab's "Who are we calling?" box: numbers the size of the rate cards', so
+	"about 100" fits its half of the narrow box, and the "19% of appointments" pill on one line */
+.st-key-phone_who [data-testid="stMetricValue"],
+.st-key-phone_who [data-testid="stMetricValue"] * {
+	font-size: 1.9rem;
+	line-height: 1.2;
+}
+.st-key-phone_who [data-testid="stMetricDelta"] [data-testid="stMarkdownContainer"],
+.st-key-phone_who [data-testid="stMetricDelta"] [data-testid="stMarkdownContainer"] p {
+	white-space: nowrap;
+}
+
+/* The phone tab's cost cards: room for a two-line label on each, so the numbers stay level
+	when only some labels wrap */
+.st-key-reflow_halves_costs [data-testid="stMetricLabel"] {
+	min-height: 2.8em;
+	align-items: start;
+}
+
 /* The muted note beside a section's question title on the phone tab (section_title) */
 .title-note {
 	font-size: 0.9rem;

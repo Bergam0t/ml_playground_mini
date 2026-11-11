@@ -1452,10 +1452,26 @@ with tab_calls:
             **kwargs,
         )
 
-    with summary_left.container(border=True, height="stretch"):
-        section_title("Who are we calling?", "per 1,000 past appointments")
+    # Keyed so style.css gives it smaller numbers: "about 100" is cut short at the full size
+    with summary_left.container(border=True, height="stretch", key="phone_who"):
+        # Per week, like the slider and the costs beside it: the one switch to per 1,000 past
+        # appointments comes with the chart below, which says how the two connect
+        section_title("Who are we calling?", "per week")
         k1, k2 = st.columns(2, gap="small")
-        k1.metric("Calls", f"{out['calls']}")
+        share_called = upcoming_called.mean()
+        k1.metric(
+            "Calls",
+            f"about {weekly_calls:.0f}" if weekly_calls > 0 else "0",
+            # The share links this to the 1,000 past appointments below; neutral, not good or bad
+            # One decimal place under 1%, so a handful of calls doesn't read as 0%
+            f"{share_called:.{1 if share_called < 0.01 else 0}%} of appointments"
+            if weekly_calls > 0
+            else None,
+            delta_color="off",
+            delta_arrow="off",
+            help=f"On average over the {n_weeks} upcoming weeks. Quieter weeks have fewer "
+            "appointments to call, so this can be a little under the slider.",
+        )
         k2.metric(
             "Cut-off risk" if mode == "Calls the team can make" else "Lowest risk phoned",
             f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody",
@@ -1473,7 +1489,7 @@ with tab_calls:
         with summary_right.container(border=True, height="stretch"):
             section_title(
                 "What are we saving?",
-                f"per week: about {weekly_calls:.0f} calls, for all the upcoming appointments",
+                "per week, for all the upcoming appointments",
                 help="Estimates from the sidebar's cost assumptions. A missed appointment's cost is the "
                 "value of a clinic slot, not cash that comes back. The call cost is staff time only.",
             )
@@ -1507,10 +1523,10 @@ with tab_calls:
                 f"about £{dna_cost:,.0f} on average. Change this and the call cost under **Cost "
                 "assumptions** in the sidebar.",
             )
-            # The words in the label, not the value: a longer value is cut short on the card,
-            # and a label longer than this wraps and drops the number below its neighbours'
+            # The words in the label, not the value: a longer value is cut short on the card.
+            # The labels can wrap onto two lines; style.css keeps the numbers level.
             c3.metric(
-                "To break even",
+                "Appointments needing to be saved to break even on cost of calls",
                 appointments(be) if can_break_even else "too many",
                 border=True,
                 height="stretch",
@@ -1526,8 +1542,12 @@ with tab_calls:
                 ),
             )
             c4.metric(
-                "Appointments saved",
+                "Appointments expected to be saved",
                 appointments(weekly_avoided),
+                # Neutral, for scale: how many appointments a week the saved ones come from
+                f"of about {len(upcoming) / n_weeks:,.0f} a week",
+                delta_color="off",
+                delta_arrow="off",
                 border=True,
                 height="stretch",
                 icon=":material/event_available:",
@@ -1543,24 +1563,16 @@ with tab_calls:
                     else ""
                 ),
             )
-            # The verdict, then side by side with the pilot: appointments saved per 3 calls, and
-            # early cancellations if calls free slots as often as they did there. One paragraph,
-            # to keep the box short.
+            # The cards above give the verdict (the pill under "Possibly saved"), so this only sets
+            # them side by side with the pilot: appointments saved per 3 calls, and early
+            # cancellations if calls free slots as often as they did there. The pilot itself is
+            # explained at the bottom of the tab, so it is named here.
             st.markdown(
-                (
-                    f"The calls cost £{econ['call_cost']:,.0f} a week, which saving about "
-                    f"{appointments(be)} missed appointments would cover. At {effect}%, they would save "
-                    f"about {appointments(weekly_avoided)}, so they would "
-                    f"{'more than ' if weekly_avoided > be else 'not '}cover their cost."
-                    if can_break_even
-                    else "Even if every call got the patient to attend, the calls would cost more "
-                    "than the missed appointments they reach."
-                )
-                # The pilot itself is explained at the bottom of the tab, so name it here
-                + f" That's about **{3 * weekly_avoided / weekly_calls:.1f} appointments saved for "
-                f"every 3 calls**; in a real-service pilot it was {3 * pilot.SAVED_PER_CALL:.0f}. If calls "
-                f"bring early cancellations as often as they did there, about "
-                f"{weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot for another patient."
+                f"The calls would save about **{3 * weekly_avoided / weekly_calls:.1f} appointments "
+                f"for every 3 calls**; in a real-service pilot it was "
+                f"{3 * pilot.SAVED_PER_CALL:.0f}. If calls bring early cancellations as often as they "
+                f"did there, about {weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot for "
+                "another patient."
             )
     elif out["calls"] > 0:
         summary_right.info(
@@ -1575,7 +1587,8 @@ with tab_calls:
     else:
         section_title(
             "Are we calling the right people?",
-            f"if we phoned these {out['calls']} appointments in every 1,000",
+            # The bridge from the per-week figures above to the past appointments below
+            f"the same setting replayed on 1,000 past appointments: {out['calls']:,} calls",
         )
         # Keyed so style.css puts the cards under the chart on narrower screens
         left, right = st.container(key="reflow_stack_icons").columns(
