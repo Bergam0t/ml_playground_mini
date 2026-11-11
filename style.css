@@ -495,26 +495,35 @@ select.mobile-nav,
 	font-weight: 600;
 	letter-spacing: 0.02em;
 }
-/* Each choice: a solid teal (the app's accent colour) button that stands out on the dark
-	red sidebar. Scoped to the button group, so the label's help icon keeps its own look. */
+/* Each choice not chosen: an outlined button on the dark red sidebar, so only the chosen
+	one is filled. Scoped to the button group, so the label's help icon keeps its own look.
+	Streamlit caps a button's height, so that is lifted to let a long label wrap onto more
+	lines without spilling out of the button. */
 .st-key-appt_view [data-testid="stButtonGroup"] button,
 .st-key-call_mode [data-testid="stButtonGroup"] button {
+	position: relative;
 	width: 100%;
 	min-height: 3.5rem;
+	height: auto !important;
+	max-height: none !important;
 	padding: 0.6rem 1rem !important;
 	justify-content: center;
 	text-align: center;
 	white-space: normal;
-	background: #1fb1b9 !important;
-	border: 2px solid #1fb1b9 !important;
+	background: transparent !important;
+	border: 2px solid rgba(255, 255, 255, 0.45) !important;
 	border-radius: 0.6rem !important;
-	color: #ffffff !important;
+	color: rgba(255, 255, 255, 0.85) !important;
 	transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.st-key-appt_view [data-testid="stButtonGroup"] button:hover,
-.st-key-call_mode [data-testid="stButtonGroup"] button:hover {
-	background: #27c7d0 !important;
+/* Hover on a choice not chosen only, so the chosen one stays white. Since Streamlit 1.66
+	the choices are react-aria toggle buttons, which mark the chosen one with data-selected
+	(the ARIA states are a fallback); the old kind/data-testid names are no longer used. */
+.st-key-appt_view [data-testid="stButtonGroup"] button:not([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]):hover,
+.st-key-call_mode [data-testid="stButtonGroup"] button:not([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]):hover {
+	background: rgba(255, 255, 255, 0.1) !important;
 	border-color: #ffffff !important;
+	color: #ffffff !important;
 }
 .st-key-appt_view [data-testid="stButtonGroup"] button p,
 .st-key-call_mode [data-testid="stButtonGroup"] button p,
@@ -522,22 +531,40 @@ select.mobile-nav,
 .st-key-call_mode [data-testid="stButtonGroup"] button span {
 	color: inherit !important;
 }
+/* Wrap the label between words only, never mid-word */
 .st-key-appt_view [data-testid="stButtonGroup"] button p,
 .st-key-call_mode [data-testid="stButtonGroup"] button p {
 	font-size: 1.1rem;
 	font-weight: 600;
+	white-space: normal;
+	overflow: visible;
+	word-break: normal;
+	overflow-wrap: normal;
 }
-/* The chosen view: solid white with dark red text, so it is unmistakable */
-.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"],
-.st-key-call_mode button[data-testid="stBaseButton-segmented_controlActive"] {
+/* The chosen view: solid white with dark red text and a tick, so it is unmistakable (and
+	not shown by colour alone) */
+.st-key-appt_view [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]),
+.st-key-call_mode [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]) {
 	background: #ffffff !important;
 	border-color: #ffffff !important;
 	color: #550000 !important;
 	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
-.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"] p,
-.st-key-call_mode button[data-testid="stBaseButton-segmented_controlActive"] p {
+.st-key-appt_view [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]) p,
+.st-key-call_mode [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"]) p {
 	font-weight: 700;
+}
+/* The tick sits in the top right corner, clear of the label */
+.st-key-appt_view [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"])::after,
+.st-key-call_mode [data-testid="stButtonGroup"] button:is([data-selected="true"], [aria-checked="true"], [aria-pressed="true"])::after {
+	content: "\2713";
+	position: absolute;
+	top: 0.3rem;
+	right: 0.5rem;
+	font-size: 0.95rem;
+	font-weight: 700;
+	line-height: 1;
+	color: #550000;
 }
 
 /* Result cards (from tab 2 of the geographic playground mini): the title as a tinted band

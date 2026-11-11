@@ -388,12 +388,17 @@ VIEW_ALL = "Show all appointments"
 VIEW_WEEK = "Show next week's call list"
 VIEW_ICONS = {VIEW_ALL: ":material/table_rows:", VIEW_WEEK: ":material/call:"}
 DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
+# Start on all appointments, so one button is always shown as chosen. Set through the session
+# state rather than default=, as go_to_call_list sets it; set again on every run, as Streamlit
+# forgets a widget's value on a run that doesn't draw it (the other tabs).
+st.session_state["appt_view"] = st.session_state.get("appt_view") or VIEW_ALL
 if st.session_state.get("page") == TAB_LABELS[1]:
     st.sidebar.segmented_control(
         "Click the buttons below to change the view",
         [VIEW_ALL, VIEW_WEEK],
         key="appt_view",
         format_func=lambda v: f"{VIEW_ICONS[v]} {v}",
+        required=True,  # clicking the chosen view again doesn't clear it
     )
 view = st.session_state.get("appt_view") or VIEW_ALL
 
@@ -1294,7 +1299,8 @@ with tab_calls:
 
     # Starting values set through the session state rather than default=/value=, so the
     # savings button on the appointments tab can preset them without a Streamlit warning
-    st.session_state.setdefault("call_mode", "Calls the team can make")
+    # `or`, not setdefault: a session from before the control was required may hold None
+    st.session_state["call_mode"] = st.session_state.get("call_mode") or "Calls the team can make"
     st.session_state.setdefault("calls_per_week", min(100, busiest))
     st.session_state.setdefault("risk_min", round(HIGH_RISK_MIN * 100))
     st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
@@ -1315,6 +1321,7 @@ with tab_calls:
             "call_mode",
             "Choose who to phone by",
             ["Calls the team can make", "Predicted risk"],
+            required=True,  # clicking the chosen option again doesn't clear it
         )
         or "Calls the team can make"
     )
