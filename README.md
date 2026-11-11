@@ -31,13 +31,17 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     beside the same number of calls made by the simple rule and at random (valued the same way;
     the value of clinic slots, not cash).
   - Then the filterable appointment list, highest risk first.
-    Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
-    attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
+    The table shows 6 rows at a time (`TABLE_ROWS`) and scrolls, so the chart below it is on
+    screen too. Click a row to open an overlay (`explain_appointment`, an `st.dialog`) with a SHAP
+    waterfall explaining that appointment's predicted risk of not attending and a "How to read
+    this chart" guide. It opens only on the click, not on later reruns, and dismissing it clears
+    the selection so the same row can be clicked again. Below the table, a bar chart always shows
     what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
     chart beside it for the filtered appointments when the appointment-detail filters leave at
-    least 30. The DNA Risk and Confidence filters sit above the appointment list and narrow only
-    that list: in the sidebar they would fight the tab's own forecast cards, grid and call list,
-    and the chart would go round in circles (they select by the forecast it explains).
+    least 30. The DNA Risk and Confidence filters sit above the appointment list, on one row with
+    a "What does confidence mean?" popover, and narrow only that list: in the sidebar they would
+    fight the tab's own forecast cards and call list, and the chart would go round in circles
+    (they select by the forecast it explains).
 - **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
   every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
   under the grid, highest risk first. The call list view covers just next week.

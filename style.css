@@ -24,7 +24,10 @@ html, body, st-emotion-cache [class*="css"] {
     font-family: var(--body-font);
     font-size: 18px;
     font-weight: 300;
-    color: #091747;
+    /* The dark theme's text colour. Dialogs and popovers are drawn outside the app root, so
+       they take their text colour from here, not from the theme (a dark navy made their
+       titles and text unreadable on the dark background). */
+    color: #fafafa;
 }
 
 /* Metric readouts in the mono font. */
