@@ -1381,13 +1381,15 @@ with tab_calls:
             [0.62, 0.38], gap="large"
         )
         with left:
-            # Share the 40 markers of width between the columns in line with their sizes
-            left_cols = min(32, max(8, round(40 * out["calls"] / 1000)))
+            # Share the 60 markers of width between the columns in line with their sizes; 60 makes
+            # the chart wide and short enough to fill its column. The cap keeps the right one at
+            # least as wide as its box.
+            left_cols = min(44, max(8, round(60 * out["calls"] / 1000)))
             st.plotly_chart(
                 charts.outcome_blocks(
                     out,
                     left_cols,
-                    40 - left_cols,
+                    60 - left_cols,
                     heading="Using the model to rank the list",
                 ),
                 width="stretch",
@@ -1649,8 +1651,9 @@ with tab_game:
         )
         with left:
             st.plotly_chart(
+                # 50 wide on the right so the chart is wide and short enough to fill its column
                 charts.outcome_blocks(
-                    mine["outcomes"], 10, 30, heading="Using your rule to rank the list"
+                    mine["outcomes"], 10, 50, heading="Using your rule to rank the list"
                 ),
                 width="stretch",
                 config={"displayModeBar": False},
