@@ -64,7 +64,7 @@ def admin_hourly_cost(salary, ni_rate, ni_threshold, pension_rate, hours_per_wee
 
 
 def dna_cost_table():
-    """The default costs as a table for st.data_editor: Specialty, New, Follow Up."""
+    """The default costs as a table: Specialty, New, Follow Up."""
     return pd.DataFrame(
         [(s, new, fu) for s, (new, fu) in DNA_COSTS.items()],
         columns=["Specialty", *APPOINTMENT_TYPES],

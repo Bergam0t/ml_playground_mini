@@ -51,8 +51,10 @@ streamlit run streamlit_app.py
 Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
 
-The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). On How many people should we phone? they
-change only the upcoming calls-per-week figures, since the chart uses past appointments. Your rule vs the
+The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). How many people should we phone?
+hides them and shows only the cost assumptions: its calls-per-week figures use all the upcoming
+appointments, and the chart uses past appointments. The filters keep their settings for the other
+tabs (the script checks the open tab, which it can since the tabs are keyed). Your rule vs the
 model uses past appointments only, so the sidebar is hidden while that tab is open (a CSS rule
 in `style.css` keyed on the selected tab, so the filters keep their settings for the other tabs).
 
