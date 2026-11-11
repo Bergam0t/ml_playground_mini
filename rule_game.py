@@ -23,6 +23,7 @@ CLUES = {
     "Age": "Being younger",
     "Lead_Time_Days": "A longer time since booking",
     "Day_Of_Week": "Riskiest days of the week",
+    "Time_Slot": "Riskiest times of day",
     "Previous_DNAs": "Most missed appointments before",
     "Deprivation_Decile": "Most deprived areas",
     "Appointment Type": "First appointments, not follow ups",
@@ -35,6 +36,7 @@ CLUE_SHORT = {
     "Age": "Age",
     "Lead_Time_Days": "Time since booking",
     "Day_Of_Week": "Day of the week",
+    "Time_Slot": "Time of day",
     "Deprivation_Decile": "Deprivation",
     "Appointment Type": "New or follow-up",
     "Specialty": "Specialty",
@@ -73,7 +75,7 @@ def results(past: pd.DataFrame, score) -> dict:
 
 def all_rule_catches(past: pd.DataFrame) -> dict:
     """Missed appointments on the list (per 1,000) for every rule the visitor can make:
-    each combination of one or more clues, keyed by its sorted clues. 255 for 8 clues."""
+    each combination of one or more clues, keyed by its sorted clues. 511 for 9 clues."""
     return {
         tuple(sorted(combo)): results(past, rule_score(past, combo))["outcomes"]["called_dna"]
         for k in range(1, len(CLUES) + 1)

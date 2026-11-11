@@ -75,7 +75,7 @@ def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
 
 
-# What every rule the visitor can make would catch, for "Your rule ranks #N of 255"
+# What every rule the visitor can make would catch, for "Your rule ranks #N of 511"
 @st.cache_data
 def load_rule_catches():
     return rule_game.all_rule_catches(rule_game.load_past())
@@ -179,17 +179,20 @@ APPOINTMENT_FIELDS = {
     "Probabilty": "Probabilty",
 }
 
-# Fixed column widths (about 1,110px in total) so the whole table fits a 1,400px
-# main area; the grid stretches them to fill any space left over.
+# Fixed column widths (about 1,110px in total; about 1,300px on the call list, with its two
+# extra columns) so the whole table fits a 1,400px main area; the grid stretches them to fill
+# any space left over.
 APPOINTMENT_COLUMNS = {
     "Appointment Date": st.column_config.DateColumn(
         "Appointment Date", format="DD/MM/YYYY", width=110
     ),
+    "Time": st.column_config.TextColumn(width=65),
     "Patient ID": st.column_config.TextColumn(width=95),
+    "Patient Name": st.column_config.TextColumn(width=150),
     "Mobile Number": st.column_config.TextColumn(width=120),
     #'Mobile Number (GP Record)': st.column_config.TextColumn(),
-    "Specialty": st.column_config.TextColumn(width=165),
-    "Location": st.column_config.TextColumn(width=175),
+    "Specialty": st.column_config.TextColumn(width=145),
+    "Location": st.column_config.TextColumn(width=155),
     "Appointment Type": st.column_config.TextColumn(width=130),
     "Expected DNA": st.column_config.TextColumn(
         width=115,
@@ -211,17 +214,29 @@ APPOINTMENT_COLUMNS = {
 }
 
 
-def appointment_table(df, by_patient=False):
+# The call list only: the admin team needs a name and a time to phone and remind. Not shown in
+# the all-appointments view
+CALL_LIST_FIELDS = {
+    "Appointment_Time": "Time",
+    "Patient Name": "Patient Name",
+}
+
+
+def appointment_table(df, by_patient=False, call_list=False):
     """Appointments to show in a table, with the forecast columns coloured.
 
     `by_patient` puts the patient columns first and shades every other patient's rows,
-    for a table sorted so each patient's appointments are together.
+    for a table sorted so each patient's appointments are together. `call_list` adds the
+    appointment time and the patient's name.
     """
     fields = list(APPOINTMENT_FIELDS)
+    if call_list:
+        fields.insert(1, "Appointment_Time")
+        fields.insert(3, "Patient Name")
     if by_patient:
         patient = ["MRN", "Mobile Telephone"]
         fields = patient + [f for f in fields if f not in patient]
-    shown = df[fields].rename(columns=APPOINTMENT_FIELDS)
+    shown = df[fields].rename(columns={**APPOINTMENT_FIELDS, **CALL_LIST_FIELDS})
     styler = shown.style.apply(forecast_cell_styles, axis=None)
     return styler.apply(patient_bands, axis=None) if by_patient else styler
 
@@ -1106,7 +1121,7 @@ with tab_appts:
             st.info(f"None of the appointments {when} are {m.day_phrase}.")
         else:
             st.dataframe(
-                appointment_table(listed),
+                appointment_table(listed, call_list=True),
                 column_config=APPOINTMENT_COLUMNS,
                 hide_index=True,
                 key=f"call_list_{filter_key}",
@@ -1701,8 +1716,8 @@ with tab_game:
     st.divider()
     st.markdown("#### 2. Watch a machine learning model learn its own rule")
     st.markdown(
-        f"It gets the same eight clues, and **{learning['n_train']:,} other past appointments** with who "
-        "missed them. It adds up the clues just as your rule does, but nobody tells it how much say each "
+        f"It gets the same {len(rule_game.CLUES)} clues, and **{learning['n_train']:,} other past "
+        "appointments** with who missed them. It adds up the clues just as your rule does, but nobody tells it how much say each "
         "clue gets or which way it points: it works that out. Then "
         "it makes its own list for the same 1,000 appointments, which it has never seen."
     )

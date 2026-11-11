@@ -15,18 +15,19 @@ streamlit run streamlit_app.py
   this.
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
-  - Using 1,000 past appointments (79 missed) and 100 calls, the visitor builds a rule for who
-    to phone from the eight clues the model sees, with each chosen clue getting an equal say.
+  - Using 1,000 past appointments (80 missed) and 100 calls, the visitor builds a rule for who
+    to phone from the nine clues the model sees (including *riskiest times of day*), with each
+    chosen clue getting an equal say.
     After each change, a callout says whether the last clue added or taken away made the list
-    better or worse, and the rule is ranked against all 255 rules the buttons can make (the
-    best is *most missed appointments before* on its own: 32 of 79).
+    better or worse, and the rule is ranked against all 511 rules the buttons can make (the
+    best is five clues together: 34 of 80).
   - They then watch a model learn its own weighting from 0 to 22,500 past appointments: the
     race against their best rule beside how much say each clue gets. A toast and an
-    "Overtook you" marker show where the model passes them (400 for the best rule).
+    "Overtook you" marker show where the model passes them (800 for the best rule).
   - The verdict follows at once: a banner saying where the model overtook them, then two short
     cards: same clues but the model learnt which matter most (no rule from the buttons can match
     its 40), and even the best possible list (knowing each patient's true chance) reaches only
-    42 of 79. A short "Why a computer?" section comes last.
+    44 of 80. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
   - Two buttons lead on to the Upcoming appointments and How many people should we phone? tabs, as in the
@@ -123,6 +124,16 @@ lambda_ml_streamlit_exercise:
    probability minus the second, which for a yes/no model is |2 × risk − 1|.
 4. `shap.TreeExplainer` explains each prediction on the probability scale.
 
+**Patient name and appointment time.** Each patient has a made-up name (the same on all their
+appointments), and each appointment a clinic time from 08:30 to 16:45 in 15-minute steps (fewer over
+lunch). Both come from a separate random stream, so adding them left every other column unchanged. The
+name is shown only on the call list (Show next week call list), with the appointment time. The model sees
+the hour (`Time_Slot`, 08:00 to 16:00) as a clue: appointments starting 10-12 or 15-17 miss more
+(`TIME_EFFECT` in `demo_data.py`), and Monday before midday gets an extra push
+(`MONDAY_MORNING_EFFECT`) on top of Monday's own, so it is the worst slot of the week (about 19%
+missed, against 6% for the rest of the week). The build checks this. Explanations show the real time
+(`Appointment_Time`), not the hour slot.
+
 Dates are not stored. `demo_data.load_forecast()` dates the appointments from next Monday onwards,
 so they always roll forward from today while each appointment keeps its weekday.
 
@@ -147,8 +158,8 @@ split as the main build, and checks that its test appointments match `past_predi
 The model on this tab is a logistic regression on raw inputs, so it has to learn which way each clue
 points as well as how much it counts. That's why it starts out worse than a person. With all the
 data it reaches the same share of misses as the XGBoost model (the build checks this). The demo
-data has no interactions between clues (`demo_data.py` adds their effects together), so the
-simpler model loses nothing.
+data has only one interaction between clues, Monday mornings (below), which the simpler model can't
+learn, but it is a small part of the risk, so the simpler model loses almost nothing.
 
 The build checks that the SHAP values add up to each prediction, that the past DNA rate is
 within a point of `DNA_RATE` and that every risk band has some appointments. It prints how the

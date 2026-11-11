@@ -40,7 +40,8 @@ HIGH_RISK_MIN = 0.40  # the high-risk flag, as HIGH_RISK_MIN in streamlit_app.py
 FORECAST_COLUMNS = [
     "row_id", "day_index", "Reporting_Site", "Specialty", "Appointment Type",
     "Appointment Location Text", "Day_Of_Week", "Previous_DNAs", "Lead_Time_Days", "Age",
-    "Deprivation_Decile", "MRN", "Mobile Telephone", "Fin Number",
+    "Deprivation_Decile", "Time_Slot", "Appointment_Time", "Patient Name", "MRN", "Mobile Telephone",
+    "Fin Number",
     "DNA_Prob_Forecast", "Confidence_Score", "DNA_Forecast",
 ]
 
@@ -137,6 +138,16 @@ def main():
           f"{past.loc[past['DNA_Prob_Forecast'] >= HIGH_RISK_MIN, 'Did_Not_Attend'].mean():.1%}")
     print("Mean |SHAP| (pp):", grouped.abs().mean().round(2).sort_values(ascending=False).to_dict())
     assert abs(y.mean() - DNA_RATE) < 0.01, "past DNA rate has drifted from demo_data.DNA_RATE"
+    # Time-of-day checks on the past appointments: 10-12 and 3-5 miss more, Monday morning most
+    hour = hist["Time_Slot"].str[:2].astype(int)
+    peak = hour.isin([10, 11, 15, 16])
+    mon_am = (hist["Day_Of_Week"] == "Monday") & (hour < 12)
+    print(f"Miss rate: peak times {y[peak].mean():.1%}, other times {y[~peak].mean():.1%}; "
+          f"Monday morning {y[mon_am].mean():.1%}, other Monday {y[(hist['Day_Of_Week'] == 'Monday') & ~mon_am].mean():.1%}, "
+          f"rest of week {y[hist['Day_Of_Week'] != 'Monday'].mean():.1%}")
+    by_slot = y.groupby([hist["Day_Of_Week"] == "Monday", hour]).mean()
+    assert y[peak].mean() > y[~peak].mean() + 0.01, "10-12 and 3-5 should miss more"
+    assert y[mon_am].mean() > 1.5 * y[hist["Day_Of_Week"] != "Monday"].mean(), "Monday morning should be much worse"
     assert (bands > 0).all(), "every risk band should have some appointments"
 
     # ---- Calibration on the past appointments the model didn't train on. The app adds risks

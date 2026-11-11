@@ -22,7 +22,7 @@ def patient_explanation(row: pd.Series, shap_row: pd.Series, base_pp: float, top
     items = [
         {
             "feature": k,
-            "label": f"{FEATURES[k]} = {display_value(row[k])}",
+            "label": f"{FEATURES[k]} = {display_value(row['Appointment_Time'] if k == 'Time_Slot' else row[k])}",
             "value": float(shap_row[k]),
         }
         for k in FEATURES

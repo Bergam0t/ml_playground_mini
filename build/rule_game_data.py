@@ -1,6 +1,6 @@
 """Data for the "Your rule vs the model" tab (offline build step, like train_and_explain.py).
 
-The tab lets a visitor build a rule for who to phone from the eight clues the model sees,
+The tab lets a visitor build a rule for who to phone from the nine clues the model sees,
 each clue with an equal say. Then it shows a computer learning how much each clue should
 count, from more and more past appointments, and overtaking the visitor's rule.
 
@@ -12,7 +12,7 @@ Writes:
   22,500 past appointments: outcomes per 1,000 at the tab's call budget, and how much say
   each clue ends up with.
 
-The computer is a logistic regression on the same eight clues: the simplest model that
+The computer is a logistic regression on the same nine clues: the simplest model that
 learns how much each clue counts. It has to learn which way each clue points too (raw
 inputs, categories one-hot), so it starts out worse than a sensible person. On these past
 appointments it reaches the same share of misses as the app's XGBoost model.

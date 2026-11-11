@@ -33,6 +33,29 @@ SPECIALTIES = {
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 DAY_EFFECT = dict(zip(DAYS, [0.60, 0.05, -0.40, -0.15, 0.45]))
 APPOINTMENT_TYPES = {"New": 0.3, "Follow Up": -0.1}
+# Clinic starts in hours: the model sees the hour an appointment starts in. Mid-morning (10-12)
+# and late afternoon (3-5) are worst; early morning and early afternoon are best.
+TIME_EFFECT = {
+    "08:00": -0.25, "09:00": -0.15, "10:00": 0.30, "11:00": 0.30, "12:00": -0.10,
+    "13:00": -0.20, "14:00": -0.10, "15:00": 0.30, "16:00": 0.30,
+}
+# Extra risk for Monday before midday, on top of Monday and the time of day
+MONDAY_MORNING_EFFECT = 0.50
+# Appointment starts: every 15 minutes from 08:30 to 16:45, fewer over lunch
+SLOT_TIMES = [f"{m // 60:02d}:{m % 60:02d}" for m in range(8 * 60 + 30, 16 * 60 + 46, 15)]
+SLOT_WEIGHTS = np.array([0.5 if "12:30" <= t < "13:30" else 1.0 for t in SLOT_TIMES])
+
+FIRST_NAMES = [
+    "Amelia", "Oliver", "Fatima", "Mohammed", "Priya", "Jack", "Aisha", "George", "Grace", "Tariq",
+    "Sophie", "Ahmed", "Emily", "Harry", "Zainab", "Daniel", "Ruth", "Samir", "Chloe", "Joseph",
+    "Hannah", "Ibrahim", "Lucy", "Arjun", "Margaret", "Kwame", "Sarah", "Raj", "Beatrice", "Tomasz",
+    "Naomi", "Hassan", "Ellie", "Marcus", "Leila", "Peter", "Anita", "Thomas", "Maryam", "William",
+]
+LAST_NAMES = [
+    "Smith", "Khan", "Patel", "Jones", "Ali", "Taylor", "Begum", "Brown", "Hussain", "Williams",
+    "Ahmed", "Evans", "Singh", "Wilson", "Rahman", "Davies", "Okafor", "Thomas", "Islam", "Roberts",
+    "Nowak", "Johnson", "Chowdhury", "Walker", "Mensah", "Wright", "Sharma", "Hall", "Costa", "Green",
+]
 
 # Model inputs: column -> label shown on the waterfall chart
 FEATURES = {
@@ -44,6 +67,7 @@ FEATURES = {
     "Specialty": "Specialty",
     "Reporting_Site": "Site",
     "Day_Of_Week": "Day of the week",
+    "Time_Slot": "Appointment time",
 }
 # Categorical model inputs and their categories (fixed, so one-hot columns always line up)
 CATEGORIES = {
@@ -51,6 +75,7 @@ CATEGORIES = {
     "Specialty": list(SPECIALTIES),
     "Reporting_Site": list(SITES),
     "Day_Of_Week": DAYS,
+    "Time_Slot": list(TIME_EFFECT),
 }
 
 
@@ -69,6 +94,9 @@ def generate_appointments(n=3200, seed=42, weeks=6):
     different days. A patient keeps their ID, mobile number, age, deprivation decile
     and missed-appointment history across all of them, and usually their site and
     specialty too (a repeat in the same specialty is a follow-up).
+
+    Patient names and appointment times come from a separate random stream, so adding them
+    left every other column as it was. A patient keeps their name across appointments.
 
     Each row has a `day_index` (0 = the first Monday) rather than a date, so the
     weekday of a row never changes when the dates roll forward.
@@ -111,6 +139,12 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         "Specialty": specialty,
         "Appointment Type": appt_type,
     })
+    # Names and clinic times: own random stream (see above)
+    rng_extra = np.random.default_rng([seed, 1])
+    names = [f"{f} {l}" for f, l in zip(rng_extra.choice(FIRST_NAMES, m), rng_extra.choice(LAST_NAMES, m))]
+    df["Patient Name"] = np.array(names)[patient]
+    df["Appointment_Time"] = rng_extra.choice(SLOT_TIMES, n, p=SLOT_WEIGHTS / SLOT_WEIGHTS.sum())
+    df["Time_Slot"] = df["Appointment_Time"].str[:2] + ":00"
     df["Appointment Location Text"] = [rng.choice(LOCATIONS[s]) for s in df["Reporting_Site"]]
 
     # Patient history and circumstances. A minority of patients miss appointments
@@ -130,6 +164,8 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         + df["Specialty"].map(SPECIALTIES).to_numpy()
         + df["Appointment Type"].map(APPOINTMENT_TYPES).to_numpy()
         + df["Day_Of_Week"].map(DAY_EFFECT).to_numpy()
+        + df["Time_Slot"].map(TIME_EFFECT).to_numpy()
+        + MONDAY_MORNING_EFFECT * ((df["Day_Of_Week"] == "Monday") & (df["Time_Slot"] < "12:00")).to_numpy()
         + 0.65 * np.minimum(df["Previous_DNAs"].to_numpy(), 5)
         + 0.55 * (np.log(df["Lead_Time_Days"].to_numpy()) - np.log(35))
         - 0.025 * (df["Age"].to_numpy() - 52)
