@@ -710,33 +710,29 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
         saving_col.metric(
             label,
             f"£{saving['value_avoided']:,.0f}",
-            # A minus only for a loss, so st.metric still colours it red; no plus or arrow
-            f"{'-' if saving['net'] < 0 else ''}£{abs(saving['net']):,.0f} after the cost of calls",
-            delta_arrow="off",
             icon=":material/savings:",
             help=f"{n_calls:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
-            f"or {few(saving['staff_hours'])} hours of staff time. In past appointments, "
+            f"or {few(saving['staff_hours'])} hours of staff time, so about "
+            f"£{saving['net']:,.0f} after the cost of the calls. In past appointments, "
             f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
             f"someone who would otherwise miss. If {DEFAULT_CALL_EFFECT}% of them attend instead, "
             f"that's about {few(reached * effect)} fewer missed appointments, each valued at about "
-            f"£{dna_cost:,.0f}.{per_week} The costs come from **Cost assumptions** in the sidebar.",
+            f"£{dna_cost:,.0f}.{per_week} This is the value of the clinic slots kept, not cash: a "
+            "Trust may not be paid more when a patient attends. The costs come from **Cost "
+            "assumptions** in the sidebar.",
         )
-        saving_col.caption(caption)
+        saving_col.caption(f"{caption} Staff time: £{saving['call_cost']:,.0f}.")
         saving_col.markdown(
-            f"**The same {n_calls:,} calls made another way:** about £{kept(rule_reached):,.0f} "
-            f"phoning those who missed most before, and £{kept(random_reached):,.0f} at random.",
+            f"Same calls by the simple rule: **£{kept(rule_reached):,.0f}** · "
+            f"at random: **£{kept(random_reached):,.0f}**",
             help=f"In past appointments, the same share of calls would have reached someone who "
             f"then missed {precision:.0%} of the time with the model's list, "
-            f"{rule_reached / n_calls:.0%} phoning those who missed most before and "
-            f"{random_reached / n_calls:.0%} at random. Each is valued the same way. This is the "
-            "value of the clinic slots kept, not cash: a Trust may not be paid more when a patient "
-            "attends.",
+            f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
+            f"and {random_reached / n_calls:.0%} at random. Each is valued the same way.",
         )
         cta_col.markdown(
-            f"**{DEFAULT_CALL_EFFECT}% is what the {pilot.SERVICE.lower()} pilot saw**, for patients at "
-            "very high risk, without a comparison group. Calls may change fewer people in other "
-            "services, or lower down the list. Try other values, and other numbers of calls, on the "
-            f"next tab. It uses all the upcoming appointments, {scope}."
+            f"**{DEFAULT_CALL_EFFECT}% comes from one {pilot.SERVICE.lower()} pilot** with no "
+            "comparison group, so calls may change fewer people here."
         )
         cta_col.button(
             "Explore these assumptions",
@@ -745,6 +741,8 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
             args=(risk_min,),
             icon=":material/arrow_forward:",
             type="primary",
+            help="Try other values, and other numbers of calls, on the next tab. It uses all the "
+            f"upcoming appointments, {scope}.",
         )
 
 
@@ -860,72 +858,42 @@ with tab_appts:
                 config={"displayModeBar": False},
             )
 
-        # Summary of the filtered appointments. Every card is a bordered container holding a
-        # metric and a one-line caption, so the four are the same height; the 20%+ and 70%+
-        # pills sit above two of them, so the row is bottom-aligned to keep the boxes level.
+        # Summary of the filtered appointments: three cards, each a metric and a one-line caption,
+        # so they are the same height. The risk cut-offs are in the labels and the detail in each
+        # card's help, to keep the row quiet.
         n_filtered = len(filtered_data)
+        n_past_dnas = int(past["Did_Not_Attend"].sum())
 
-        def pill(risk_band, threshold):
-            st.markdown(
-                f'<span class="pill" style="background-color:{RISK_COLOURS[risk_band]};color:#fff">'
-                f"{threshold:.0%}+ risk</span>",
-                unsafe_allow_html=True,
-            )
+        def card_caption(count, recall):
+            return f"{count / n_filtered:.1%} of appointments · catches {recall:.0%} of past DNAs"
 
-        def share_of_appointments(count):
-            return f"{count / n_filtered:.1%} of upcoming appointments"
-
-        with st.container(horizontal=True, vertical_alignment="bottom"):
-            # with st.container(border=True):
-            #     st.metric(
-            #         "Appointments (filtered)",
-            #         f"{n_filtered:,}",
-            #         icon=":material/calendar_month:",
-            #     )
-            #     st.caption("Matching the filters on the left")
-            with st.container():
-                pill("High", FORECAST_MIN)
-                with st.container(border=True):
-                    n_forecast = int(filtered_data["DNA_Forecast"].sum())
-                    st.metric(
-                        "All forecast DNAs",
-                        f"{n_forecast:,}",
-                        share_of_appointments(n_forecast),
-                        delta_color="off",
-                        delta_arrow="off",
-                        icon=":material/event_busy:",
-                        help=f"Appointments the model forecasts as a DNA: a predicted risk of "
-                        f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them "
-                        "will be missed, and some lower-risk appointments will be.",
-                    )
-                    st.caption(
-                        f"Catches {forecast_recall:.0%} of past DNAs",
-                        help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
-                        f"missed in the past appointments the model was tested on, "
-                        f"{forecast_recall:.0%} had a predicted risk of {FORECAST_MIN:.0%} or more. "
-                        f"Of all those forecast as a DNA, {forecast_precision:.0%} were missed.",
-                    )
-            with st.container():
-                pill("Very High", HIGH_RISK_MIN)
-                with st.container(border=True):
-                    n_high = int(filtered_data["High_Risk_DNA"].sum())
-                    st.metric(
-                        "DNAs we're confident about",
-                        f"{n_high:,}",
-                        share_of_appointments(n_high),
-                        delta_color="off",
-                        delta_arrow="off",
-                        icon=":material/warning:",
-                        help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more "
-                        "(the Very High band).",
-                    )
-                    st.caption(
-                        f"Catches {high_recall:.0%} of past DNAs",
-                        help=f"Of the {int(past['Did_Not_Attend'].sum()):,} appointments that were "
-                        f"missed in the past appointments the model was tested on, "
-                        f"{high_recall:.0%} had a predicted risk of {HIGH_RISK_MIN:.0%} or more. "
-                        f"Of all those flagged, {high_precision:.0%} were missed.",
-                    )
+        with st.container(horizontal=True):
+            with st.container(border=True):
+                n_forecast = int(filtered_data["DNA_Forecast"].sum())
+                st.metric(
+                    f"Forecast DNAs ({FORECAST_MIN:.0%}+ risk)",
+                    f"{n_forecast:,}",
+                    icon=":material/event_busy:",
+                    help=f"Appointments the model forecasts as a DNA: a predicted risk of "
+                    f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them will be "
+                    f"missed, and some lower-risk appointments will be. Of the {n_past_dnas:,} "
+                    "appointments missed in the past appointments the model was tested on, "
+                    f"{forecast_recall:.0%} had a risk this high; of all those forecast as a DNA, "
+                    f"{forecast_precision:.0%} were missed.",
+                )
+                st.caption(card_caption(n_forecast, forecast_recall))
+            with st.container(border=True):
+                n_high = int(filtered_data["High_Risk_DNA"].sum())
+                st.metric(
+                    f"Confident DNAs ({HIGH_RISK_MIN:.0%}+ risk)",
+                    f"{n_high:,}",
+                    icon=":material/warning:",
+                    help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more (the "
+                    f"Very High band). Of the {n_past_dnas:,} appointments missed in the past "
+                    f"appointments the model was tested on, {high_recall:.0%} had a risk this high; "
+                    f"of all those flagged, {high_precision:.0%} were missed.",
+                )
+                st.caption(card_caption(n_high, high_recall))
             with st.container(border=True):
                 st.metric(
                     "Expected cost of missed appointments",
@@ -951,10 +919,9 @@ with tab_appts:
         savings_box(
             filtered_data[filtered_data["DNA_Forecast"] == 1],
             FORECAST_MIN,
-            f"Value of appointments kept over the next {length} if we phone every forecast DNA",
-            f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
-            f"pilot, with {n_forecast:,} calls "
-            f"between {dates.min():%d %b} and {dates.max():%d %b}.",
+            f"Value of appointments kept if we phone every forecast DNA ({length})",
+            f"{n_forecast:,} calls, {dates.min():%d %b} to {dates.max():%d %b}, if "
+            f"{DEFAULT_CALL_EFFECT}% of those who'd have missed attend instead.",
             "not just your filters",
             "savings",
             "None of the appointments in your filters is forecast as a DNA, so there are no "
@@ -1373,9 +1340,8 @@ with tab_appts:
             listed,
             MEASURE_RISK_MIN[column],
             f"Value of appointments kept {when} if we phone everyone on this list",
-            f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
-            f"pilot, with {len(listed):,} calls "
-            f"in the week ending {weekly.week_label(first_week, year=True)}.",
+            f"{len(listed):,} calls in the week ending {weekly.week_label(first_week, year=True)}, "
+            f"if {DEFAULT_CALL_EFFECT}% of those who'd have missed attend instead.",
             "not just this week or your filters",
             "week_savings",
             f"Nobody {when} is on this list, so there are no calls to cost.",
