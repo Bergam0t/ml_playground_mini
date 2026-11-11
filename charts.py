@@ -227,7 +227,7 @@ def learning_curve(
             hovertemplate=f"After %{{x}} past appointments: %{{y}} of the {n_missed} who missed on its list<extra></extra>",
         )
     )
-    lines = [(perfect, "A perfect model", MUTED, "dot")]
+    lines = [(perfect, "Best possible list", MUTED, "dot")]
     if your_best is not None:
         lines.append((your_best, "Your best rule", YOU, "dash"))
     for value, label, colour, dash in lines:
