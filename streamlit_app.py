@@ -887,7 +887,9 @@ with tab_appts:
                 "forecast of what this one person will do. The bars show what the model relied on, "
                 "not what causes missed appointments: changing one of these facts would not "
                 f"necessarily change whether the patient attends. The model is reasonably but not "
-                f"perfectly accurate (AUC {meta['auc_test']:.2f} on past appointments it hadn't seen)."
+                f"perfectly accurate: tested on past appointments it hadn't seen, it gave a missed "
+                f"appointment a higher risk than an attended one about {meta['auc_test'] * 100:.0f} "
+                f"times in 100."
             )
         else:
             # No row selected: what the model relies on across all upcoming appointments, and,
@@ -964,8 +966,9 @@ with tab_appts:
             st.info(
                 "These bars show what the model relied on, not what causes missed appointments: "
                 "changing one of these facts would not necessarily change whether a patient attends. "
-                f"The model is reasonably but not perfectly accurate (AUC {meta['auc_test']:.2f} on "
-                "past appointments it hadn't seen)."
+                "The model is reasonably but not perfectly accurate: tested on past appointments it "
+                "hadn't seen, it gave a missed appointment a higher risk than an attended one about "
+                f"{meta['auc_test'] * 100:.0f} times in 100."
             )
 
         # ---- The way on: a split button, styled like the game tab's (style.css)
