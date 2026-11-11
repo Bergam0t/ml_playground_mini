@@ -16,32 +16,34 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
 
 - **Upcoming appointments** tab (the landing page), with three views picked by the stacked switch at
   the top of the sidebar: **All appointments**, **Weekly summary** and **Next week's call list**.
-  All appointments opens with a short introduction beside the demonstration
-  notice (which gives the real pilot's result), then the case for the model, with no clicks needed:
-  - **Same calls, three ways**, under the introduction: of 1,000 past appointments (80 missed),
-    how many would 100 calls have reached who then missed, phoning at random (8), phoning those
-    who missed most before (43, the best rule in the game) and phoning the model's list (46). It
-    says plainly that the simple rule does most of the work, and that the model adds a risk for
-    every patient (to fit the list to the calls the team can make) and the reasons behind it.
-    Worked out by `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv`
-    (the same rows).
-  - **Why is this patient flagged?**: the SHAP waterfall for the highest-risk appointment in the
-    sidebar's filters (not a picked example), with a button to the bonus game.
-  - The forecast cards, then the value of appointments kept if every forecast DNA is phoned,
-    beside the same number of calls made by the simple rule and at random (valued the same way;
-    the value of clinic slots, not cash).
-  - Then the filterable appointment list, highest risk first.
-    The table shows 6 rows at a time (`TABLE_ROWS`) and scrolls, so the chart below it is on
-    screen too. Click a row to open an overlay (`explain_appointment`, an `st.dialog`) with a SHAP
-    waterfall explaining that appointment's predicted risk of not attending and a "How to read
-    this chart" guide. It opens only on the click, not on later reruns, and dismissing it clears
-    the selection so the same row can be clicked again. Below the table, a bar chart always shows
-    what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
+  All appointments puts the table, the thing to click, as high on the page as it can:
+  - A short introduction and the three forecast cards, beside the demonstration notice (which
+    gives the real pilot's result): forecast DNAs, confident DNAs (the best return on staff time
+    when only a few calls can be made) and the value of appointments kept if every forecast DNA
+    is phoned (`forecast_savings`; the value of clinic slots, not cash).
+  - The appointment table, highest risk first, 6 rows at a time (`TABLE_ROWS`); it scrolls.
+    Click a row to open an overlay (`explain_appointment`, an `st.dialog`) with a SHAP waterfall
+    explaining that appointment's predicted risk of not attending and a "How to read this chart"
+    guide. It opens only on the click, not on later reruns, and dismissing it clears the
+    selection so the same row can be clicked again. The table is a fragment
+    (`appointments_table`), so a click reruns just that part and the overlay opens in about a
+    second; the sidebar filters are outside it and rerun the page. Its DNA Risk and Confidence
+    filters sit above it, on one row with a "What does confidence mean?" popover, and narrow
+    only the table: in the sidebar they would fight the forecast cards and call list, and the
+    chart below would go round in circles (they select by the forecast it explains).
+  - **Same calls, three ways**: of 1,000 past appointments (80 missed), how many would 100 calls
+    have reached who then missed, phoning at random (8), phoning those who missed most before
+    (43, the best rule in the game) and phoning the model's list (46). It says plainly that the
+    simple rule does most of the work, and that the model adds a risk for every patient (to fit
+    the list to the calls the team can make) and the reasons behind it. Worked out by
+    `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv` (the same
+    rows). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
+    kept by phoning every forecast DNA, against the same number of calls made at random and by
+    the simple rule (valued the same way). Buttons lead to the phone tab ("Explore these
+    assumptions") and the bonus game.
+  - What the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
     chart beside it for the filtered appointments when the appointment-detail filters leave at
-    least 30. The DNA Risk and Confidence filters sit above the appointment list, on one row with
-    a "What does confidence mean?" popover, and narrow only that list: in the sidebar they would
-    fight the tab's own forecast cards and call list, and the chart would go round in circles
-    (they select by the forecast it explains).
+    least 30.
 - **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
   every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
   under the grid, highest risk first. The call list view covers just next week.

@@ -328,21 +328,25 @@ def close_explanation():
     st.session_state["table_nonce"] = st.session_state.get("table_nonce", 0) + 1
 
 
-@st.dialog(
-    "Why this appointment has its risk", width="large", on_dismiss=close_explanation
-)
 def explain_appointment(row):
     """The SHAP waterfall for one appointment, in an overlay so it can't be missed below the
-    table. Opened by clicking a row in the All appointments table."""
+    table. Opened by clicking a row in the All appointments table. The overlay's title names
+    the patient, so the dialog is made here, when it opens, rather than with a fixed title."""
     meta = load_model_meta()
     expl = explain.patient_explanation(
         row, load_shap().loc[row["row_id"]], meta["base_value_pp"]
     )
-
-    st.subheader(
+    title = (
         f"Patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y}: a "
-        f"{expl['fx']:.0f}% risk of not attending"
+        f"{expl['fx']:.0f}% risk of not attending: why?"
     )
+    st.dialog(title, width="large", on_dismiss=close_explanation)(explanation_body)(
+        row, expl, meta
+    )
+
+
+def explanation_body(row, expl, meta):
+    """What the explain_appointment overlay shows."""
     st.markdown(
         f"**The model predicts a {expl['fx']:.0f}% risk that this patient won't attend**, "
         f"compared with about **{expl['base']:.0f}%** for the average appointment."
@@ -355,6 +359,7 @@ def explain_appointment(row):
         key="chart_guide",
         icon=":material/help:",
     ):
+        st.caption("A made-up example.")
         # Keyed so style.css stacks the example above the steps on narrower screens
         example_col, steps_col = st.container(key="reflow_stack_guide").columns(
             [4, 5], vertical_alignment="center"
@@ -365,7 +370,6 @@ def explain_appointment(row):
             width="content",
             config={"staticPlot": True},
         )
-        example_col.caption("A made-up example.")
         steps_col.markdown(
             "\n".join(
                 f"<div class='guide-step'><span class='guide-num'>{n}</span><div>{text}</div></div>"
@@ -827,18 +831,17 @@ MEASURE_RISK_MIN = {
 }
 
 
-def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=None):
-    """Predicted savings from phoning every appointment in `called` (all those at or above
-    `risk_min`), if a call gets DEFAULT_CALL_EFFECT% of those who would have missed to attend.
+def forecast_savings(called, risk_min, weeks=None):
+    """Predicted value of the appointments kept by phoning every appointment in `called` (all
+    those at or above `risk_min`), if a call gets DEFAULT_CALL_EFFECT% of those who would have
+    missed to attend, with the same number of calls made by the simple rule and at random.
     Worked out as the phone tab does: calls reach a would-be DNA as often as they did in the
-    past appointments at the same cut-off. A button opens the phone tab on the same setting.
-    `scope` says what the phone tab covers that this doesn't; `none_text` is shown instead
-    when nobody would be phoned; `weeks` adds a weekly figure."""
+    past appointments at the same cut-off. None when nobody would be phoned. `weeks` adds a
+    weekly figure to the help text."""
     n_calls = len(called)
     dna_cost = costs.cost_per_dna_reached(called) if n_calls else None
     if dna_cost is None:
-        st.caption(none_text)
-        return
+        return None
     past = load_past()
     precision = past.loc[past["DNA_Prob_Forecast"] >= risk_min, "Did_Not_Attend"].mean()
     effect = DEFAULT_CALL_EFFECT / 100
@@ -872,47 +875,73 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
     def kept(n_reached):
         return n_reached * effect * dna_cost
 
+    return {
+        "n_calls": n_calls,
+        "value": saving["value_avoided"],
+        "call_cost": saving["call_cost"],
+        "rule": kept(rule_reached),
+        "random": kept(random_reached),
+        "help": f"{n_calls:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
+        f"or {few(saving['staff_hours'])} hours of staff time, so about "
+        f"£{saving['net']:,.0f} after the cost of the calls. In past appointments, "
+        f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
+        f"someone who would otherwise miss. If {DEFAULT_CALL_EFFECT}% of them attend instead "
+        f"(what the {pilot.SERVICE.lower()} pilot saw, with no comparison group, so calls may "
+        f"change fewer people here), that's about {few(reached * effect)} fewer missed "
+        f"appointments, each valued at about £{dna_cost:,.0f}.{per_week} This is the value of "
+        "the clinic slots kept, not cash: a Trust may not be paid more when a patient attends. "
+        "The costs come from **Cost assumptions** in the sidebar.",
+        "compare_help": f"In past appointments, the same share of calls would have reached "
+        f"someone who then missed {precision:.0%} of the time with the model's list, "
+        f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
+        f"and {random_reached / n_calls:.0%} at random. Each is valued the same way, if "
+        f"{DEFAULT_CALL_EFFECT}% of those reached who would have missed attend instead.",
+    }
+
+
+def explore_button(risk_min, key, scope, primary=True):
+    """Opens the phone tab set to phone everyone at or above `risk_min`, with the default
+    effect, so its figures match the savings shown here."""
+    st.button(
+        "Explore these assumptions",
+        key=f"to_calls_from_{key}",
+        on_click=go_to_forecast_calls,
+        args=(risk_min,),
+        icon=":material/arrow_forward:",
+        type="primary" if primary else "secondary",
+        help="Try other values, and other numbers of calls, on the next tab. It uses all the "
+        f"upcoming appointments, {scope}.",
+    )
+
+
+def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=None):
+    """The value of the appointments kept by phoning every appointment in `called`
+    (forecast_savings), beside the same calls by the simple rule and at random, with a button
+    to the phone tab. `scope` says what the phone tab covers that this doesn't; `none_text` is
+    shown instead when nobody would be phoned; `weeks` adds a weekly figure."""
+    sv = forecast_savings(called, risk_min, weeks)
+    if sv is None:
+        st.caption(none_text)
+        return
     with st.container(border=True):
         saving_col, cta_col = st.container(key=f"reflow_stack_{key}").columns(
             2, gap="large", vertical_alignment="center"
         )
         saving_col.metric(
-            label,
-            f"£{saving['value_avoided']:,.0f}",
-            icon=":material/savings:",
-            help=f"{n_calls:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
-            f"or {few(saving['staff_hours'])} hours of staff time, so about "
-            f"£{saving['net']:,.0f} after the cost of the calls. In past appointments, "
-            f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
-            f"someone who would otherwise miss. If {DEFAULT_CALL_EFFECT}% of them attend instead, "
-            f"that's about {few(reached * effect)} fewer missed appointments, each valued at about "
-            f"£{dna_cost:,.0f}.{per_week} This is the value of the clinic slots kept, not cash: a "
-            "Trust may not be paid more when a patient attends. The costs come from **Cost "
-            "assumptions** in the sidebar.",
+            label, f"£{sv['value']:,.0f}", icon=":material/savings:", help=sv["help"]
         )
-        saving_col.caption(f"{caption} Staff time: £{saving['call_cost']:,.0f}.")
+        saving_col.caption(f"{caption} Staff time: £{sv['call_cost']:,.0f}.")
         saving_col.markdown(
-            f"Same calls by the simple rule: **£{kept(rule_reached):,.0f}** · "
-            f"at random: **£{kept(random_reached):,.0f}**",
-            help=f"In past appointments, the same share of calls would have reached someone who "
-            f"then missed {precision:.0%} of the time with the model's list, "
-            f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
-            f"and {random_reached / n_calls:.0%} at random. Each is valued the same way.",
+            f"Same calls by the simple rule: **£{sv['rule']:,.0f}** · "
+            f"at random: **£{sv['random']:,.0f}**",
+            help=sv["compare_help"],
         )
         cta_col.markdown(
             f"**{DEFAULT_CALL_EFFECT}% comes from one {pilot.SERVICE.lower()} pilot** with no "
             "comparison group, so calls may change fewer people here."
         )
-        cta_col.button(
-            "Explore these assumptions",
-            key=f"to_calls_from_{key}",
-            on_click=go_to_forecast_calls,
-            args=(risk_min,),
-            icon=":material/arrow_forward:",
-            type="primary",
-            help="Try other values, and other numbers of calls, on the next tab. It uses all the "
-            f"upcoming appointments, {scope}.",
-        )
+        with cta_col:
+            explore_button(risk_min, key, scope)
 
 
 # ---------------------------------------------------------------- tab 1: Upcoming appointments (the landing page)
@@ -933,9 +962,7 @@ with tab_appts:
         high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
 
         # Opening text beside the demonstration notice (stacked on narrower screens, see style.css),
-        # with the case for the model under it: the same calls three ways. For a visitor who sees
-        # only this page, so it is near the top and needs no clicks.
-        ways, _, _ = load_comparison()
+        # with the forecast cards under it, so the table, the thing to click, starts high on the page
         with intro_columns("intro"):
             st.markdown(
                 """
@@ -948,159 +975,140 @@ with tab_appts:
                 """,
                 unsafe_allow_html=True,
             )
-            with st.container(border=True, key="landing_compare"):
+            # Summary of the filtered appointments: three cards, each a metric and a caption,
+            # stretched to the same height. The risk cut-offs are in the labels and the detail in
+            # each card's help, to keep the row quiet.
+            n_filtered = len(filtered_data)
+            n_past_dnas = int(past["Did_Not_Attend"].sum())
+            dates = pd.to_datetime(filtered_data["Activity_Date"])
+            days = (dates.max() - dates.min()).days + 1
+            weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
+            length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
+            n_forecast = int(filtered_data["DNA_Forecast"].sum())
+            # The value of the appointments kept by phoning every forecast DNA, and the same
+            # calls made by the simple rule and at random (shown under the table)
+            savings = forecast_savings(
+                filtered_data[filtered_data["DNA_Forecast"] == 1], FORECAST_MIN, weeks
+            )
+
+            def card_caption(count, recall):
+                return f"{count / n_filtered:.1%} of appointments · catches {recall:.0%} of past DNAs"
+
+            with st.container(horizontal=True):
+                with st.container(border=True, height="stretch"):
+                    st.metric(
+                        f"Forecast DNAs ({FORECAST_MIN:.0%}+ risk)",
+                        f"{n_forecast:,}",
+                        icon=":material/event_busy:",
+                        help=f"Appointments the model forecasts as a DNA: a predicted risk of "
+                        f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them will be "
+                        f"missed, and some lower-risk appointments will be. Of the {n_past_dnas:,} "
+                        "appointments missed in the past appointments the model was tested on, "
+                        f"{forecast_recall:.0%} had a risk this high; of all those forecast as a DNA, "
+                        f"{forecast_precision:.0%} were missed.",
+                    )
+                    st.caption(card_caption(n_forecast, forecast_recall))
+                with st.container(border=True, height="stretch"):
+                    n_high = int(filtered_data["High_Risk_DNA"].sum())
+                    st.metric(
+                        f"Confident DNAs ({HIGH_RISK_MIN:.0%}+ risk)",
+                        f"{n_high:,}",
+                        icon=":material/warning:",
+                        help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more (the "
+                        f"Very High band). Of the {n_past_dnas:,} appointments missed in the past "
+                        f"appointments the model was tested on, {high_recall:.0%} had a risk this high; "
+                        f"of all those flagged, {high_precision:.0%} were missed.",
+                    )
+                    st.caption(
+                        f"{card_caption(n_high, high_recall)}. If we can only call a few "
+                        "patients, calling these gives the best return on staff time."
+                    )
+                with st.container(border=True, height="stretch"):
+                    if savings is None:
+                        st.metric("Value of appointments kept", "–", icon=":material/savings:")
+                        st.caption(
+                            "None of the appointments in your filters is forecast as a DNA, so "
+                            "there are no calls to cost."
+                        )
+                    else:
+                        st.metric(
+                            f"Value of appointments kept ({length})",
+                            f"£{savings['value']:,.0f}",
+                            icon=":material/savings:",
+                            help=savings["help"],
+                        )
+                        st.caption(
+                            f"If we phone all {n_forecast:,} forecast DNAs, {dates.min():%d %b} to "
+                            f"{dates.max():%d %b}, and {DEFAULT_CALL_EFFECT}% of those who'd have "
+                            "missed attend instead."
+                        )
+
+        # The weekly grid has its own view (VIEW_SUMMARY), so the table shows every appointment
+        # in the sidebar's filters
+        appointments_table(filtered_data, filter_key)
+
+        # ---- Why use the model: the same calls three ways, under the table
+        ways, _, _ = load_comparison()
+        with st.container(border=True, key="landing_compare"):
+            ways_text, ways_numbers = st.container(key="reflow_stack_landing_ways").columns(
+                [0.45, 0.55], gap="large", vertical_alignment="center"
+            )
+            with ways_text:
                 st.markdown("#### Same calls, three ways")
                 st.caption(
                     f"Of {1000:,} past appointments the model didn't learn from, {ways['n_missed']} "
                     f"({past_dna_rate:.0%}) were missed. If the team had made {ways['n_calls']} calls, "
                     "how many would have reached someone who then missed?"
                 )
-                with st.container(horizontal=True, key="landing_ways"):
-                    st.metric(
-                        "At random",
-                        f"{ways['random']:.0f}",
-                        border=True,
-                        icon=":material/casino:",
-                        help="Phoning 100 appointments picked at random.",
-                    )
-                    st.metric(
-                        "Missed before",
-                        f"{ways['rule']}",
-                        border=True,
-                        icon=":material/history:",
-                        help="Phoning the 100 patients who had missed the most appointments before: "
-                        "the simple rule most people would choose.",
-                    )
-                    st.metric(
-                        "The model",
-                        f"{ways['model']}",
-                        border=True,
-                        icon=":material/smart_toy:",
-                        help="Phoning the 100 appointments with the highest predicted risk.",
-                    )
                 st.markdown(
                     "**A simple rule does most of the work.** The model reaches a few more, and adds "
                     "a risk for every patient, so the list fits the calls the team can make, and the "
-                    "reasons behind each one (below)."
+                    "reasons behind each one (click a row in the table)."
                 )
-
-        # ---- The reasons for one patient. The highest-risk appointment in the sidebar's
-        # filters: an honest example, not a picked one. Clicking a row in the table further
-        # down explains that appointment instead.
-        example = filtered_data.sort_values(
-            "DNA_Prob_Forecast", ascending=False, kind="stable"
-        ).iloc[0]
-        example_expl = explain.patient_explanation(
-            example,
-            load_shap().loc[example["row_id"]],
-            load_model_meta()["base_value_pp"],
-            top=4,
-        )
-        with st.container(border=True, key="landing_why"):
-            why_text, why_chart = st.container(key="reflow_stack_landing_why").columns(
-                [0.4, 0.6], gap="large", vertical_alignment="center"
-            )
-            with why_text:
-                st.markdown("#### Why is this patient flagged?")
-                st.markdown(
-                    f"The highest-risk upcoming appointment ({example['Specialty']}, "
-                    f"{example['Activity_Date']:%A %d %B}). The model starts from the average "
-                    f"risk, **{example_expl['base']:.0f}%**. Each bar is one fact about this "
-                    "appointment: red pushes the risk up, blue pushes it down. Together they make "
-                    f"this patient's **{example_expl['fx']:.0f}%**."
-                )
-                st.caption(
-                    "The reasons can shape the call, such as offering help with a long journey. They "
-                    "show what the model relied on, not what causes a missed appointment."
-                )
-                st.button(
-                    "Bonus: can you beat the model?",
-                    key="to_game_from_appts",
-                    on_click=go_to_tab,
-                    args=(TAB_GAME,),
-                    icon=":material/sports_esports:",
-                )
-            why_chart.plotly_chart(
-                charts.waterfall(example_expl, compact=True),
-                key="landing_waterfall",
-                width="stretch",
-                config={"displayModeBar": False},
-            )
-
-        # Summary of the filtered appointments: three cards, each a metric and a one-line caption,
-        # so they are the same height. The risk cut-offs are in the labels and the detail in each
-        # card's help, to keep the row quiet.
-        n_filtered = len(filtered_data)
-        n_past_dnas = int(past["Did_Not_Attend"].sum())
-
-        def card_caption(count, recall):
-            return f"{count / n_filtered:.1%} of appointments · catches {recall:.0%} of past DNAs"
-
-        with st.container(horizontal=True):
-            with st.container(border=True):
-                n_forecast = int(filtered_data["DNA_Forecast"].sum())
+                with st.container(horizontal=True):
+                    if savings is not None:
+                        explore_button(
+                            FORECAST_MIN, "savings", "not just your filters", primary=False
+                        )
+                    st.button(
+                        "Bonus: can you beat the model?",
+                        key="to_game_from_appts",
+                        on_click=go_to_tab,
+                        args=(TAB_GAME,),
+                        icon=":material/sports_esports:",
+                    )
+            with ways_numbers.container(horizontal=True, key="landing_ways"):
                 st.metric(
-                    f"Forecast DNAs ({FORECAST_MIN:.0%}+ risk)",
-                    f"{n_forecast:,}",
-                    icon=":material/event_busy:",
-                    help=f"Appointments the model forecasts as a DNA: a predicted risk of "
-                    f"{FORECAST_MIN:.0%} or more (the 'Expected DNA' column). Not all of them will be "
-                    f"missed, and some lower-risk appointments will be. Of the {n_past_dnas:,} "
-                    "appointments missed in the past appointments the model was tested on, "
-                    f"{forecast_recall:.0%} had a risk this high; of all those forecast as a DNA, "
-                    f"{forecast_precision:.0%} were missed.",
+                    "At random",
+                    f"{ways['random']:.0f}",
+                    border=True,
+                    icon=":material/casino:",
+                    help="Phoning 100 appointments picked at random.",
                 )
-                st.caption(card_caption(n_forecast, forecast_recall))
-            with st.container(border=True):
-                n_high = int(filtered_data["High_Risk_DNA"].sum())
                 st.metric(
-                    f"Confident DNAs ({HIGH_RISK_MIN:.0%}+ risk)",
-                    f"{n_high:,}",
-                    icon=":material/warning:",
-                    help=f"Appointments with a predicted risk of {HIGH_RISK_MIN:.0%} or more (the "
-                    f"Very High band). Of the {n_past_dnas:,} appointments missed in the past "
-                    f"appointments the model was tested on, {high_recall:.0%} had a risk this high; "
-                    f"of all those flagged, {high_precision:.0%} were missed.",
+                    "Missed before",
+                    f"{ways['rule']}",
+                    border=True,
+                    icon=":material/history:",
+                    help="Phoning the 100 patients who had missed the most appointments before: "
+                    "the simple rule most people would choose.",
                 )
-                st.caption(card_caption(n_high, high_recall))
-            with st.container(border=True):
                 st.metric(
-                    "Expected cost of missed appointments",
-                    f"£{costs.expected_dna_cost(filtered_data):,.0f}",
-                    icon=":material/payments:",
-                    help="Each appointment's predicted risk of not attending times the cost of "
-                    "missing it, added up. The costs are assumptions you can change under "
-                    "**Cost assumptions** in the sidebar.",
+                    "The model",
+                    f"{ways['model']}",
+                    border=True,
+                    icon=":material/smart_toy:",
+                    help="Phoning the 100 appointments with the highest predicted risk.",
                 )
-                dates = pd.to_datetime(filtered_data["Activity_Date"])
-                days = (dates.max() - dates.min()).days + 1
-                weeks = -(
-                    -days // 7
-                )  # whole weeks, rounded up (appointments run Monday to Friday)
-                length = (
-                    f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
+            # The same in £: the value of the appointments kept by phoning every forecast DNA
+            # (the third card at the top), and by the same calls made the other two ways
+            if savings is not None:
+                ways_numbers.markdown(
+                    f"**In £ over the next {length}**, phoning {savings['n_calls']:,} people: "
+                    f"£{savings['random']:,.0f} at random · £{savings['rule']:,.0f} by those who "
+                    f"missed before · **£{savings['value']:,.0f}** by the model's list",
+                    help=savings["compare_help"],
                 )
-                st.caption(
-                    f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})"
-                )
-
-        # Predicted savings from phoning every forecast DNA in the period above
-        savings_box(
-            filtered_data[filtered_data["DNA_Forecast"] == 1],
-            FORECAST_MIN,
-            f"Value of appointments kept if we phone every forecast DNA ({length})",
-            f"{n_forecast:,} calls, {dates.min():%d %b} to {dates.max():%d %b}, if "
-            f"{DEFAULT_CALL_EFFECT}% of those who'd have missed attend instead.",
-            "not just your filters",
-            "savings",
-            "None of the appointments in your filters is forecast as a DNA, so there are no "
-            "calls to cost.",
-            weeks=weeks,
-        )
-
-        # The weekly grid has its own view (VIEW_SUMMARY), so the table shows every appointment
-        # in the sidebar's filters
-        appointments_table(filtered_data, filter_key)
 
         # What the model relies on across all upcoming appointments, and, when the sidebar
         # filters narrow the table enough, for the filtered ones beside it

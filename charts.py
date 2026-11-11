@@ -51,18 +51,15 @@ def _layout(fig, height, **kwargs):
     return fig
 
 
-def waterfall(expl: dict, compact: bool = False) -> go.Figure:
-    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away.
-
-    `compact` makes it shorter, with a shorter axis title, for the example at the top of the
-    appointments tab."""
+def waterfall(expl: dict) -> go.Figure:
+    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away."""
     steps = list(expl["shown"])
     if expl["other"]:
         steps.append(expl["other"])
     labels = ["Average appointment"] + [s["label"] for s in steps] + ["This appointment"]
     values = [expl["base"]] + [s["value"] for s in steps] + [expl["fx"]]
     measure = ["absolute"] + ["relative"] * len(steps) + ["total"]
-    texts = [f"{expl['base']:.1f}%"] + [f"{s['value']:+.1f}" for s in steps] + [f"{expl['fx']:.1f}%"]
+    texts = [f"{expl['base']:.1f}%"] + [f"{s['value']:+.1f}%" for s in steps] + [f"{expl['fx']:.1f}%"]
     fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
     # Room past the furthest bar end for its outside label
     running = [expl["base"]]
@@ -71,12 +68,10 @@ def waterfall(expl: dict, compact: bool = False) -> go.Figure:
     x_max = max(running) * 1.15 + 3
     return _layout(
         fig,
-        (70 + 34 * len(labels)) if compact else (120 + 40 * len(labels)),
+        120 + 40 * len(labels),
         margin=dict(l=0, r=50, t=10, b=40),
         xaxis=dict(
-            title="Predicted risk of not attending (%)"
-            if compact
-            else "Predicted risk of not attending (%). Red raises it, blue lowers it. Changes in percentage points.",
+            title="Predicted risk of not attending (%). Red raises it, blue lowers it. Changes in percentage points.",
             ticksuffix="%",
             gridcolor="rgba(255,255,255,0.1)",
             zeroline=False,
@@ -129,9 +124,9 @@ def importance_bars(overall: list, overall_title: str, filtered: list | None = N
 # Made-up example for the "How to read this chart" box: average 8%, three factors, 27%
 GUIDE_STEPS = [
     ("Average appointment", 8, "absolute", "8%"),
-    ("Missed appointments = 3", 18, "relative", "+18"),
-    ("Days since booking = 60", 4, "relative", "+4"),
-    ("Age = 70", -3, "relative", "-3"),
+    ("Missed appointments = 3", 18, "relative", "+18%"),
+    ("Days since booking = 60", 4, "relative", "+4%"),
+    ("Age = 70", -3, "relative", "-3%"),
     ("This appointment", 27, "total", "27%"),
 ]
 # Which row each numbered badge sits beside (the numbers match the steps written next to it)
