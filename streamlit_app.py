@@ -1276,21 +1276,25 @@ with tab_calls:
     past = load_past()
     p_past = past["DNA_Prob_Forecast"].to_numpy()
 
-    # The thought-experiment box sits under the opening text and the notice column is wider than
-    # on the other tabs, so the short opening text and the long notice come out about as tall
+    # The thought-experiment note and the sidebar prompt sit under the opening text and the notice
+    # column is wider than on the other tabs, so the short opening text and the long notice come
+    # out about as tall
     with intro_columns("intro_calls", widths=(0.55, 0.45)):
         st.subheader("How many people should we phone?")
         st.markdown(
-            "This tab helps weigh up how many reminder calls to make, and who should get them. "
-            "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
-            "phones patients beforehand, someone has to choose who gets a call. In the sidebar, you can choose "
-            "by **how many calls the team can make**, or by **how high the predicted risk must be**."
+            "This tab helps weigh up how many reminder calls to make, and who should get them.\n\n"
+            "The model gives each appointment a **risk** of not attending, not a yes or no, so someone has "
+            "to choose who gets a call."
+        )
+        st.caption(
+            "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
+            f"the chart uses {meta['n_past_test']:,} **past** ones the model didn't learn from. Nobody in them "
+            "was phoned, so we can check who the model would have picked against who really didn't attend."
         )
         st.info(
-            "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
-            f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
-            "in them was phoned. Imagine the model had made its list for them: we can check who it would have "
-            "picked against who really did not attend."
+            "**Choose who gets a call in the sidebar**: by **Calls the team can make**, or by "
+            "**Predicted risk**.",
+            icon=":material/touch_app:",
         )
 
     # All the upcoming appointments, by week: the filters are hidden on this tab
