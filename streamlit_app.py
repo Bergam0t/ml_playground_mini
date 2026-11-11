@@ -733,14 +733,16 @@ with tab_appts:
                 )
 
         st.subheader("Week by week")
+        # Only the cut-off lists: "ranked by risk" describes a call list, not a colouring
+        grid_measures = {n: mm for n, mm in weekly.MEASURES.items() if mm.flag}
         measure = (
             st.segmented_control(
                 "Colour the grid by",
-                list(weekly.MEASURES),
+                list(grid_measures),
                 default=DEFAULT_MEASURE,
                 key="grid_measure",
                 help="  \n".join(
-                    f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
+                    f"**{name}:** {mm.help}" for name, mm in grid_measures.items()
                 ),
             )
             or DEFAULT_MEASURE
@@ -1260,8 +1262,7 @@ with tab_calls:
         help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
     )
     ctrl_right.caption(
-        "A guess: nobody knows yet how many a call would change. See **What difference might the calls "
-        "make?** below."
+        "A guess: nobody knows yet how many a call would change."
     )
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
@@ -1300,7 +1301,7 @@ with tab_calls:
         )
         st.markdown(how)
 
-    # Headline cost of the chosen setting; the breakdown is further down the tab
+    # Cost of the chosen setting; the assumptions and caveats sit in the cards' help and the caption
     if has_costs:
         with st.container(border=True):
             st.markdown(
@@ -1339,7 +1340,9 @@ with tab_calls:
                 height="stretch",
                 icon=":material/savings:",
                 help=f"If a call gets {effect}% of the people it reaches, who would have missed, "
-                "to attend.",
+                f"to attend. A missed appointment among the patients these calls reach is valued at "
+                f"about £{dna_cost:,.0f} on average. Change this and the call cost under **Cost "
+                "assumptions** in the sidebar.",
             )
             c4.metric(
                 "Missed appointments avoided",
@@ -1352,18 +1355,26 @@ with tab_calls:
                 help=f"About {weekly_reached:.0f} calls a week would reach someone who would otherwise "
                 f"miss their appointment. If {effect}% of them attend instead, that's about "
                 f"{weekly_avoided:.1f} fewer missed appointments a week: the assumption behind "
-                "'Possibly saved'.",
+                "'Possibly saved'."
+                + (
+                    f" That's about {weekly_calls / weekly_avoided:.0f} calls, or "
+                    f"£{weekly_calls / weekly_avoided * cost_per_call:,.0f} of staff time, for each "
+                    "one avoided."
+                    if weekly_avoided > 0
+                    else ""
+                ),
             )
             st.markdown(
-                (
-                    f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} the "
-                    f"break-even, so the calls would {'more than ' if effect / 100 > be else 'not '}"
-                    "cover their cost."
-                    if be <= 1
-                    else "Even if every call got the patient to attend, the calls would cost more than "
-                    "the missed appointments they reach."
-                )
-                + " Breakdown and caveats below."
+                f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} the "
+                f"break-even, so the calls would {'more than ' if effect / 100 > be else 'not '}"
+                "cover their cost."
+                if be <= 1
+                else "Even if every call got the patient to attend, the calls would cost more than "
+                "the missed appointments they reach."
+            )
+            st.caption(
+                "Estimates from the sidebar's cost assumptions. A missed appointment's cost is the value "
+                "of a clinic slot, not cash that comes back. The call cost is staff time only."
             )
     elif out["calls"] > 0:
         st.info(
@@ -1453,89 +1464,6 @@ with tab_calls:
                 f"Counts are scaled from {meta['n_past_test']:,} past appointments to 1,000, so they can be out "
                 "by a few. They count appointments that were missed without a call, not missed appointments a "
                 "call would have prevented."
-            )
-
-        st.divider()
-        st.subheader("What difference might the calls make?")
-        st.markdown(
-            "Reaching someone who would have missed their appointment is not the same as getting them to "
-            "come. **Nobody knows yet how many a call would change**, so it is an assumption: set it with "
-            f"the slider at the top of the tab (now **{effect}%**)."
-        )
-        avoided = out["called_dna"] * effect / 100
-
-        m1, m2, m3 = st.container(key="reflow_docked_difference").columns(
-            3, gap="large"
-        )
-        m1.metric(
-            "Possibly avoided, per 1,000",
-            f"{avoided:.0f}",
-            help="Missed appointments a call might avoid, per 1,000 past appointments, if the assumption above holds.",
-        )
-        m2.metric(
-            "Calls for each one avoided",
-            f"{out['calls'] / avoided:.0f}" if avoided else "no effect assumed",
-        )
-        if avoided:
-            m2.caption(
-                f"About **£{out['calls'] / avoided * cost_per_call:,.0f}** of staff time for each "
-                f"one avoided, at £{cost_per_call:.2f} a call."
-            )
-        m3.metric(
-            "Possibly avoided, per week",
-            f"{weekly_avoided:.0f}",
-            help="For all the upcoming appointments, if the assumption above holds.",
-        )
-
-        st.markdown(
-            f"**For all the upcoming appointments** ({len(upcoming):,} over {n_weeks} "
-            f"week{'s' if n_weeks != 1 else ''}), this setting means about **{weekly_calls:.0f} calls a week**. "
-            f"Going by the past appointments, about **{weekly_reached:.0f}** of them would reach someone who "
-            f"would otherwise miss their appointment, and if a call gets {effect}% of them to come, about "
-            f"**{weekly_avoided:.0f}** fewer missed appointments a week."
-        )
-        st.caption(
-            "Only this paragraph and the last figure above use the upcoming appointments; the chart uses "
-            "the past ones. Weekly figures use the past precision, so they are rough."
-        )
-
-        st.divider()
-        st.subheader("How the cost is worked out")
-        if not has_costs:
-            st.info(
-                "None of the upcoming appointments would get a call with this "
-                "setting, so there is nothing to cost. Lower the bar."
-            )
-        else:
-            st.markdown(
-                f"Per week, for all the upcoming appointments. A call costs about "
-                f"**£{cost_per_call:.2f}** of staff time, and a missed appointment among the patients "
-                f"these calls would reach costs about **£{dna_cost:,.0f}** on average (more for new "
-                "appointments and some specialties). Change these under **Cost assumptions** in the "
-                "sidebar. The break-even at the top is the cost of calls divided by the missed "
-                "appointments reached."
-            )
-            with st.container(horizontal=True):
-                st.metric(
-                    "Staff time",
-                    f"{econ['staff_hours']:.1f} hours",
-                    border=True,
-                    icon=":material/schedule:",
-                    help=f"{weekly_calls:.0f} calls at {minutes_per_call:g} minutes each.",
-                )
-                st.metric(
-                    "Missed appointments reached",
-                    f"£{econ['value_reached']:,.0f}",
-                    border=True,
-                    icon=":material/person_search:",
-                    help=f"About {weekly_reached:.0f} calls a week would reach someone who would "
-                    f"otherwise miss their appointment, at about £{dna_cost:,.0f} each.",
-                )
-            st.caption(
-                "These are estimates from the assumptions in the sidebar. A missed appointment's cost "
-                "is the value of a clinic slot, not cash that comes back: the clinic still runs, and the "
-                "gain is slots used and shorter waits. Prices are not costs. The call cost counts staff "
-                "time only, not phones, supervision or rebooking."
             )
 
     st.warning(
