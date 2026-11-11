@@ -39,7 +39,7 @@ streamlit run streamlit_app.py
   chart beside it for the filtered appointments when the appointment-detail filters leave at
   least 30 (not shown for the DNA Risk and Confidence filters, which select by the forecast).
 - **Weekly summary** tab: appointments and forecast DNAs by week and day.
-- **How many people should we phone?** tab: choose who an admin team would phone, by the number of calls
+- **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
   reach someone who then did not attend, and how many such patients would get no call. An
@@ -53,7 +53,7 @@ Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
 
 The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). How many people should we phone?
-hides them and shows only the cost assumptions: its calls-per-week figures use all the upcoming
+hides them and shows its own controls (who to phone, and the assumed effect of a call) and the cost assumptions: its calls-per-week figures use all the upcoming
 appointments, and the chart uses past appointments. The filters keep their settings for the other
 tabs (the script checks the open tab, which it can since the tabs are keyed). Your rule vs the
 model uses past appointments only, so the sidebar is hidden while that tab is open (a CSS rule

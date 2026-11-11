@@ -479,22 +479,26 @@ select.mobile-nav,
 	}
 }
 
-/* ---- The sidebar's View switch: big, stacked, full-width choices ---- */
-.st-key-appt_view [data-testid="stButtonGroup"] {
+/* ---- The sidebar's switches (the appointments tab's view, the phone tab's who to phone
+	by): big, stacked, full-width choices ---- */
+.st-key-appt_view [data-testid="stButtonGroup"],
+.st-key-call_mode [data-testid="stButtonGroup"] {
 	flex-direction: column;
 	align-items: stretch;
 	width: 100%;
 	gap: 0.6rem;
 }
 /* The "View" label, a little bolder so the switch reads as the sidebar's main control */
-.st-key-appt_view [data-testid="stWidgetLabel"] p {
+.st-key-appt_view [data-testid="stWidgetLabel"] p,
+.st-key-call_mode [data-testid="stWidgetLabel"] p {
 	font-size: 1.05rem;
 	font-weight: 600;
 	letter-spacing: 0.02em;
 }
 /* Each choice: a solid teal (the app's accent colour) button that stands out on the dark
 	red sidebar. Scoped to the button group, so the label's help icon keeps its own look. */
-.st-key-appt_view [data-testid="stButtonGroup"] button {
+.st-key-appt_view [data-testid="stButtonGroup"] button,
+.st-key-call_mode [data-testid="stButtonGroup"] button {
 	width: 100%;
 	min-height: 3.5rem;
 	padding: 0.6rem 1rem !important;
@@ -507,26 +511,32 @@ select.mobile-nav,
 	color: #ffffff !important;
 	transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.st-key-appt_view [data-testid="stButtonGroup"] button:hover {
+.st-key-appt_view [data-testid="stButtonGroup"] button:hover,
+.st-key-call_mode [data-testid="stButtonGroup"] button:hover {
 	background: #27c7d0 !important;
 	border-color: #ffffff !important;
 }
 .st-key-appt_view [data-testid="stButtonGroup"] button p,
-.st-key-appt_view [data-testid="stButtonGroup"] button span {
+.st-key-call_mode [data-testid="stButtonGroup"] button p,
+.st-key-appt_view [data-testid="stButtonGroup"] button span,
+.st-key-call_mode [data-testid="stButtonGroup"] button span {
 	color: inherit !important;
 }
-.st-key-appt_view [data-testid="stButtonGroup"] button p {
+.st-key-appt_view [data-testid="stButtonGroup"] button p,
+.st-key-call_mode [data-testid="stButtonGroup"] button p {
 	font-size: 1.1rem;
 	font-weight: 600;
 }
 /* The chosen view: solid white with dark red text, so it is unmistakable */
-.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"] {
+.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"],
+.st-key-call_mode button[data-testid="stBaseButton-segmented_controlActive"] {
 	background: #ffffff !important;
 	border-color: #ffffff !important;
 	color: #550000 !important;
 	box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
-.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"] p {
+.st-key-appt_view button[data-testid="stBaseButton-segmented_controlActive"] p,
+.st-key-call_mode button[data-testid="stBaseButton-segmented_controlActive"] p {
 	font-weight: 700;
 }
 

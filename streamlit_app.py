@@ -377,7 +377,7 @@ if st.session_state.get("page") == TAB_LABELS[1]:
 view = st.session_state.get("appt_view") or VIEW_ALL
 
 # Filters. Hidden on the How many people should we phone? tab, which uses all the upcoming
-# appointments and only shows the cost assumptions. The choices made on the other tabs are
+# appointments and shows its own controls and the cost assumptions. The choices made on the other tabs are
 # kept, and still applied to them, while it is open.
 show_filters = st.session_state.get("page") != TAB_LABELS[2]
 
@@ -500,10 +500,15 @@ if selected_confidence != "All":
     filtered_data = filtered_data[filtered_data["Confidence"] == selected_confidence]
 # --- END of new filter ---
 
+# The How many people should we phone? tab's own controls, only on that tab. Filled in from
+# that tab's code below, which works out the slider range; None on the other tabs.
+call_controls = None
+if not show_filters:
+    call_controls = st.sidebar.container()
+
 # Cost assumptions: not filters, so they stay out of filter_key below and editing them
 # never clears a table selection
-if show_filters:
-    st.sidebar.divider()
+st.sidebar.divider()
 st.sidebar.subheader("Cost assumptions")
 band5 = costs.admin_hourly_cost(**costs.BAND5)
 with st.sidebar.expander("Calls and missed appointments", icon=":material/payments:"):
@@ -1273,8 +1278,8 @@ with tab_calls:
         st.markdown(
             "This tab helps weigh up how many reminder calls to make, and who should get them. "
             "The model gives each appointment a **risk** of not attending, not a yes or no. If the team "
-            "phones patients beforehand, someone has to choose who gets a call. You can choose by **how many "
-            "calls the team can make**, or by **how high the predicted risk must be**."
+            "phones patients beforehand, someone has to choose who gets a call. In the sidebar, you can choose "
+            "by **how many calls the team can make**, or by **how high the predicted risk must be**."
         )
         st.info(
             "**This is a thought experiment.** We don't know yet who will miss the upcoming appointments, so "
@@ -1291,40 +1296,47 @@ with tab_calls:
     per_week = upcoming_week.value_counts()
     n_weeks = len(per_week)
 
+    # The calls slider runs up to the busiest upcoming week, rounded up to a multiple of 10.
+    # Clamp the kept value first, so it is never out of range.
+    busiest = max(10, int(-(-per_week.max() // 10) * 10))
+    if st.session_state.get("calls_per_week", 0) > busiest:
+        st.session_state["calls_per_week"] = busiest
+
     # Starting values set through the session state rather than default=/value=, so the
     # savings button on the appointments tab can preset them without a Streamlit warning
     st.session_state.setdefault("call_mode", "Calls the team can make")
+    st.session_state.setdefault("calls_per_week", min(100, busiest))
     st.session_state.setdefault("risk_min", round(HIGH_RISK_MIN * 100))
     st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
+    # Streamlit forgets a widget's value on a run that doesn't draw it: the controls are only
+    # in the sidebar while this tab is open, and only one of the two sliders shows at a time
+    for key in ("call_mode", "calls_per_week", "risk_min", "call_effect"):
+        st.session_state[key] = st.session_state[key]
+
+    def call_control(widget, key, *args, **kwargs):
+        """A control in the sidebar while this tab is open; on the other tabs, its kept value."""
+        if call_controls is None:
+            return st.session_state[key]
+        return getattr(call_controls, widget)(*args, key=key, **kwargs)
+
     mode = (
-        st.segmented_control(
+        call_control(
+            "segmented_control",
+            "call_mode",
             "Choose who to phone by",
             ["Calls the team can make", "Predicted risk"],
-            key="call_mode",
         )
         or "Calls the team can make"
     )
 
-    # The setting for who gets a call, and the guess at what a call changes, side by side.
-    # The reflow_docked_ keys here and below let style.css stack rows where the sidebar
-    # leaves the page narrow.
-    ctrl_left, ctrl_right = st.container(key="reflow_docked_controls").columns(
-        2, gap="large"
-    )
-
     if mode == "Calls the team can make":
-        # Slider runs up to the busiest upcoming week, rounded up to a multiple of 10. Clamp
-        # the kept value first, so it is never out of range.
-        busiest = max(10, int(-(-per_week.max() // 10) * 10))
-        if st.session_state.get("calls_per_week", 0) > busiest:
-            st.session_state["calls_per_week"] = busiest
-        st.session_state.setdefault("calls_per_week", min(100, busiest))
-        cap = ctrl_left.slider(
+        cap = call_control(
+            "slider",
+            "calls_per_week",
             "Calls the team can make per week",
             0,
             busiest,
             step=10,
-            key="calls_per_week",
             help="Each week, the team phones this many of that week's highest-risk appointments "
             "(from all the upcoming appointments).",
         )
@@ -1340,20 +1352,21 @@ with tab_calls:
         how = (
             "**This is the cut-off.** It isn't chosen directly: it follows from how many calls the team can "
             "make. More calls means a lower bar, so more patients get a call, and more of them are people "
-            "who would have come anyway. **Move the slider and watch it change.**"
+            "who would have come anyway. **Move the slider in the sidebar and watch it change.**"
         )
     else:
         # Risk only: confidence is a function of the risk alone, so it adds nothing a risk bar doesn't, and
         # on its own it would also pick the patients the model is confident will attend.
         # Few risks pass 60% at an 8% DNA rate, so the slider stops there, in 1% steps
         risk_min = (
-            ctrl_left.slider(
+            call_control(
+                "slider",
+                "risk_min",
                 "Phone if the predicted risk is at least",
                 0,
                 60,
                 step=1,
                 format="%d%%",
-                key="risk_min",
             )
             / 100
         )
@@ -1368,16 +1381,20 @@ with tab_calls:
             f"app's high-risk flag; {FORECAST_MIN:.0%} phones everyone forecast as a DNA."
         )
 
-    effect = ctrl_right.slider(
+    if call_controls is not None:
+        call_controls.divider()
+    effect = call_control(
+        "slider",
+        "call_effect",
         "Suppose a call gets this share of the people it reaches, who would have missed, to attend instead",
         0,
         100,
         step=5,
         format="%d%%",
-        key="call_effect",
         help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
     )
-    ctrl_right.caption("A guess: nobody knows yet how many a call would change.")
+    if call_controls is not None:
+        call_controls.caption("A guess: nobody knows yet how many a call would change.")
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
 
