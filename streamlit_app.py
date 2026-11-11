@@ -136,10 +136,16 @@ def Confidence_Score_Txt(confidence):
 EXPECTED_DNA_COLOURS = {"Yes": "#8b1e2d", "No": "#1e5631"}
 # Confidence is neither good nor bad, so it uses a single-hue teal ramp, not red/green
 CONFIDENCE_COLOURS = {
-    "Low": "#1c3436", "Medium": "#164f53", "High": "#0f6a70", "Very High": "#07858d",
+    "Low": "#1c3436",
+    "Medium": "#164f53",
+    "High": "#0f6a70",
+    "Very High": "#07858d",
 }
 RISK_COLOURS = {
-    "Low": "#1e5631", "Medium": "#7a6a12", "High": "#9a4a12", "Very High": "#8b1e2d",
+    "Low": "#1e5631",
+    "Medium": "#7a6a12",
+    "High": "#9a4a12",
+    "Very High": "#8b1e2d",
 }
 
 
@@ -153,7 +159,9 @@ def forecast_cell_styles(df):
     styles["Expected DNA"] = df["Expected DNA"].map(EXPECTED_DNA_COLOURS).map(css)
     styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
     # Same bands as the sidebar's "DNA Risk" filter
-    styles["Probabilty"] = (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
+    styles["Probabilty"] = (
+        (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
+    )
     return styles
 
 
@@ -221,7 +229,9 @@ def appointment_table(df, by_patient=False):
 def patient_bands(df):
     """Shade every other patient's rows (outside the coloured forecast columns)."""
     patient_no = (df["Patient ID"] != df["Patient ID"].shift()).cumsum()
-    plain = [c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")]
+    plain = [
+        c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")
+    ]
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
     styles.loc[patient_no % 2 == 0, plain] = "background-color: #2e2c2c;"
     return styles
@@ -231,15 +241,14 @@ def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a :blue[**real tool**] that is being piloted by "
-        "outpatient teams. The real tool forecasts real upcoming appointments.\n\n"
-        "Here, all the data is synthetic and the model is trained on synthetic past "
-        "appointments. No real patients or Trust data are displayed.\n\n"
-        "Read the story behind the real tool in this "
+        "This is a demonstration of a :blue[**real tool**], currently being piloted by "
+        "outpatient teams in a London trust, which predicts attendance for real upcoming appointments.\n\n"
+        "Here, all the data for training and display is synthetic: "
+        "no real patients or Trust data are displayed.\n\n"
+        "Read the story behind this HSMA project in this "
         "[impact poster](https://hsma.co.uk/impact_posters/Outpatient%20non%20attendance.png), "
         "or hear more directly from the associate "
-        "[here](https://hsma.co.uk/previous_projects/hsma_6/"
-        "H6_6046_Proactive_Patient_attendance_prediction/index.html).",
+        "[here](https://youtu.be/tWcLIMTQb8A).",
         icon=":material/science:",
     )
 
@@ -249,7 +258,9 @@ def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
 
     Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
     """
-    left, right = st.container(key=f"reflow_stack_{key}").columns(list(widths), gap="large")
+    left, right = st.container(key=f"reflow_stack_{key}").columns(
+        list(widths), gap="large"
+    )
     with right:
         notice()
     return left
@@ -285,7 +296,11 @@ def go_to_call_list():
 # Dropdown in place of the tab pills on narrower screens (shown by style.css)
 add_mobile_nav()
 # Keyed and rerun on change, so buttons can switch tab (go_to_tab), as in the geographic mini
-TAB_LABELS = ["Your rule vs the model", "Upcoming appointments", "How many people should we phone?"]
+TAB_LABELS = [
+    "Your rule vs the model",
+    "Upcoming appointments",
+    "How many people should we phone?",
+]
 tab_game, tab_appts, tab_calls = st.tabs(TAB_LABELS, key="page", on_change="rerun")
 # st.subheader("AI Forecast of the Risk of a Patient Not Attending an Appointment")
 
@@ -325,7 +340,9 @@ VIEW_WEEK = "Show next week call list"
 DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
 if st.session_state.get("page") == TAB_LABELS[1]:
     st.sidebar.segmented_control(
-        "View", [VIEW_ALL, VIEW_WEEK], key="appt_view",
+        "View",
+        [VIEW_ALL, VIEW_WEEK],
+        key="appt_view",
         help="What the Upcoming appointments tab shows: the list of appointments, or a summary by week and day.",
     )
 view = st.session_state.get("appt_view") or VIEW_ALL
@@ -359,9 +376,7 @@ if show_filters:
     st.sidebar.subheader("Appointment details")
 
 # Allow the user to filter by Site
-reporting_site_options = sorted(
-    filtered_data["Reporting_Site"].dropna().unique()
-)
+reporting_site_options = sorted(filtered_data["Reporting_Site"].dropna().unique())
 selected_reporting_site = filter_select(
     "Select Reporting Site", ["All"] + list(reporting_site_options), "filter_site"
 )
@@ -379,14 +394,10 @@ selected_specialty = filter_select(
 )
 
 if selected_specialty != "All":
-    filtered_data = filtered_data[
-        filtered_data["Specialty"] == selected_specialty
-    ]
+    filtered_data = filtered_data[filtered_data["Specialty"] == selected_specialty]
 
 # Appointment Type options (from filtered data)
-appointment_type_options = sorted(
-    filtered_data["Appointment Type"].dropna().unique()
-)
+appointment_type_options = sorted(filtered_data["Appointment Type"].dropna().unique())
 selected_appointment_type = filter_select(
     "Select Appointment Type", ["All"] + list(appointment_type_options), "filter_type"
 )
@@ -408,8 +419,7 @@ selected_appointment_location = filter_select(
 
 if selected_appointment_location != "All":
     filtered_data = filtered_data[
-        filtered_data["Appointment Location Text"]
-        == selected_appointment_location
+        filtered_data["Appointment Location Text"] == selected_appointment_location
     ]
 
 if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
@@ -422,9 +432,7 @@ if show_filters:
 
 # DNA Risk options (from filtered data)
 risk_options = ["Low", "Medium", "High", "Very High"]
-available_risks = [
-    r for r in risk_options if r in filtered_data["Risk"].unique()
-]
+available_risks = [r for r in risk_options if r in filtered_data["Risk"].unique()]
 selected_dna_risk = filter_select(
     "Select DNA Risk",
     ["All"] + available_risks,
@@ -460,9 +468,7 @@ selected_confidence = filter_select(
 )
 
 if selected_confidence != "All":
-    filtered_data = filtered_data[
-        filtered_data["Confidence"] == selected_confidence
-    ]
+    filtered_data = filtered_data[filtered_data["Confidence"] == selected_confidence]
 # --- END of new filter ---
 
 # Cost assumptions: not filters, so they stay out of filter_key below and editing them
@@ -497,17 +503,20 @@ with st.sidebar.expander("Calls and missed appointments", icon=":material/paymen
     cost_per_call = hourly * minutes_per_call / 60
     st.caption(f"So each call costs about **£{cost_per_call:.2f}** in staff time.")
 
-    share_lost = st.slider(
-        "Share of a missed appointment's cost really lost",
-        0,
-        100,
-        100,
-        step=5,
-        format="%d%%",
-        key="cost_share_lost",
-        help="Lower this if some empty slots get re-used, for example by overbooking or a "
-        "clinician catching up on other work.",
-    ) / 100
+    share_lost = (
+        st.slider(
+            "Share of a missed appointment's cost really lost",
+            0,
+            100,
+            100,
+            step=5,
+            format="%d%%",
+            key="cost_share_lost",
+            help="Lower this if some empty slots get re-used, for example by overbooking or a "
+            "clinician catching up on other work.",
+        )
+        / 100
+    )
     # A pair of boxes per specialty rather than a table, which is cramped at the sidebar's
     # width. They make the same table as costs.dna_cost_table(), for appointment_costs().
     st.markdown("**Cost of a missed appointment (£)**")
@@ -523,11 +532,19 @@ with st.sidebar.expander("Calls and missed appointments", icon=":material/paymen
             st.markdown(f"**{specialty}**")
             new_col, fu_col = st.columns(2, gap="small")
             new_cost = new_col.number_input(
-                "New (£)", min_value=0, value=int(new_default), step=10, key=f"cost_dna_{i}_new",
+                "New (£)",
+                min_value=0,
+                value=int(new_default),
+                step=10,
+                key=f"cost_dna_{i}_new",
                 help=f"A missed first appointment in {specialty}.",
             )
             fu_cost = fu_col.number_input(
-                "Follow up (£)", min_value=0, value=int(fu_default), step=10, key=f"cost_dna_{i}_fu",
+                "Follow up (£)",
+                min_value=0,
+                value=int(fu_default),
+                step=10,
+                key=f"cost_dna_{i}_fu",
                 help=f"A missed follow-up appointment in {specialty}.",
             )
         cost_rows.append((specialty, new_cost, fu_cost))
@@ -537,7 +554,9 @@ if filtered_data.empty:
     st.info("No appointments match the selected filters.")
     st.stop()
 
-filtered_data["DNA_Cost"] = costs.appointment_costs(filtered_data, dna_costs, share_lost)
+filtered_data["DNA_Cost"] = costs.appointment_costs(
+    filtered_data, dna_costs, share_lost
+)
 
 # Remap DNA_Forecast values from 1/0 to Yes/No
 filtered_data["DNA_Forecast_Text"] = filtered_data["DNA_Forecast"].replace(
@@ -598,7 +617,9 @@ with tab_appts:
                 f"That is the recorded outcome in {len(past):,} past appointments the model was tested on, "
                 "so most predicted risks are low."
             )
-            with st.expander("What does the confidence score mean?", icon=":material/help:"):
+            with st.expander(
+                "What does the confidence score mean?", icon=":material/help:"
+            ):
                 st.markdown(
                     "Confidence is how clear-cut the model's yes-or-no call is. A 90% risk gives 80% "
                     "confidence; a 50% risk gives 0%, because the model could go either way. So it is "
@@ -683,18 +704,29 @@ with tab_appts:
                 )
                 dates = pd.to_datetime(filtered_data["Activity_Date"])
                 days = (dates.max() - dates.min()).days + 1
-                weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
-                length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
-                st.caption(f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})")
+                weeks = -(
+                    -days // 7
+                )  # whole weeks, rounded up (appointments run Monday to Friday)
+                length = (
+                    f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
+                )
+                st.caption(
+                    f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})"
+                )
 
         st.subheader("Week by week")
-        measure = st.segmented_control(
-            "Colour the grid by",
-            list(weekly.MEASURES),
-            default=DEFAULT_MEASURE,
-            key="grid_measure",
-            help="  \n".join(f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()),
-        ) or DEFAULT_MEASURE
+        measure = (
+            st.segmented_control(
+                "Colour the grid by",
+                list(weekly.MEASURES),
+                default=DEFAULT_MEASURE,
+                key="grid_measure",
+                help="  \n".join(
+                    f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
+                ),
+            )
+            or DEFAULT_MEASURE
+        )
         m = weekly.MEASURES[measure]
         column = m.column
         h = weekly.headline(filtered_data, column)
@@ -716,7 +748,9 @@ with tab_appts:
             },
             index=week_index,
         )
-        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(week_index)
+        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(
+            week_index
+        )
 
         st.caption(
             f"Each cell: appointments · {m.cell_label} "
@@ -736,10 +770,10 @@ with tab_appts:
             key=f"weekly_{filter_key}",
         )
 
-
         # The clicked day narrows the appointment list (clicks on the week labels are ignored)
         picked = [
-            (r, day) for r, day in week_table.selection.cells
+            (r, day)
+            for r, day in week_table.selection.cells
             if r < len(counts) and day in counts.columns
         ]
         day_key = "all"
@@ -747,9 +781,13 @@ with tab_appts:
         if picked:
             r, day = picked[0]
             date = counts.index[r] - pd.Timedelta(days=6 - weekly.DAYS.index(day))
-            table_data = filtered_data[pd.to_datetime(filtered_data["Activity_Date"]) == date]
+            table_data = filtered_data[
+                pd.to_datetime(filtered_data["Activity_Date"]) == date
+            ]
             day_key = f"{date:%Y%m%d}"
-            st.subheader(f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments")
+            st.subheader(
+                f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments"
+            )
 
         st.info(
             "**Click a row in the table** (highest risk first) to see what made the model give that "
@@ -760,7 +798,9 @@ with tab_appts:
 
         # Highest risk first, so the first rows are the red ones worth clicking. Sorted here
         # rather than in the grid, so the selected position still matches table_data.
-        table_data = table_data.sort_values("DNA_Prob_Forecast", ascending=False, kind="stable")
+        table_data = table_data.sort_values(
+            "DNA_Prob_Forecast", ascending=False, kind="stable"
+        )
         table = st.dataframe(
             appointment_table(table_data),
             column_config=APPOINTMENT_COLUMNS,
@@ -791,7 +831,10 @@ with tab_appts:
 
             # Starts open; collapse it once you have the idea (it stays collapsed between patients)
             with st.expander(
-                "How to read this chart", expanded=True, key="chart_guide", icon=":material/help:"
+                "How to read this chart",
+                expanded=True,
+                key="chart_guide",
+                icon=":material/help:",
             ):
                 # Keyed so style.css stacks the example above the steps on narrower screens
                 example_col, steps_col = st.container(key="reflow_stack_guide").columns(
@@ -840,8 +883,12 @@ with tab_appts:
             is_filtered = n < len(data)
             # Not for the forecast filters: they pick appointments by the very pushes being
             # charted (Very High risk = big pushes up), so the comparison would be circular
-            forecast_filtered = selected_dna_risk != "All" or selected_confidence != "All"
-            show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
+            forecast_filtered = (
+                selected_dna_risk != "All" or selected_confidence != "All"
+            )
+            show_filtered = (
+                is_filtered and n >= MIN_GROUP_FOR_CHART and not forecast_filtered
+            )
 
             st.subheader("What the model relies on most")
             st.markdown(
@@ -853,7 +900,9 @@ with tab_appts:
                 charts.importance_bars(
                     explain.group_importance(shap_all.loc[data["row_id"]]),
                     f"All {len(data):,} upcoming appointments",
-                    explain.group_importance(shap_all.loc[filtered_data["row_id"]]) if show_filtered else None,
+                    explain.group_importance(shap_all.loc[filtered_data["row_id"]])
+                    if show_filtered
+                    else None,
                     f"The {n:,} appointments in your filters",
                 ),
                 key=f"importance_{filter_key}",
@@ -907,7 +956,9 @@ with tab_appts:
         # ---- The way on: a split button, styled like the game tab's (style.css)
         st.divider()
         with st.container(key="appts_next"):
-            call_list, plan = st.container(key="reflow_stack_appts_next").columns(2, gap="large")
+            call_list, plan = st.container(key="reflow_stack_appts_next").columns(
+                2, gap="large"
+            )
             call_list.markdown(
                 "### See the list for the admin team\n"
                 "What the team would actually work from: next week's appointments, highest risk first, "
@@ -941,13 +992,18 @@ with tab_appts:
                 "picture, choose **Show all appointments** in the sidebar."
             )
 
-        measure = st.segmented_control(
-            "Who goes on the list",
-            list(weekly.MEASURES),
-            default=DEFAULT_MEASURE,
-            key="weekly_measure",
-            help="  \n".join(f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()),
-        ) or DEFAULT_MEASURE
+        measure = (
+            st.segmented_control(
+                "Who goes on the list",
+                list(weekly.MEASURES),
+                default=DEFAULT_MEASURE,
+                key="weekly_measure",
+                help="  \n".join(
+                    f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()
+                ),
+            )
+            or DEFAULT_MEASURE
+        )
         m = weekly.MEASURES[measure]
         st.info(
             "**Where to draw the line is a human decision.** The model gives every appointment a risk "
@@ -966,7 +1022,11 @@ with tab_appts:
         first_week = h["first_week"]
         title = weekly.week_title(first_week)
         when_week = title[0].lower() + title[1:]
-        week_end = pd.to_datetime(filtered_data["Activity_Date"]).dt.to_period("W-SUN").dt.end_time.dt.normalize()
+        week_end = (
+            pd.to_datetime(filtered_data["Activity_Date"])
+            .dt.to_period("W-SUN")
+            .dt.end_time.dt.normalize()
+        )
         next_week = filtered_data[week_end == first_week]
         hw = weekly.headline(next_week, column)
         plural = "s" if h["n_weeks"] != 1 else ""
@@ -998,7 +1058,9 @@ with tab_appts:
             st.metric(
                 "Highest-risk weekday",
                 hw["top_day"],
-                weekly.pts_vs_average(hw["top_day_rate"], hw["overall"]) if hw["n_days"] > 1 else None,
+                weekly.pts_vs_average(hw["top_day_rate"], hw["overall"])
+                if hw["n_days"] > 1
+                else None,
                 delta_color="inverse",
                 icon=":material/today:",
                 border=True,
@@ -1082,22 +1144,29 @@ with tab_calls:
         )
 
     # All the upcoming appointments, by week: the filters are hidden on this tab
-    upcoming = data.assign(DNA_Cost=costs.appointment_costs(data, dna_costs, share_lost))
+    upcoming = data.assign(
+        DNA_Cost=costs.appointment_costs(data, dna_costs, share_lost)
+    )
     upcoming_week = pd.to_datetime(upcoming["Activity_Date"]).dt.to_period("W-SUN")
     per_week = upcoming_week.value_counts()
     n_weeks = len(per_week)
 
-    mode = st.segmented_control(
-        "Choose who to phone by",
-        ["Calls the team can make", "Predicted risk"],
-        default="Calls the team can make",
-        key="call_mode",
-    ) or "Calls the team can make"
+    mode = (
+        st.segmented_control(
+            "Choose who to phone by",
+            ["Calls the team can make", "Predicted risk"],
+            default="Calls the team can make",
+            key="call_mode",
+        )
+        or "Calls the team can make"
+    )
 
     # The setting for who gets a call, and the guess at what a call changes, side by side.
     # The reflow_docked_ keys here and below let style.css stack rows where the sidebar
     # leaves the page narrow.
-    ctrl_left, ctrl_right = st.container(key="reflow_docked_controls").columns(2, gap="large")
+    ctrl_left, ctrl_right = st.container(key="reflow_docked_controls").columns(
+        2, gap="large"
+    )
 
     if mode == "Calls the team can make":
         # Slider runs up to the busiest upcoming week, rounded up to a multiple of 10. Clamp
@@ -1117,8 +1186,10 @@ with tab_calls:
         )
         # Each week, phone that week's highest-risk appointments, up to capacity. The past
         # appointments then get the same share of calls, highest risk first.
-        rank_in_week = upcoming["DNA_Prob_Forecast"].groupby(upcoming_week).rank(
-            method="first", ascending=False
+        rank_in_week = (
+            upcoming["DNA_Prob_Forecast"]
+            .groupby(upcoming_week)
+            .rank(method="first", ascending=False)
         )
         upcoming_called = rank_in_week <= cap
         called = calls.called_by_share(p_past, upcoming_called.mean())
@@ -1131,15 +1202,18 @@ with tab_calls:
         # Risk only: confidence is |2 x risk - 1|, so it adds nothing a risk bar doesn't, and
         # on its own it would also pick the patients the model is confident will attend.
         # Few risks pass 60% at an 8% DNA rate, so the slider stops there, in 1% steps
-        risk_min = ctrl_left.slider(
-            "Phone if the predicted risk is at least",
-            0,
-            60,
-            round(HIGH_RISK_MIN * 100),
-            step=1,
-            format="%d%%",
-            key="risk_min",
-        ) / 100
+        risk_min = (
+            ctrl_left.slider(
+                "Phone if the predicted risk is at least",
+                0,
+                60,
+                round(HIGH_RISK_MIN * 100),
+                step=1,
+                format="%d%%",
+                key="risk_min",
+            )
+            / 100
+        )
         called = calls.called_by_threshold(p_past, risk_min)
         upcoming_called = pd.Series(
             calls.called_by_threshold(upcoming["DNA_Prob_Forecast"], risk_min),
@@ -1178,14 +1252,21 @@ with tab_calls:
         weekly_avoided = weekly_reached * effect / 100
     if has_costs:
         econ = costs.call_economics(
-            weekly_calls, weekly_reached, effect / 100, cost_per_call, minutes_per_call, dna_cost
+            weekly_calls,
+            weekly_reached,
+            effect / 100,
+            cost_per_call,
+            minutes_per_call,
+            dna_cost,
         )
         # None when the calls reach nobody who would miss: no effect could pay for them
         be = econ["break_even_effect"]
         be = float("inf") if be is None else be
 
     with st.container(border=True):
-        k1, k2 = st.container(key="reflow_docked_cutoff").columns([0.35, 0.65], gap="large")
+        k1, k2 = st.container(key="reflow_docked_cutoff").columns(
+            [0.35, 0.65], gap="large"
+        )
         k1.metric("Calls per 1,000 appointments", f"{out['calls']}")
         k2.metric(
             "So we phone anyone with a predicted risk of at least"
@@ -1204,7 +1285,9 @@ with tab_calls:
             )
             # Fixed columns rather than a horizontal container, so the four cards never wrap
             # three and one. Keyed so style.css shows them two per line on narrower screens.
-            c1, c2, c3, c4 = st.container(key="reflow_halves_costs").columns(4, gap="small")
+            c1, c2, c3, c4 = st.container(key="reflow_halves_costs").columns(
+                4, gap="small"
+            )
             c1.metric(
                 "Cost of calls",
                 f"£{econ['call_cost']:,.0f}",
@@ -1236,7 +1319,9 @@ with tab_calls:
             )
             c4.metric(
                 "Missed appointments avoided",
-                f"{weekly_avoided:.1f}" if weekly_avoided < 10 else f"{weekly_avoided:.0f}",
+                f"{weekly_avoided:.1f}"
+                if weekly_avoided < 10
+                else f"{weekly_avoided:.0f}",
                 border=True,
                 height="stretch",
                 icon=":material/event_available:",
@@ -1263,20 +1348,29 @@ with tab_calls:
         )
 
     if out["calls"] == 0:
-        st.info("With this setting nobody would get a call. Raise the number of calls or lower the bar.")
+        st.info(
+            "With this setting nobody would get a call. Raise the number of calls or lower the bar."
+        )
     else:
         # Keyed so style.css puts the cards under the chart on narrower screens
-        left, right = st.container(key="reflow_stack_icons").columns([0.62, 0.38], gap="large")
+        left, right = st.container(key="reflow_stack_icons").columns(
+            [0.62, 0.38], gap="large"
+        )
         with left:
             # Share the 40 markers of width between the columns in line with their sizes
             left_cols = min(32, max(8, round(40 * out["calls"] / 1000)))
             st.plotly_chart(
-                charts.outcome_blocks(out, left_cols, 40 - left_cols, heading="Using the model to rank the list"),
+                charts.outcome_blocks(
+                    out,
+                    left_cols,
+                    40 - left_cols,
+                    heading="Using the model to rank the list",
+                ),
                 width="stretch",
                 config={"displayModeBar": False},
             )
             st.caption(
-                "Each marker is one of 1,000 past appointments. \"On the call list\" is the model's list (no "
+                'Each marker is one of 1,000 past appointments. "On the call list" is the model\'s list (no '
                 "calls were made); the boxes show what really happened. An unnecessary call went to "
                 "someone who would have attended anyway."
             )
@@ -1292,7 +1386,9 @@ with tab_calls:
                     width="stretch",
                 )
         with right:
-            st.markdown(f"**If we phoned these {out['calls']} appointments in every 1,000:**")
+            st.markdown(
+                f"**If we phoned these {out['calls']} appointments in every 1,000:**"
+            )
             # Short titles on the cards, with the explanation in a caption under each number
             with st.container(border=True, gap="small"):
                 st.metric(
@@ -1318,7 +1414,11 @@ with tab_calls:
                     f"The other {out['not_called_dna']} would get no call."
                 )
             with st.container(border=True, gap="small"):
-                st.metric("Unnecessary calls", f"{out['called_attended']}", icon=":material/event_available:")
+                st.metric(
+                    "Unnecessary calls",
+                    f"{out['called_attended']}",
+                    icon=":material/event_available:",
+                )
                 st.caption(
                     f"These people would have attended anyway: "
                     f"{out['called_attended'] / out['calls']:.0%} of the {out['calls']} calls."
@@ -1338,7 +1438,9 @@ with tab_calls:
         )
         avoided = out["called_dna"] * effect / 100
 
-        m1, m2, m3 = st.container(key="reflow_docked_difference").columns(3, gap="large")
+        m1, m2, m3 = st.container(key="reflow_docked_difference").columns(
+            3, gap="large"
+        )
         m1.metric(
             "Possibly avoided, per 1,000",
             f"{avoided:.0f}",
@@ -1445,7 +1547,12 @@ with tab_game:
     with st.container(horizontal=True, vertical_alignment="center", key="game_title"):
         st.subheader("Can you beat a computer?")
         if playing:
-            st.button("Start again", key="game_reset_top", on_click=reset_game, icon=":material/restart_alt:")
+            st.button(
+                "Start again",
+                key="game_reset_top",
+                on_click=reset_game,
+                icon=":material/restart_alt:",
+            )
     st.markdown(
         f"""<div class="game-stats">
         <div class="game-stat"><span class="game-stat-num">1,000</span>past appointments, when no reminder calls were made</div>
@@ -1493,7 +1600,10 @@ with tab_game:
     )
 
     if not clues:
-        st.info("Pick at least one clue to see who your rule would put on the call list.", icon=":material/touch_app:")
+        st.info(
+            "Pick at least one clue to see who your rule would put on the call list.",
+            icon=":material/touch_app:",
+        )
     else:
         mine = rule_game.results(game_past, rule_game.rule_score(game_past, clues))
         caught = mine["outcomes"]["called_dna"]
@@ -1508,10 +1618,14 @@ with tab_game:
         if best is None or mine["reached"] > best["reached"]:
             st.session_state["game_best"] = {"clues": list(clues), **mine}
 
-        left, right = st.container(key="reflow_stack_game_rule").columns([0.62, 0.38], gap="large")
+        left, right = st.container(key="reflow_stack_game_rule").columns(
+            [0.62, 0.38], gap="large"
+        )
         with left:
             st.plotly_chart(
-                charts.outcome_blocks(mine["outcomes"], 10, 30, heading="Using your rule to rank the list"),
+                charts.outcome_blocks(
+                    mine["outcomes"], 10, 30, heading="Using your rule to rank the list"
+                ),
                 width="stretch",
                 config={"displayModeBar": False},
                 key="game_rule_icons",
@@ -1533,9 +1647,15 @@ with tab_game:
                 added = [c for c in rule_key if c not in prev["clues"]]
                 removed = [c for c in prev["clues"] if c not in rule_key]
                 change = (
-                    "Adding " + " and ".join(f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in added)
+                    "Adding "
+                    + " and ".join(
+                        f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in added
+                    )
                     if added and not removed
-                    else "Taking away " + " and ".join(f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in removed)
+                    else "Taking away "
+                    + " and ".join(
+                        f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in removed
+                    )
                     if removed and not added
                     else "Changing your rule"
                 )
@@ -1543,7 +1663,11 @@ with tab_game:
                 if gain < 0:
                     st.error(
                         f"**{change} made your list worse**, from {prev['caught']} to {caught}."
-                        + (" More information, a worse list." if added and not removed else ""),
+                        + (
+                            " More information, a worse list."
+                            if added and not removed
+                            else ""
+                        ),
                         icon=":material/trending_down:",
                     )
                 elif gain > 0:
@@ -1552,7 +1676,10 @@ with tab_game:
                         icon=":material/trending_up:",
                     )
                 else:
-                    st.info(f"**{change} made no difference.** Still {caught}.", icon=":material/trending_flat:")
+                    st.info(
+                        f"**{change} made no difference.** Still {caught}.",
+                        icon=":material/trending_flat:",
+                    )
             st.metric(
                 "Your rule ranks",
                 f"#{rule_game.rank_of(caught, all_catches)} of {n_rules}",
@@ -1566,7 +1693,9 @@ with tab_game:
                 + ", ".join(f"*{rule_game.CLUES[c].lower()}*" for c in best["clues"])
                 + "."
             )
-            st.caption("Try adding or taking away a clue. Does more information always help?")
+            st.caption(
+                "Try adding or taking away a clue. Does more information always help?"
+            )
 
     # ---- 2. The model learns
     st.divider()
@@ -1596,7 +1725,12 @@ with tab_game:
         f = frames[i]
         with slot.container():
             m1, m2, m3 = st.container(key=f"reflow_halves_game_{phase}_{i}").columns(3)
-            m1.metric("Past appointments learnt from", f"{f['n']:,}", border=True, icon=":material/school:")
+            m1.metric(
+                "Past appointments learnt from",
+                f"{f['n']:,}",
+                border=True,
+                icon=":material/school:",
+            )
             m2.metric(
                 "Missed appointments on its list",
                 f"{f['outcomes']['called_dna']} of {n_missed}",
@@ -1609,7 +1743,9 @@ with tab_game:
                 border=True,
                 icon=":material/person:",
             )
-            left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns([0.55, 0.45], gap="large")
+            left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns(
+                [0.55, 0.45], gap="large"
+            )
             with left:
                 st.markdown("**The race: missed appointments on each list**")
                 st.plotly_chart(
@@ -1629,7 +1765,12 @@ with tab_game:
             with right:
                 st.markdown("**How much say each clue gets**")
                 st.plotly_chart(
-                    charts.say_bars(say_order, rule_game.CLUE_SHORT, f["say"], clues or best["clues"]),
+                    charts.say_bars(
+                        say_order,
+                        rule_game.CLUE_SHORT,
+                        f["say"],
+                        clues or best["clues"],
+                    ),
                     width="stretch",
                     config={"displayModeBar": False},
                     key=f"game_say_{phase}_{i}",
@@ -1639,10 +1780,16 @@ with tab_game:
         for i in range(len(frames)):
             draw_model(i, "run", best)
             if i == at:
-                st.toast("The model just overtook your best rule!", icon=":material/emoji_events:")
+                st.toast(
+                    "The model just overtook your best rule!",
+                    icon=":material/emoji_events:",
+                )
             if i < len(frames) - 1:
                 # Linger where the model passes you, hurry through frames where little changes
-                flat = abs(frames[i + 1]["reached"] - frames[i]["reached"]) * n_missed <= 1.5
+                flat = (
+                    abs(frames[i + 1]["reached"] - frames[i]["reached"]) * n_missed
+                    <= 1.5
+                )
                 time.sleep(2.0 if i == at else 0.4 if flat else 0.9)
         st.session_state["game_trained"] = True
     elif st.session_state.get("game_trained") and best:
@@ -1673,9 +1820,13 @@ with tab_game:
             else f"No rule from the buttons can match it: the best reaches {best_possible} of {n_missed}."
         )
 
-        c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(2, gap="small")
+        c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(
+            2, gap="small"
+        )
         with c1.container(border=True, key="title_card_game_say", height="stretch"):
-            st.markdown(":material/balance: **Same clues. The model learnt which matter most.**")
+            st.markdown(
+                ":material/balance: **Same clues. The model learnt which matter most.**"
+            )
             st.markdown(
                 "Your rule gives every clue an equal say. The model gives "
                 f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
@@ -1695,7 +1846,7 @@ with tab_game:
         w1, w2 = st.container(key="reflow_halves_game_why").columns(2, gap="small")
         w1.metric(
             f"Ways to give {n_clues} clues 0 to 10 points each",
-            f"{11 ** n_clues:,}",
+            f"{11**n_clues:,}",
             border=True,
             height="stretch",
             help="The model doesn't try these one by one: it works out the best points straight from the "
@@ -1724,7 +1875,9 @@ with tab_game:
     # ---- The way on: styled like the geographic mini's next-step boxes (style.css)
     st.divider()
     with st.container(key="game_next"):
-        onward, plan = st.container(key="reflow_stack_game_next").columns(2, gap="large")
+        onward, plan = st.container(key="reflow_stack_game_next").columns(
+            2, gap="large"
+        )
         onward.markdown(
             "### See the model at work\n"
             "The tool this demo is based on gives every upcoming appointment a predicted risk. See which "
