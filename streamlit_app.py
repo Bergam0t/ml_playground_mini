@@ -231,7 +231,7 @@ def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a real tool that is being piloted by "
+        "This is a demonstration of a :blue[**real tool**] that is being piloted by "
         "outpatient teams. The real tool forecasts real upcoming appointments.\n\n"
         "Here, all the data is synthetic and the model is trained on synthetic past "
         "appointments. No real patients or Trust data are displayed.\n\n"
@@ -508,21 +508,30 @@ with st.sidebar.expander("Calls and missed appointments", icon=":material/paymen
         help="Lower this if some empty slots get re-used, for example by overbooking or a "
         "clinician catching up on other work.",
     ) / 100
-    dna_costs = st.data_editor(
-        costs.dna_cost_table(),
-        column_config={
-            "Specialty": st.column_config.TextColumn(disabled=True),
-            "New": st.column_config.NumberColumn("New (£)", min_value=0, format="£%d"),
-            "Follow Up": st.column_config.NumberColumn("Follow up (£)", min_value=0, format="£%d"),
-        },
-        hide_index=True,
-        key="cost_dna_table",
-        alt="Cost of a missed appointment by specialty and appointment type",
-    )
+    # A pair of boxes per specialty rather than a table, which is cramped at the sidebar's
+    # width. They make the same table as costs.dna_cost_table(), for appointment_costs().
+    st.markdown("**Cost of a missed appointment (£)**")
     st.caption(
-        "Cost of a missed appointment. Illustrative values, loosely in line with NHS Payment "
-        "Scheme outpatient prices: replace them with your Trust's own costs."
+        "Illustrative values, loosely in line with NHS Payment Scheme outpatient prices: "
+        "replace them with your Trust's own costs."
     )
+    cost_rows = []
+    for i, (specialty, new_default, fu_default) in enumerate(
+        costs.dna_cost_table().itertuples(index=False)
+    ):
+        with st.container(key=f"cost_dna_{i}", gap="small"):
+            st.markdown(f"**{specialty}**")
+            new_col, fu_col = st.columns(2, gap="small")
+            new_cost = new_col.number_input(
+                "New (£)", min_value=0, value=int(new_default), step=10, key=f"cost_dna_{i}_new",
+                help=f"A missed first appointment in {specialty}.",
+            )
+            fu_cost = fu_col.number_input(
+                "Follow up (£)", min_value=0, value=int(fu_default), step=10, key=f"cost_dna_{i}_fu",
+                help=f"A missed follow-up appointment in {specialty}.",
+            )
+        cost_rows.append((specialty, new_cost, fu_cost))
+    dna_costs = pd.DataFrame(cost_rows, columns=["Specialty", *costs.APPOINTMENT_TYPES])
 
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
