@@ -308,11 +308,12 @@ def go_to_call_list():
     st.session_state.scroll_to_top = True
 
 
-def go_to_forecast_calls():
+def go_to_forecast_calls(risk_min):
     """From the predicted savings on the appointments tab to the phone tab, set to phone
-    every forecast DNA with the default guess at what a call changes, so the figures match."""
+    everyone at or above `risk_min` with the default guess at what a call changes, so the
+    figures match."""
     st.session_state.call_mode = "Predicted risk"
-    st.session_state.risk_min = round(FORECAST_MIN * 100)
+    st.session_state.risk_min = round(risk_min * 100)
     st.session_state.call_effect = DEFAULT_CALL_EFFECT
     go_to_tab(TAB_LABELS[2])
 
@@ -606,6 +607,81 @@ filter_key = hashlib.md5(
     ).encode()
 ).hexdigest()[:10]
 
+# The lowest predicted risk on each call list (weekly.MEASURES), for the savings box
+MEASURE_RISK_MIN = {
+    "High_Risk_DNA": HIGH_RISK_MIN,
+    "DNA_Forecast": FORECAST_MIN,
+    "DNA_Prob_Forecast": 0.0,
+}
+
+
+def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=None):
+    """Predicted savings from phoning every appointment in `called` (all those at or above
+    `risk_min`), if a call gets DEFAULT_CALL_EFFECT% of those who would have missed to attend.
+    Worked out as the phone tab does: calls reach a would-be DNA as often as they did in the
+    past appointments at the same cut-off. A button opens the phone tab on the same setting.
+    `scope` says what the phone tab covers that this doesn't; `none_text` is shown instead
+    when nobody would be phoned; `weeks` adds a weekly figure."""
+    n_calls = len(called)
+    dna_cost = costs.cost_per_dna_reached(called) if n_calls else None
+    if dna_cost is None:
+        st.caption(none_text)
+        return
+    past = load_past()
+    precision = past.loc[past["DNA_Prob_Forecast"] >= risk_min, "Did_Not_Attend"].mean()
+    effect = DEFAULT_CALL_EFFECT / 100
+    reached = n_calls * precision
+    saving = costs.call_economics(
+        n_calls, reached, effect, cost_per_call, minutes_per_call, dna_cost
+    )
+    who = (
+        f"those with a predicted risk of {risk_min:.0%} or more"
+        if risk_min > 0
+        else "all appointments"
+    )
+    per_week = (
+        f" About £{saving['value_avoided'] / weeks:,.0f} a week."
+        if weeks and weeks > 1
+        else ""
+    )
+    def few(x):
+        """One decimal place under 10, as on the phone tab"""
+        return f"{x:.1f}" if x < 10 else f"{x:,.0f}"
+
+    with st.container(border=True):
+        saving_col, cta_col = st.container(key=f"reflow_stack_{key}").columns(
+            2, gap="large", vertical_alignment="center"
+        )
+        saving_col.metric(
+            label,
+            f"£{saving['value_avoided']:,.0f}",
+            # A minus only for a loss, so st.metric still colours it red; no plus or arrow
+            f"{'-' if saving['net'] < 0 else ''}£{abs(saving['net']):,.0f} after the cost of calls",
+            delta_arrow="off",
+            icon=":material/savings:",
+            help=f"{n_calls:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
+            f"or {few(saving['staff_hours'])} hours of staff time. In past appointments, "
+            f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
+            f"someone who would otherwise miss. If {DEFAULT_CALL_EFFECT}% of them attend instead, "
+            f"that's about {few(reached * effect)} fewer missed appointments, each valued at about "
+            f"£{dna_cost:,.0f}.{per_week} The costs come from **Cost assumptions** in the sidebar.",
+        )
+        saving_col.caption(caption)
+        cta_col.markdown(
+            f"**{DEFAULT_CALL_EFFECT}% is a guess, not a measurement.** Nobody knows yet how "
+            "many people a reminder call would change. Try other guesses, and other numbers "
+            f"of calls, on the next tab. It uses all the upcoming appointments, {scope}."
+        )
+        cta_col.button(
+            "Explore these assumptions",
+            key=f"to_calls_from_{key}",
+            on_click=go_to_forecast_calls,
+            args=(risk_min,),
+            icon=":material/arrow_forward:",
+            type="primary",
+        )
+
+
 # ---------------------------------------------------------------- tab 1
 # One tab, two views picked by the switch at the top of the sidebar
 with tab_appts:
@@ -744,65 +820,19 @@ with tab_appts:
                     f"Appointments {dates.min():%d %b} to {dates.max():%d %b} ({length})"
                 )
 
-        # Predicted savings from phoning every forecast DNA, worked out as the phone tab does
-        # (calls reaching a would-be DNA at the past precision), so its button can open that
-        # tab on the same setting
-        forecast_dnas = filtered_data[filtered_data["DNA_Forecast"] == 1]
-        dna_cost_reached = costs.cost_per_dna_reached(forecast_dnas)
-        if n_forecast and dna_cost_reached is not None:
-            saving_effect = DEFAULT_CALL_EFFECT / 100
-            reached = n_forecast * forecast_precision
-            saving = costs.call_economics(
-                n_forecast,
-                reached,
-                saving_effect,
-                cost_per_call,
-                minutes_per_call,
-                dna_cost_reached,
-            )
-            avoided = reached * saving_effect
-            with st.container(border=True):
-                saving_col, cta_col = st.container(key="reflow_stack_savings").columns(
-                    2, gap="large", vertical_alignment="center"
-                )
-                saving_col.metric(
-                    "Predicted savings if we phone every forecast DNA",
-                    f"£{saving['value_avoided']:,.0f}",
-                    # A minus only for a loss, so st.metric still colours it red; no plus or arrow
-                    f"{'-' if saving['net'] < 0 else ''}£{abs(saving['net']):,.0f} after the cost of calls",
-                    delta_arrow="off",
-                    icon=":material/savings:",
-                    help=f"{n_forecast:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
-                    f"or {saving['staff_hours']:,.0f} hours of staff time. In past appointments, "
-                    f"{forecast_precision:.0%} of those forecast as a DNA were missed, so about "
-                    f"{reached:,.0f} calls would reach someone who would otherwise miss. If "
-                    f"{DEFAULT_CALL_EFFECT}% of them attend instead, that's about {avoided:,.0f} "
-                    f"fewer missed appointments, each valued at about £{dna_cost_reached:,.0f}. "
-                    f"Over {length}: about £{saving['value_avoided'] / max(weeks, 1):,.0f} a week. "
-                    "The costs come from **Cost assumptions** in the sidebar.",
-                )
-                saving_col.caption(
-                    f"If half of those who would have missed attend instead. Over the "
-                    f"{length} above, with {n_forecast:,} calls."
-                )
-                cta_col.markdown(
-                    f"**{DEFAULT_CALL_EFFECT}% is a guess, not a measurement.** Nobody knows yet how "
-                    "many people a reminder call would change. Try other guesses, and other numbers "
-                    "of calls, on the next tab. It uses all the upcoming appointments, not just "
-                    "your filters."
-                )
-                cta_col.button(
-                    "Explore these assumptions",
-                    key="to_calls_from_savings",
-                    on_click=go_to_forecast_calls,
-                    icon=":material/arrow_forward:",
-                    type="primary",
-                )
-        else:
-            st.caption(
-                "None of the appointments in your filters is forecast as a DNA, so there are no "
-                "calls to cost."
-            )
+        # Predicted savings from phoning every forecast DNA in the period above
+        savings_box(
+            filtered_data[filtered_data["DNA_Forecast"] == 1],
+            FORECAST_MIN,
+            f"Predicted savings over the next {length} if we phone every forecast DNA",
+            f"If half of those who would have missed attend instead, with {n_forecast:,} calls "
+            f"between {dates.min():%d %b} and {dates.max():%d %b}.",
+            "not just your filters",
+            "savings",
+            "None of the appointments in your filters is forecast as a DNA, so there are no "
+            "calls to cost.",
+            weeks=weeks,
+        )
 
         st.subheader("Predicted Non-Attender Summary - Weekly")
         # Only the cut-off lists: "ranked by risk" describes a call list, not a colouring
@@ -1180,13 +1210,25 @@ with tab_appts:
                 "**Cost assumptions** in the sidebar.",
             )
 
-        # The call list covers the first week
+        # The call list covers the first week: the period's counted appointments
         period = next_week
         when = when_week
-
-        # The call list itself: the period's counted appointments, highest risk first
-        st.subheader("Calls to make")
         listed = period[period[column] == 1] if m.flag else period
+
+        # Predicted savings from phoning everyone on the list
+        savings_box(
+            listed,
+            MEASURE_RISK_MIN[column],
+            f"Predicted savings {when} if we phone everyone on this list",
+            f"If half of those who would have missed attend instead, with {len(listed):,} calls "
+            f"in the week ending {weekly.week_label(first_week, year=True)}.",
+            "not just this week or your filters",
+            "week_savings",
+            f"Nobody {when} is on this list, so there are no calls to cost.",
+        )
+
+        # The call list itself, highest risk first
+        st.subheader("Calls to make")
         listed = listed.sort_values("DNA_Prob_Forecast", ascending=False)
         if m.flag:
             st.markdown(
