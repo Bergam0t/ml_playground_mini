@@ -474,12 +474,12 @@ selected_confidence = filter_select(
     ["All"] + available_confidences,
     "filter_confidence",
     # Bands from Confidence_Score_Txt()
-    help="How clear-cut the model's yes-or-no call is: the gap between its chance that the "
-    "patient won't attend and its chance that they will. It follows from the risk.  \n"
-    "**Low:** under 50% (risk 25% to 75%)  \n"
-    "**Medium:** 50% to 80% (risk 10% to 25% or 75% to 90%)  \n"
-    "**High:** 80% to 90% (risk 5% to 10% or 90% to 95%)  \n"
-    "**Very High:** 90% or more (risk under 5% or over 95%)",
+    help="How clear-cut the model's yes-or-no call is: how far the risk is from 20%, where the "
+    "forecast changes from No to Yes. It follows from the risk.  \n"
+    "**Low:** under 50% (risk 8% to 43%)  \n"
+    "**Medium:** 50% to 80% (risk 3% to 8% or 43% to 69%)  \n"
+    "**High:** 80% to 90% (risk 1.3% to 3% or 69% to 83%)  \n"
+    "**Very High:** 90% or more (risk under 1.3% or over 83%)",
 )
 
 if selected_confidence != "All":
@@ -636,10 +636,12 @@ with tab_appts:
                 "What does the confidence score mean?", icon=":material/help:"
             ):
                 st.markdown(
-                    "Confidence is how clear-cut the model's yes-or-no call is. A 90% risk gives 80% "
-                    "confidence; a 50% risk gives 0%, because the model could go either way. So it is "
-                    "**Low for any risk between 25% and 75%**, and high at both ends. Most appointments "
-                    "here are high-confidence because the model is fairly sure the patient *will* attend."
+                    f"Confidence is how clear-cut the model's yes-or-no call is: how far the risk is "
+                    f"from {FORECAST_MIN:.0%}, where the forecast changes from No to Yes. A "
+                    f"{FORECAST_MIN:.0%} risk gives 0% confidence, because the model could go either "
+                    "way. A 70% risk gives about 80% confidence that the patient won't attend, and a 2% "
+                    "risk about 85% confidence that they will. So it is **Low for any risk between 8% "
+                    "and 43%**, and rises towards both ends."
                 )
 
         # Summary of the filtered appointments. Every card is a bordered container holding a
@@ -658,19 +660,19 @@ with tab_appts:
             return f"{count / n_filtered:.1%} of upcoming appointments"
 
         with st.container(horizontal=True, vertical_alignment="bottom"):
-            with st.container(border=True):
-                st.metric(
-                    "Appointments (filtered)",
-                    f"{n_filtered:,}",
-                    icon=":material/calendar_month:",
-                )
-                st.caption("Matching the filters on the left")
+            # with st.container(border=True):
+            #     st.metric(
+            #         "Appointments (filtered)",
+            #         f"{n_filtered:,}",
+            #         icon=":material/calendar_month:",
+            #     )
+            #     st.caption("Matching the filters on the left")
             with st.container():
                 pill("High", FORECAST_MIN)
                 with st.container(border=True):
                     n_forecast = int(filtered_data["DNA_Forecast"].sum())
                     st.metric(
-                        "Forecast DNAs",
+                        "All forecast DNAs",
                         f"{n_forecast:,}",
                         share_of_appointments(n_forecast),
                         delta_color="off",
@@ -692,7 +694,7 @@ with tab_appts:
                 with st.container(border=True):
                     n_high = int(filtered_data["High_Risk_DNA"].sum())
                     st.metric(
-                        "High-risk flagged",
+                        "DNAs we're confident about",
                         f"{n_high:,}",
                         share_of_appointments(n_high),
                         delta_color="off",
@@ -803,6 +805,8 @@ with tab_appts:
             st.subheader(
                 f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments"
             )
+
+        st.subheader("Appointment Details")
 
         st.info(
             "**Click a row in the table** (highest risk first) to see what made the model give that "
@@ -1002,12 +1006,21 @@ with tab_appts:
             )
 
     else:
-        with intro_columns("intro_weekly"):
-            st.title("Prioritised call list")
-            st.markdown(
-                "For the admin team: next week's appointments the model thinks patients are most likely "
-                "to miss, highest risk first, so reminder calls can start at the top. For the week-by-week "
-                "picture, choose **Show all appointments** in the sidebar."
+        with intro_columns("intro_weekly", widths=(0.70, 0.3)):
+            st.title("Prioritised call list for admin team")
+
+            st.info(
+                "**Where to draw the line is a human decision.** "
+                "\n\nThe model gives every appointment a risk "
+                "of not attending, not a yes or no. "
+                ""
+                "\n\n- A higher cut-off gives a shorter list that is "
+                "more likely to reach people who really would have missed their appointment"
+                "\n- A lower one catches "
+                "more missed appointments but means more calls, many to people who would have come anyway. "
+                "\n\nThe right balance depends on how many calls the team can make."
+                "Choose a starting point above, then head to the **How many people should we phone?** tab to explore the trade-off.",
+                icon=":material/balance:",
             )
 
         measure = (
@@ -1023,15 +1036,7 @@ with tab_appts:
             or DEFAULT_MEASURE
         )
         m = weekly.MEASURES[measure]
-        st.info(
-            "**Where to draw the line is a human decision.** The model gives every appointment a risk "
-            "of not attending, not a yes or no. A higher cut-off gives a shorter list that is "
-            "more likely to reach people who really would have missed their appointment; a lower one catches "
-            "more missed appointments but means more calls, many to people who would have come anyway. "
-            "The right balance depends on how many calls the team can make, so choose a starting point above. "
-            "The **How many people should we phone?** tab explores the trade-off.",
-            icon=":material/balance:",
-        )
+
         column = m.column
         h = weekly.headline(filtered_data, column)
 
@@ -1217,7 +1222,7 @@ with tab_calls:
             "who would have come anyway. **Move the slider and watch it change.**"
         )
     else:
-        # Risk only: confidence is |2 x risk - 1|, so it adds nothing a risk bar doesn't, and
+        # Risk only: confidence is a function of the risk alone, so it adds nothing a risk bar doesn't, and
         # on its own it would also pick the patients the model is confident will attend.
         # Few risks pass 60% at an 8% DNA rate, so the slider stops there, in 1% steps
         risk_min = (

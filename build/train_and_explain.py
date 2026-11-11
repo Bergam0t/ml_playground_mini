@@ -48,10 +48,16 @@ FORECAST_COLUMNS = [
 
 def confidence_score(p):
     """The live model's Confidence_Score, as in WX-BIU/Outpatient-DNAs
-    (src/forecast/Outpatient_Forecast.py): the top class probability minus the second. With
-    two classes, not attending (p) and attending (1 - p), that is |2p - 1|: 0 at a 50% risk,
-    1 at 0% or 100%. A function of the risk alone, so the same risk gets the same confidence."""
-    return np.abs(2 * p - 1).round(3)
+    (src/forecast/Outpatient_Forecast.py): the top class probability minus the second, which
+    for two classes is |2q - 1|, 0 where the model says yes or no at 50%. But the live model's
+    q is inflated by scale_pos_weight=4, so its 50% is about a 20% true risk. This model is
+    calibrated and says yes at FORECAST_MIN, so the risk is first inflated the same way
+    (odds times k), giving 0 at FORECAST_MIN and 1 at 0% or 100%. Without that, confidence
+    would fall as the risk rose from 20% to 50%, for patients forecast as DNAs. A function of
+    the risk alone, so the same risk gets the same confidence."""
+    k = (1 - FORECAST_MIN) / FORECAST_MIN
+    q = k * p / (k * p + 1 - p)
+    return np.abs(2 * q - 1).round(3)
 
 
 def build_matrix(df):

@@ -121,7 +121,10 @@ lambda_ml_streamlit_exercise:
 2. An XGBoost model is trained on those past appointments.
 3. The model scores 3,200 future appointments. Their confidence score is worked out as in the
    live pipeline (WX-BIU/Outpatient-DNAs, `src/forecast/Outpatient_Forecast.py`): the top class
-   probability minus the second, which for a yes/no model is |2 × risk − 1|.
+   probability minus the second, which for a yes/no model is |2q − 1|. The live model's q is
+   inflated about four times by `scale_pos_weight=4`, so its 50% is about a 20% true risk. The demo's
+   model is calibrated, so the risk is first inflated the same way (odds × 4). Confidence is then 0
+   at the 20% forecast line and goes up with the risk for every appointment forecast as a DNA.
 4. `shap.TreeExplainer` explains each prediction on the probability scale.
 
 **Patient name and appointment time.** Each patient has a made-up name (the same on all their
