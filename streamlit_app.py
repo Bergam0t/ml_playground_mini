@@ -315,6 +315,74 @@ def show_video():
     st.video(VIDEO_URL)
 
 
+def overall_importance(filtered_data, filter_key, sidebar_choices):
+    """The "Overall" tab of the explanation overlay: what the model relies on across all upcoming
+    appointments, and, when the sidebar filters narrow them enough, for the filtered ones beside
+    it. `sidebar_choices` is (label, choice) for the filters that name a kind of appointment."""
+    data = load_data()
+    # filtered_data leaves out the table's forecast filters: they pick appointments by the
+    # very pushes being charted (Very High risk = big pushes up), so the comparison would be
+    # circular
+    meta = load_model_meta()
+    shap_all = load_shap()
+    n = len(filtered_data)
+    is_filtered = n < len(data)
+    show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART
+
+    st.markdown(
+        "Each bar shows how much a factor moves an appointment's predicted risk of not "
+        "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
+        "the model relies on that factor more. Hover over a bar for the figure."
+    )
+    st.plotly_chart(
+        charts.importance_bars(
+            explain.group_importance(shap_all.loc[data["row_id"]]),
+            f"All {len(data):,} upcoming appointments",
+            explain.group_importance(shap_all.loc[filtered_data["row_id"]])
+            if show_filtered
+            else None,
+            f"The {n:,} appointments in your filters",
+        ),
+        key=f"importance_{filter_key}",
+        width="stretch",
+        config={"displayModeBar": False},
+    )
+
+    if show_filtered:
+        notes = [
+            (
+                f"On average the model predicts a **{filtered_data['DNA_Prob_Forecast'].mean():.0%}** "
+                "risk of not attending for the appointments in your filters, compared with "
+                f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
+            )
+        ]
+        same_value = [
+            label
+            for label, choice in sidebar_choices
+            if choice != "All"
+        ]
+        if same_value:
+            listed = " and ".join(same_value)
+            notes.append(
+                f"Every appointment in your filters has the same {listed}, so "
+                f"{'that bar shows' if len(same_value) == 1 else 'those bars show'} how much "
+                f"that one {listed} moves the risk."
+            )
+        st.markdown("\n".join(f"- {note}" for note in notes))
+    elif is_filtered:
+        st.caption(
+            f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
+            f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
+        )
+    st.info(
+        "These bars show what the model relied on, not what causes missed appointments: "
+        "changing one of these facts would not necessarily change whether a patient attends. "
+        "The model is reasonably but not perfectly accurate: tested on past appointments it "
+        "hadn't seen, it gave a missed appointment a higher risk than an attended one about "
+        f"{meta['auc_test'] * 100:.0f} times in 100."
+    )
+
+
 def open_explanation():
     """The appointments table's on_select: a row was picked (or unpicked), so the script opens
     the explanation if a row is now selected. Only on this run, so it doesn't reopen whenever
@@ -328,7 +396,7 @@ def close_explanation():
     st.session_state["table_nonce"] = st.session_state.get("table_nonce", 0) + 1
 
 
-def explain_appointment(row):
+def explain_appointment(row, overall):
     """The SHAP waterfall for one appointment, in an overlay so it can't be missed below the
     table. Opened by clicking a row in the All appointments table. The overlay's title names
     the patient, so the dialog is made here, when it opens, rather than with a fixed title."""
@@ -341,12 +409,31 @@ def explain_appointment(row):
         f"{expl['fx']:.0f}% risk of not attending: why?"
     )
     st.dialog(title, width="large", on_dismiss=close_explanation)(explanation_body)(
-        row, expl, meta
+        row, expl, meta, overall
     )
 
 
-def explanation_body(row, expl, meta):
-    """What the explain_appointment overlay shows."""
+def explanation_body(row, expl, meta, overall):
+    """What the explain_appointment overlay shows: this appointment, and, on a second tab, what
+    the model relies on overall."""
+    # A segmented control, not st.tabs: style.css turns every top-level tab bar into the page
+    # navbar, and a dialog's would be caught by that
+    show = st.segmented_control(
+        "Show",
+        ["This appointment", "Overall: what the model relies on"],
+        default="This appointment",
+        required=True,
+        key="explain_tab",
+        label_visibility="collapsed",
+    )
+    if show == "This appointment":
+        this_appointment(row, expl, meta)
+    else:
+        overall_importance(*overall)
+
+
+def this_appointment(row, expl, meta):
+    """The "This appointment" tab: the waterfall for one appointment."""
     st.markdown(
         f"**The model predicts a {expl['fx']:.0f}% risk that this patient won't attend**, "
         f"compared with about **{expl['base']:.0f}%** for the average appointment."
@@ -402,11 +489,12 @@ def explanation_body(row, expl, meta):
 
 
 @st.fragment
-def appointments_table(table_data, filter_key):
+def appointments_table(table_data, filter_key, sidebar_choices):
     """The All appointments table, with its own forecast filters, highest risk first. A
     fragment, so clicking a row (which opens explain_appointment) or changing these two filters
     reruns just this part, not the whole page. The sidebar's filters are outside it: changing
     one reruns the page, which passes the newly filtered appointments in here."""
+    filtered_data = table_data  # the sidebar's filters, before this table's own
     st.subheader("Appointment details")
     st.info(
         "**Click a row** (highest risk first) to see why the model gave that appointment its "
@@ -472,7 +560,10 @@ def appointments_table(table_data, filter_key):
         selected_rows = [r for r in table.selection.rows if r < len(table_data)]
         # Only on the run the click caused, so it doesn't reopen on later reruns
         if st.session_state.pop("explain_open", False) and selected_rows:
-            explain_appointment(table_data.iloc[selected_rows[0]])
+            explain_appointment(
+                table_data.iloc[selected_rows[0]],
+                (filtered_data, filter_key, sidebar_choices),
+            )
 
 
 def demo_notice_full(key):
@@ -1045,7 +1136,15 @@ with tab_appts:
 
         # The weekly grid has its own view (VIEW_SUMMARY), so the table shows every appointment
         # in the sidebar's filters
-        appointments_table(filtered_data, filter_key)
+        appointments_table(
+            filtered_data,
+            filter_key,
+            [
+                ("site", selected_reporting_site),
+                ("specialty", selected_specialty),
+                ("appointment type", selected_appointment_type),
+            ],
+        )
 
         # ---- Why use the model: the same calls three ways, under the table
         ways, _, _ = load_comparison()
@@ -1109,75 +1208,6 @@ with tab_appts:
                     f"missed before · **£{savings['value']:,.0f}** by the model's list",
                     help=savings["compare_help"],
                 )
-
-        # What the model relies on across all upcoming appointments, and, when the sidebar
-        # filters narrow the table enough, for the filtered ones beside it
-        meta = load_model_meta()
-        shap_all = load_shap()
-        n = len(filtered_data)
-        is_filtered = n < len(data)
-        # filtered_data leaves out the table's forecast filters: they pick appointments by
-        # the very pushes being charted (Very High risk = big pushes up), so the comparison
-        # would be circular
-        show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART
-
-        st.subheader("What the model relies on most")
-        st.markdown(
-            "Each bar shows how much a factor moves an appointment's predicted risk of not "
-            "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
-            "the model relies on that factor more. Hover over a bar for the figure."
-        )
-        st.plotly_chart(
-            charts.importance_bars(
-                explain.group_importance(shap_all.loc[data["row_id"]]),
-                f"All {len(data):,} upcoming appointments",
-                explain.group_importance(shap_all.loc[filtered_data["row_id"]])
-                if show_filtered
-                else None,
-                f"The {n:,} appointments in your filters",
-            ),
-            key=f"importance_{filter_key}",
-            width="stretch",
-            config={"displayModeBar": False},
-        )
-
-        if show_filtered:
-            notes = [
-                (
-                    f"On average the model predicts a **{filtered_data['DNA_Prob_Forecast'].mean():.0%}** "
-                    "risk of not attending for the appointments in your filters, compared with "
-                    f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
-                )
-            ]
-            same_value = [
-                label
-                for label, choice in [
-                    ("site", selected_reporting_site),
-                    ("specialty", selected_specialty),
-                    ("appointment type", selected_appointment_type),
-                ]
-                if choice != "All"
-            ]
-            if same_value:
-                listed = " and ".join(same_value)
-                notes.append(
-                    f"Every appointment in your filters has the same {listed}, so "
-                    f"{'that bar shows' if len(same_value) == 1 else 'those bars show'} how much "
-                    f"that one {listed} moves the risk."
-                )
-            st.markdown("\n".join(f"- {note}" for note in notes))
-        elif is_filtered:
-            st.caption(
-                f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
-                f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
-            )
-        st.info(
-            "These bars show what the model relied on, not what causes missed appointments: "
-            "changing one of these facts would not necessarily change whether a patient attends. "
-            "The model is reasonably but not perfectly accurate: tested on past appointments it "
-            "hadn't seen, it gave a missed appointment a higher risk than an attended one about "
-            f"{meta['auc_test'] * 100:.0f} times in 100."
-        )
 
         # ---- The way on: a split button, styled like the game tab's (style.css)
         st.divider()

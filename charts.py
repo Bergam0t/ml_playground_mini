@@ -144,18 +144,20 @@ def guide_waterfall() -> go.Figure:
             y=list(GUIDE_BADGES.values()),
             mode="markers+text",
             text=[f"<b>{n}</b>" for n in GUIDE_BADGES],
-            marker=dict(size=26, color="#ffffff"),
-            textfont=dict(color="#1b1a1a", size=15),
+            marker=dict(size=22, color="#ffffff"),
+            textfont=dict(color="#1b1a1a", size=13),
             hoverinfo="skip",
         )
     )
-    return _layout(
+    _layout(
         fig,
-        300,
-        width=480,
-        margin=dict(l=0, r=0, t=10, b=10),
+        200,
+        width=440,
+        margin=dict(l=0, r=0, t=4, b=4),
         xaxis=dict(visible=False, range=[0, badge_x + 4], fixedrange=True),
     )
+    fig.update_layout(font_size=12)  # smaller than the real chart: it is only a guide
+    return fig
 
 
 YOU = FILTERED  # the visitor's rule on the "Your rule vs the model" tab
