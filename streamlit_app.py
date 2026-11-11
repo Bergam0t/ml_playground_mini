@@ -642,6 +642,7 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
         if weeks and weeks > 1
         else ""
     )
+
     def few(x):
         """One decimal place under 10, as on the phone tab"""
         return f"{x:.1f}" if x < 10 else f"{x:,.0f}"
@@ -1309,7 +1310,9 @@ with tab_calls:
     # Starting values set through the session state rather than default=/value=, so the
     # savings button on the appointments tab can preset them without a Streamlit warning
     # `or`, not setdefault: a session from before the control was required may hold None
-    st.session_state["call_mode"] = st.session_state.get("call_mode") or "Calls the team can make"
+    st.session_state["call_mode"] = (
+        st.session_state.get("call_mode") or "Calls the team can make"
+    )
     st.session_state.setdefault("calls_per_week", min(100, busiest))
     st.session_state.setdefault("risk_min", round(HIGH_RISK_MIN * 100))
     st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
@@ -1439,9 +1442,10 @@ with tab_calls:
 
     # The cut-off and the costs side by side, so the results fit on one screen. Keyed so
     # style.css stacks them on narrower screens.
-    summary_left, summary_right = st.container(key="reflow_stack_phone_summary").columns(
-        [0.28, 0.72], gap="small"
-    )
+    summary_left, summary_right = st.container(
+        key="reflow_stack_phone_summary"
+    ).columns([0.28, 0.72], gap="small")
+
     def section_title(question, note, **kwargs):
         """A short question as a section's title, with what it counts in a muted note on the same
         line (styled by style.css), so the titles cost no extra height."""
@@ -1473,7 +1477,9 @@ with tab_calls:
             "appointments to call, so this can be a little under the slider.",
         )
         st.metric(
-            "Cut-off risk" if mode == "Calls the team can make" else "Lowest risk phoned",
+            "Cut-off risk"
+            if mode == "Calls the team can make"
+            else "Lowest risk phoned",
             f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody",
             help=how,
         )
@@ -1568,11 +1574,11 @@ with tab_calls:
             # cancellations if calls free slots as often as they did there. The pilot itself is
             # explained at the bottom of the tab, so it is named here.
             st.markdown(
-                f"The calls would save about **{3 * weekly_avoided / weekly_calls:.1f} appointments "
-                f"for every 3 calls**; in a real-service pilot it was "
-                f"{3 * pilot.SAVED_PER_CALL:.0f}. If calls bring early cancellations as often as they "
-                f"did there, about {weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot for "
-                "another patient."
+                f"These calls are estimated to save **{3 * weekly_avoided / weekly_calls:.1f} "
+                f"appointments per 3 calls**; a real-service pilot saved "
+                f"{3 * pilot.SAVED_PER_CALL:.0f}.\n\nAt that pilot's early-cancellation rate, about "
+                f"{weekly_calls * pilot.CANCEL_RATE:.0f} calls a week would free a slot for another "
+                "patient."
             )
     elif out["calls"] > 0:
         summary_right.info(
