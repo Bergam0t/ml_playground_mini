@@ -276,8 +276,8 @@ def learning_curve(
 
 # The dataviz skill's fixed status steps (good / warning / critical), plus a recessive
 # grey for the large "nothing happens" group. Green and red are close for deuteranopes,
-# so every group also has its own marker shape, a legend label with its count, a hover
-# label and a table view: colour is never the only cue.
+# so every group also has its own marker shape, a label with its count and a hover label:
+# colour is never the only cue.
 _ICON_STYLE = {
     "called_dna": ("#0ca30c", "circle"),
     "called_attended": ("#fab219", "square"),
@@ -298,13 +298,17 @@ _COLUMNS = [
     ("On the call list", ["called_dna", "called_attended"]),
     ("Not on the list", ["not_called_dna", "not_called_attended"]),
 ]
-# Layout in marker-row units: a box is at least this wide for its text, and reserves room for
-# its heading (title + two explanation lines) and the column heading above
-_MIN_BOX_W = 16
-_BOX_HEAD = 5.0
-_COL_HEAD = 2.8
-_HEADING_H = 2.0  # the optional line above the column headings
-_UNIT_PX = 16
+# Sizes in pixels. unit: one marker row (and column). A box is at least min_box wide for its
+# text, and reserves box_head for its heading (title + explanation) and col_head for the
+# column heading above. The compact set is for the phone tab, where the chart sits beside the
+# cards and above the fold: smaller markers and text, and each explanation on one line.
+_SIZES = {
+    False: dict(unit=16, marker=9, line=2, col_font=22, sym_font=18, title_font=15, why_font=13,
+                col_head=44.8, box_head=80, min_box=256),
+    True: dict(unit=10, marker=6, line=1.5, col_font=18, sym_font=15, title_font=14, why_font=12,
+               col_head=30, box_head=48, min_box=230),
+}
+_HEADING_H = 2.0  # the optional line above the column headings, in units
 
 
 def _tint(hex_colour: str, alpha: float) -> str:
@@ -313,13 +317,23 @@ def _tint(hex_colour: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-def outcome_blocks(outcomes: dict, left_cols: int, right_cols: int, heading: str = "") -> go.Figure:
+def outcome_blocks(
+    outcomes: dict,
+    left_cols: int,
+    right_cols: int,
+    heading: str = "",
+    compact: bool = False,
+) -> go.Figure:
     """The 1,000 past appointments as four boxes, two per column: those on the call list (left)
     and those not (right), each split into who would have missed and who would have attended.
     Every box has its own heading and plain-words explanation in place of a legend. Markers are
     laid out left_cols / right_cols wide, so the Your rule tab can keep its 100 calls in a 10 x 10
     square and the phone tab can widen the columns with the number of calls. heading, if given,
-    runs across the top of both columns to say how the list was made."""
+    runs across the top of both columns to say how the list was made. compact draws it smaller
+    and shorter (see _SIZES); give it about 85 columns in all to fill a 860px-wide column."""
+    size = _SIZES[compact]
+    unit = size["unit"]
+    min_box_w, box_head, col_head = (size[k] / unit for k in ("min_box", "box_head", "col_head"))
     labels = dict(GROUPS)
     fig = go.Figure()
     x0 = 0.0
@@ -332,19 +346,21 @@ def outcome_blocks(outcomes: dict, left_cols: int, right_cols: int, heading: str
         )
     for (title, keys), cols in zip(_COLUMNS, (left_cols, right_cols)):
         cols = max(1, cols)
-        box_w = max(cols, _MIN_BOX_W)
+        box_w = max(cols, min_box_w)
         n_col = sum(outcomes[k] for k in keys)
         fig.add_annotation(
             x=x0 - 0.4, y=-top, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
-            text=f"<b>{title}: {n_col}</b>", showarrow=False, font=dict(size=22, color=TEXT),
+            text=f"<b>{title}: {n_col}</b>", showarrow=False, font=dict(size=size["col_font"], color=TEXT),
         )
-        y = -top - _COL_HEAD
+        y = -top - col_head
         for key in keys:
             colour, symbol = _ICON_STYLE[key]
             sym, name, why = _OUTCOME_TEXT[key]
+            if compact:
+                why = why.replace("<br>", " ")
             count = outcomes[key]
             rows = -(-count // cols) if count else 0
-            box_h = _BOX_HEAD + rows + 0.6
+            box_h = box_head + rows + 0.6
             fig.add_shape(
                 type="rect", x0=x0 - 0.5, x1=x0 - 0.5 + box_w + 0.4, y0=y, y1=y - box_h,
                 fillcolor=_tint(colour, 0.10), line=dict(color=_tint(colour, 0.6), width=1),
@@ -353,19 +369,20 @@ def outcome_blocks(outcomes: dict, left_cols: int, right_cols: int, heading: str
             fig.add_annotation(
                 x=x0 - 0.2, y=y - 0.3, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
                 text=(
-                    f"<span style='color:{colour};font-size:18px'>{sym}</span> "
+                    f"<span style='color:{colour};font-size:{size['sym_font']}px'>{sym}</span> "
                     f"<b>{count} · {name}</b><br>"
-                    f"<span style='font-size:13px;color:{TEXT}'>{why}</span>"
+                    f"<span style='font-size:{size['why_font']}px;color:{TEXT}'>{why}</span>"
                 ),
-                showarrow=False, font=dict(size=15, color=TEXT),
+                showarrow=False, font=dict(size=size["title_font"], color=TEXT),
             )
             idx = range(count)
             fig.add_trace(
                 go.Scatter(
                     x=[x0 + i % cols for i in idx],
-                    y=[y - _BOX_HEAD - (i // cols) - 0.3 for i in idx],
+                    y=[y - box_head - (i // cols) - 0.3 for i in idx],
                     mode="markers",
-                    marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
+                    marker=dict(color=colour, symbol=symbol, size=size["marker"],
+                                line=dict(width=size["line"], color=colour)),
                     hovertemplate=f"{labels[key]}<extra></extra>",
                 )
             )
@@ -373,7 +390,7 @@ def outcome_blocks(outcomes: dict, left_cols: int, right_cols: int, heading: str
         total_h = max(total_h, -y)
         x0 += box_w + 1.2
     fig.update_layout(
-        height=round((total_h + 0.5) * _UNIT_PX),
+        height=round((total_h + 0.5) * unit),
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
         xaxis=dict(visible=False, range=[-0.6, x0 - 0.8], fixedrange=True,

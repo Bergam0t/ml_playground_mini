@@ -1292,59 +1292,6 @@ with tab_calls:
             "picked against who really did not attend."
         )
 
-    # What happened when the real tool was piloted (pilot.py): the evidence behind the effect
-    # slider's starting value. Keyed so style.css shows the cards two per line on narrower screens.
-    with st.container(border=True):
-        st.markdown(
-            f"**What happened in the real pilot.** The {pilot.SERVICE} service phoned patients the live "
-            f"model flagged as high risk, from {pilot.PERIOD}, to confirm, rearrange or reassure."
-        )
-        p1, p2, p3, p4 = st.container(key="reflow_halves_pilot").columns(4, gap="small")
-        p1.metric(
-            "Patients phoned",
-            f"{pilot.CALLS}",
-            border=True,
-            height="stretch",
-            icon=":material/call:",
-            help="Patients the live model flagged as at high risk of not attending.",
-        )
-        p2.metric(
-            "Missed after a call",
-            f"{pilot.DNA_AFTER:.0%}",
-            f"down from {pilot.DNA_BEFORE:.0%}",
-            delta_arrow="off",
-            border=True,
-            height="stretch",
-            icon=":material/event_available:",
-            help=f"These patients typically missed {pilot.DNA_BEFORE:.0%} of their appointments. "
-            f"Those who answered and said they would come missed only {pilot.DNA_CONFIRMED:.0%}, "
-            "about the same as patients at low risk.",
-        )
-        p3.metric(
-            "Extra appointments attended",
-            f"{pilot.EXTRA_ATTENDED}",
-            f"about £{pilot.REVENUE:,.0f} not lost",
-            delta_arrow="off",
-            border=True,
-            height="stretch",
-            icon=":material/savings:",
-            help=f"Over {pilot.WEEKS} weeks: about £{pilot.VALUE_PER_APPOINTMENT:,.0f} an appointment, "
-            "in revenue the trust would otherwise have lost.",
-        )
-        p4.metric(
-            "Appointments saved per call",
-            "2 in every 3",
-            border=True,
-            height="stretch",
-            icon=":material/balance:",
-            help=f"{pilot.EXTRA_ATTENDED} extra appointments from {pilot.CALLS} calls.",
-        )
-        st.caption(
-            f"The calls also brought {pilot.EARLY_CANCELLATIONS} early cancellations, so those slots could be "
-            "offered to other patients. There was no comparison group of similar patients who weren't phoned, "
-            "and it was one service over the winter, so other services may see less."
-        )
-
     # All the upcoming appointments, by week: the filters are hidden on this tab
     upcoming = data.assign(
         DNA_Cost=costs.appointment_costs(data, dna_costs, share_lost)
@@ -1484,25 +1431,45 @@ with tab_calls:
         be = econ["break_even_effect"]
         be = float("inf") if be is None else be
 
-    with st.container(border=True):
-        k1, k2 = st.container(key="reflow_docked_cutoff").columns(
-            [0.35, 0.65], gap="large"
+    # The cut-off and the costs side by side, so the results fit on one screen. Keyed so
+    # style.css stacks them on narrower screens.
+    summary_left, summary_right = st.container(key="reflow_stack_phone_summary").columns(
+        [0.28, 0.72], gap="small"
+    )
+    def section_title(question, note, **kwargs):
+        """A short question as a section's title, with what it counts in a muted note on the same
+        line (styled by style.css), so the titles cost no extra height."""
+        st.markdown(
+            # An en space before the note, not a margin, so a note that wraps lines up on the left
+            f"#### {question}&ensp;<span class='title-note'>{note}</span>",
+            unsafe_allow_html=True,
+            **kwargs,
         )
-        k1.metric("Calls per 1,000 appointments", f"{out['calls']}")
-        k2.metric(
-            "So we phone anyone with a predicted risk of at least"
-            if mode == "Calls the team can make"
-            else "Lowest predicted risk that gets a call",
-            f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody is phoned",
-        )
-        st.markdown(how)
 
-    # Cost of the chosen setting; the assumptions and caveats sit in the cards' help and the caption
+    with summary_left.container(border=True, height="stretch"):
+        section_title("Who are we calling?", "per 1,000 past appointments")
+        k1, k2 = st.columns(2, gap="small")
+        k1.metric("Calls", f"{out['calls']}")
+        k2.metric(
+            "Cut-off risk" if mode == "Calls the team can make" else "Lowest risk phoned",
+            f"{out['cutoff']:.0%}" if out["cutoff"] is not None else "nobody",
+            help=how,
+        )
+        st.caption(
+            "The cut-off follows from how many calls the team can make. Move the slider in the "
+            "sidebar to change it."
+            if mode == "Calls the team can make"
+            else "You set the bar in the sidebar; the number of calls follows from it."
+        )
+
+    # Cost of the chosen setting; the assumptions and caveats sit in the cards' help
     if has_costs:
-        with st.container(border=True):
-            st.markdown(
-                f"**What this setting costs and might save, per week** (about {weekly_calls:.0f} calls, "
-                "for all the upcoming appointments)"
+        with summary_right.container(border=True, height="stretch"):
+            section_title(
+                "What are we saving?",
+                f"per week: about {weekly_calls:.0f} calls, for all the upcoming appointments",
+                help="Estimates from the sidebar's cost assumptions. A missed appointment's cost is the "
+                "value of a clinic slot, not cash that comes back. The call cost is staff time only.",
             )
             # Fixed columns rather than a horizontal container, so the four cards never wrap
             # three and one. Keyed so style.css shows them two per line on narrower screens.
@@ -1531,7 +1498,7 @@ with tab_calls:
                 "Possibly saved",
                 f"£{econ['value_avoided']:,.0f}",
                 # A minus only for a loss, so st.metric still colours it red; no plus or arrow
-                f"{'-' if econ['net'] < 0 else ''}£{abs(econ['net']):,.0f} after the cost of calls",
+                f"{'-' if econ['net'] < 0 else ''}£{abs(econ['net']):,.0f} after costs",
                 delta_arrow="off",
                 border=True,
                 height="stretch",
@@ -1542,7 +1509,7 @@ with tab_calls:
                 "assumptions** in the sidebar.",
             )
             c4.metric(
-                "Missed appointments avoided",
+                "Appointments saved",
                 f"{weekly_avoided:.1f}"
                 if weekly_avoided < 10
                 else f"{weekly_avoided:.0f}",
@@ -1561,28 +1528,25 @@ with tab_calls:
                     else ""
                 ),
             )
+            # The verdict, then side by side with the pilot: appointments saved per 3 calls, and
+            # early cancellations if calls free slots as often as they did there. One paragraph,
+            # to keep the box short.
             st.markdown(
-                f"At {effect}%, the calls are {'above' if effect / 100 > be else 'below'} the "
-                f"break-even, so they would {'more than ' if effect / 100 > be else 'not '}"
-                "cover their cost."
-                if be <= 1
-                else "Even if every call got the patient to attend, the calls would cost more than "
-                "the missed appointments they reach."
-            )
-            # Side by side with the pilot: appointments saved per 3 calls, and early cancellations
-            # if calls free slots as often as they did there
-            st.markdown(
-                f"That's about **{3 * weekly_avoided / weekly_calls:.1f} appointments saved for every 3 "
-                f"calls** (the pilot: {3 * pilot.SAVED_PER_CALL:.0f}). If calls bring early cancellations as "
-                f"often as in the pilot, about {weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot "
-                "for another patient."
-            )
-            st.caption(
-                "Estimates from the sidebar's cost assumptions. A missed appointment's cost is the value "
-                "of a clinic slot, not cash that comes back. The call cost is staff time only."
+                (
+                    f"At {effect}%, the calls are {'above' if effect / 100 > be else 'below'} the "
+                    f"break-even, so they would {'more than ' if effect / 100 > be else 'not '}"
+                    "cover their cost."
+                    if be <= 1
+                    else "Even if every call got the patient to attend, the calls would cost more "
+                    "than the missed appointments they reach."
+                )
+                + f" That's about **{3 * weekly_avoided / weekly_calls:.1f} appointments saved for "
+                f"every 3 calls** (the pilot: {3 * pilot.SAVED_PER_CALL:.0f}). If calls bring early "
+                f"cancellations as often as in the pilot, about {weekly_calls * pilot.CANCEL_RATE:.0f} a "
+                "week would free a slot for another patient."
             )
     elif out["calls"] > 0:
-        st.info(
+        summary_right.info(
             "None of the upcoming appointments would get a call with this setting, so there is "
             "nothing to cost. Lower the bar."
         )
@@ -1592,47 +1556,35 @@ with tab_calls:
             "With this setting nobody would get a call. Raise the number of calls or lower the bar."
         )
     else:
+        section_title(
+            "Are we calling the right people?",
+            f"if we phoned these {out['calls']} appointments in every 1,000",
+        )
         # Keyed so style.css puts the cards under the chart on narrower screens
         left, right = st.container(key="reflow_stack_icons").columns(
-            [0.62, 0.38], gap="large"
+            [0.58, 0.42], gap="large"
         )
         with left:
-            # Share the 60 markers of width between the columns in line with their sizes; 60 makes
-            # the chart wide and short enough to fill its column. The cap keeps the right one at
-            # least as wide as its box.
-            left_cols = min(44, max(8, round(60 * out["calls"] / 1000)))
+            # Share 84 small markers of width between the columns in line with their sizes: the
+            # compact chart is then wide and short enough to fill its column and sit beside the
+            # cards, with the costs above, on one 1080p screen. The limits keep each column at
+            # least as wide as its box (23 markers), so the markers fill it.
+            left_cols = min(61, max(23, round(84 * out["calls"] / 1000)))
             st.plotly_chart(
-                charts.outcome_blocks(
-                    out,
-                    left_cols,
-                    60 - left_cols,
-                    heading="Using the model to rank the list",
-                ),
+                charts.outcome_blocks(out, left_cols, 84 - left_cols, compact=True),
                 width="stretch",
                 config={"displayModeBar": False},
             )
             st.caption(
                 'Each marker is one of 1,000 past appointments. "On the call list" is the model\'s list (no '
                 "calls were made); the boxes show what really happened. An unnecessary call went to "
-                "someone who would have attended anyway."
+                f"someone who would have attended anyway. Counts are scaled from {meta['n_past_test']:,} "
+                "past appointments to 1,000, so they can be out by a few."
             )
-            with st.expander("Show these counts as a table"):
-                st.dataframe(
-                    pd.DataFrame(
-                        {
-                            "Group": [label for _, label in calls.GROUPS],
-                            "Per 1,000 appointments": [out[k] for k, _ in calls.GROUPS],
-                        }
-                    ),
-                    hide_index=True,
-                    width="stretch",
-                )
-        with right:
-            st.markdown(
-                f"**If we phoned these {out['calls']} appointments in every 1,000:**"
-            )
+        # Keyed so style.css makes these cards more compact, to sit beside the short chart
+        with right.container(key="phone_rates", gap="small"):
             # Short titles on the cards, with the explanation in a caption under each number
-            with st.container(border=True, gap="small"):
+            with st.container(border=True, gap="small", key="rate_card_precision"):
                 st.metric(
                     "Calls that reach a miss",
                     f"{out['precision']:.0%}",
@@ -1644,7 +1596,7 @@ with tab_calls:
                 st.caption(
                     f"{out['called_dna']} of the {out['calls']} calls would reach someone who then did not attend."
                 )
-            with st.container(border=True, gap="small"):
+            with st.container(border=True, gap="small", key="rate_card_recall"):
                 st.metric(
                     "Misses reached",
                     f"{out['recall']:.0%}",
@@ -1652,10 +1604,10 @@ with tab_calls:
                     help="Also called recall or sensitivity.",
                 )
                 st.caption(
-                    f"We would reach {out['called_dna']} of the {out['dna_total']} patients who did not attend. "
-                    f"The other {out['not_called_dna']} would get no call."
+                    f"{out['called_dna']} of the {out['dna_total']} patients who did not attend would get a "
+                    f"call; {out['not_called_dna']} would not."
                 )
-            with st.container(border=True, gap="small"):
+            with st.container(border=True, gap="small", key="rate_card_unnecessary"):
                 st.metric(
                     "Unnecessary calls",
                     f"{out['called_attended']}",
@@ -1665,25 +1617,74 @@ with tab_calls:
                     f"These people would have attended anyway: "
                     f"{out['called_attended'] / out['calls']:.0%} of the {out['calls']} calls."
                 )
-            st.caption(
-                f"Counts are scaled from {meta['n_past_test']:,} past appointments to 1,000, so they can be out "
-                "by a few. They count appointments that were missed without a call, not missed appointments a "
-                "call would have prevented."
-            )
 
-    st.warning(
-        f"**The {pilot.SERVICE.lower()} pilot suggests calls help a lot, but it isn't proof.** The chart shows "
-        "who the calls would *reach*, not missed appointments they would *prevent*.\n\n"
-        f"- Even in the pilot, {pilot.DNA_AFTER:.0%} of the patients phoned still missed.\n"
-        "- The pilot compared patients with how often they usually missed, not with similar patients who "
-        "weren't phoned at the same time, so some of the fall might have happened anyway.\n"
-        "- It phoned patients at very high risk in one service. Calls lower down the list, or in other "
-        "services, may change fewer people.\n"
-        "- Calls to people who would have come anyway still take staff time, and could worry them.\n"
-        "- The surest way to know is to test it: for example, randomly phone half of the flagged patients "
-        "and compare how many from each half attend.",
-        icon=":material/warning:",
-    )
+    # What happened when the real tool was piloted (pilot.py): the evidence behind the effect
+    # slider's starting value. Full width at the bottom, in an expander, so the results above
+    # stay on one screen. Keyed so style.css shows the cards two per line on narrower screens.
+    with st.expander("What happened in the real pilot?"):
+        st.markdown(
+            f"The {pilot.SERVICE} service phoned patients the live model flagged as high risk, from "
+            f"{pilot.PERIOD}, to confirm, rearrange or reassure."
+        )
+        p1, p2, p3, p4 = st.container(key="reflow_halves_pilot").columns(4, gap="small")
+        p1.metric(
+            "Patients phoned",
+            f"{pilot.CALLS}",
+            border=True,
+            height="stretch",
+            icon=":material/call:",
+            help="Patients the live model flagged as at high risk of not attending.",
+        )
+        p2.metric(
+            "Missed after a call",
+            f"{pilot.DNA_AFTER:.0%}",
+            f"down from {pilot.DNA_BEFORE:.0%}",
+            delta_arrow="off",
+            border=True,
+            height="stretch",
+            icon=":material/event_available:",
+            help=f"These patients typically missed {pilot.DNA_BEFORE:.0%} of their appointments. "
+            f"Those who answered and said they would come missed only {pilot.DNA_CONFIRMED:.0%}, "
+            "about the same as patients at low risk.",
+        )
+        p3.metric(
+            "Extra appointments attended",
+            f"{pilot.EXTRA_ATTENDED}",
+            f"about £{pilot.REVENUE:,.0f} not lost",
+            delta_arrow="off",
+            border=True,
+            height="stretch",
+            icon=":material/savings:",
+            help=f"Over {pilot.WEEKS} weeks: about £{pilot.VALUE_PER_APPOINTMENT:,.0f} an appointment, "
+            "in revenue the trust would otherwise have lost.",
+        )
+        p4.metric(
+            "Appointments saved per call",
+            "2 in every 3",
+            border=True,
+            height="stretch",
+            icon=":material/balance:",
+            help=f"{pilot.EXTRA_ATTENDED} extra appointments from {pilot.CALLS} calls.",
+        )
+        # The pilot's limits are in the warning below, so the caption keeps only the extra finding
+        st.caption(
+            f"The calls also brought {pilot.EARLY_CANCELLATIONS} early cancellations, so those slots could be "
+            "offered to other patients."
+        )
+        st.warning(
+            f"**The {pilot.SERVICE.lower()} pilot suggests calls help a lot, but it isn't proof.** The "
+            "chart above shows who the calls would *reach*, not missed appointments they would *prevent*.\n\n"
+            f"- Even in the pilot, {pilot.DNA_AFTER:.0%} of the patients phoned still missed.\n"
+            "- The pilot compared patients with how often they usually missed, not with similar patients who "
+            "weren't phoned at the same time, so some of the fall might have happened anyway.\n"
+            "- It phoned patients at very high risk in one service. Calls lower down the list, or in other "
+            "services, may change fewer people.\n"
+            "- Calls to people who would have come anyway still take staff time, and could worry them.\n"
+            "- The surest way to know is to test it: for example, randomly phone half of the flagged patients "
+            "and compare how many from each half attend.",
+            icon=":material/warning:",
+        )
+
 
 # ---------------------------------------------------------------- tab 0: Your rule vs the model
 # First on the bar but last in the script: the training animation pauses between frames, so
