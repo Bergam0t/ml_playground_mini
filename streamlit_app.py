@@ -284,7 +284,7 @@ def demo_notice_full():
     """The fuller version of the notice, beside tab 1's opening text."""
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a :violet[**real tool**], currently being piloted by "
+        "This is a demonstration of a :red[**real tool**], currently being piloted by "
         "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
         f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
         f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
