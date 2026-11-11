@@ -153,15 +153,32 @@ section[data-testid="stSidebar"] hr {
 	padding-left: 2rem;
 }
 
-/* ---- The three boxes under the opening text on "Your rule vs the model" ---- */
-.game-fact-icon {
-	font-size: 1.6rem;
+/* ---- The setup at the top of "Your rule vs the model" ---- */
+/* Kept short so the clue buttons are on screen without scrolling: three big numbers in a
+	row (wrapping on narrow screens), then the question. */
+.st-key-game_title { justify-content: space-between; }
+.st-key-game_title h3 { padding-bottom: 0; }
+.game-stats {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 2.5rem;
+	margin: 0 0 0.6rem;
+}
+.game-stat {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	font-size: 1.05rem;
+}
+.game-stat-num {
+	font-family: "HSMA Display", sans-serif;
+	font-size: 2.6rem;
+	line-height: 1;
 	color: #1fb1b9;
 }
-/* The question in the third box, a size up from the rest of the box's text */
-.game-fact-question {
+.game-question {
 	font-size: 1.2rem;
-	line-height: 1.4;
+	line-height: 1.45;
 }
 
 /* ---- "Pick one clue or several", the first thing to do on "Your rule vs the model" ---- */

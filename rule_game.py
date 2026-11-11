@@ -5,6 +5,7 @@ scored on the 4,500 past appointments the model didn't learn from, at the same n
 calls as the model gets. The model's results, learning from more and more past
 appointments, are precomputed by build/rule_game_data.py (the app needs no ML packages).
 """
+import itertools
 import json
 
 import numpy as np
@@ -19,14 +20,14 @@ CALL_SHARE = 0.10
 # Clue -> button label. The direction is given: the visitor chooses which clues to use and
 # the rule gives each an equal say, so the game is about how much each clue should count.
 CLUES = {
-    "Previous_DNAs": "Most missed appointments before",
     "Age": "Being younger",
     "Lead_Time_Days": "A longer time since booking",
     "Day_Of_Week": "Riskiest days of the week",
+    "Previous_DNAs": "Most missed appointments before",
     "Deprivation_Decile": "Most deprived areas",
     "Appointment Type": "First appointments, not follow ups",
-    "Specialty": "A speciality with a high miss rate",
-    "Reporting_Site": "Sites that miss most",
+    "Specialty": "Specialities with the highest miss rate",
+    "Reporting_Site": "Sites with the highest miss rate",
 }
 # Short names for the say chart
 CLUE_SHORT = {
@@ -58,7 +59,7 @@ def rule_score(past: pd.DataFrame, clues) -> np.ndarray:
 
 
 def results(past: pd.DataFrame, score) -> dict:
-    """Outcomes per 1,000 (for charts.icon_array), share of misses reached and accuracy,
+    """Outcomes per 1,000 (for charts.outcome_blocks), share of misses reached and accuracy,
     when phoning the top CALL_SHARE by score. Matches results() in build/rule_game_data.py."""
     y = past["Did_Not_Attend"].to_numpy()
     called = calls.called_by_share(score, CALL_SHARE)
@@ -82,9 +83,24 @@ def nobody(past: pd.DataFrame) -> dict:
     }
 
 
+def all_rule_catches(past: pd.DataFrame) -> dict:
+    """Missed appointments on the list (per 1,000) for every rule the visitor can make:
+    each combination of one or more clues, keyed by its sorted clues. 255 for 8 clues."""
+    return {
+        tuple(sorted(combo)): results(past, rule_score(past, combo))["outcomes"]["called_dna"]
+        for k in range(1, len(CLUES) + 1)
+        for combo in itertools.combinations(CLUES, k)
+    }
+
+
+def rank_of(caught: int, catches: dict) -> int:
+    """Where a rule that catches `caught` ranks among all the rules: 1 + those that catch more."""
+    return 1 + sum(c > caught for c in catches.values())
+
+
 def overtook_at(frames: list, score: float):
-    """The fewest past appointments after which the model beat `score`, or None."""
-    for f in frames:
+    """The first frame (index) where the model beats `score`, or None."""
+    for i, f in enumerate(frames):
         if f["reached"] > score:
-            return f["n"]
+            return i
     return None

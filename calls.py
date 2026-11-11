@@ -1,4 +1,4 @@
-"""Who would we phone? Choose appointments to call and count what happens, per 1,000.
+"""How many people should we phone? Choose appointments to call and count what happens, per 1,000.
 
 Adapted from metrics.call_outcomes() in lambda_ml_streamlit_exercise. The outcomes come
 from past appointments the model didn't train on (data/past_predictions.csv), so we know

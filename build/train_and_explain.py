@@ -99,7 +99,7 @@ def main():
     fut["DNA_Forecast"] = (p >= FORECAST_MIN).astype(int)
 
     # ---- Past appointments the model didn't train on, with what really happened, for the
-    # "Who would we phone?" tab
+    # "How many people should we phone?" tab
     p_past = model.predict_proba(X.loc[idx_test])[:, 1]
     past = pd.DataFrame({
         "DNA_Prob_Forecast": p_past.round(4),

@@ -13,26 +13,32 @@ streamlit run streamlit_app.py
 
 - **Your rule vs the model** tab: a short game to show why a machine learning model can beat a person at
   this.
+  - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
+    clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
   - Using 1,000 past appointments (79 missed) and 100 calls, the visitor builds a rule for who
     to phone from the eight clues the model sees, with each chosen clue getting an equal say.
-  - They then watch a model learn its own weighting from 0 to 22,500 past appointments,
-    overtaking their rule after a few hundred.
-  - A "Why a computer?" section follows: how many rules and weightings there are to choose
-    from, and what a model can and can't do. It mentions in general terms that some models
-    find clues that only matter in combination. The demo data has none (see the build notes
-    below).
-  - It ends with a table where "phone nobody" has the best accuracy and reaches nobody, and a
-    perfect model reaches only 42 of 79.
-  - Two buttons lead on to the Appointments and Who would we phone? tabs, as in the
+    After each change, a callout says whether the last clue added or taken away made the list
+    better or worse, and the rule is ranked against all 255 rules the buttons can make (the
+    best is *most missed appointments before* on its own: 32 of 79).
+  - They then watch a model learn its own weighting from 0 to 22,500 past appointments: the
+    race against their best rule beside how much say each clue gets. A toast and an
+    "Overtook you" marker show where the model passes them (400 for the best rule).
+  - The verdict follows at once: a table where "phone nobody" has the best accuracy and reaches
+    nobody, the note that no rule from the buttons can win (the model reaches 40), and two
+    cards: accuracy is the wrong score, and a perfect model reaches only 42 of 79. A short "Why
+    a computer?" section comes last.
+  - **Start again** (at the top once a game has begun, and after the verdict) clears the game
+    for the next visitor.
+  - Two buttons lead on to the Upcoming appointments and How many people should we phone? tabs, as in the
     geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
-- **Appointments** tab: a short introduction to the app, then the filterable appointment list.
+- **Appointments** tab: a short introduction to the app, then the filterable appointment list, highest risk first.
   Click a row to see a SHAP waterfall explaining that appointment's predicted risk of not
   attending, with a "How to read this chart" guide. With no row selected, a bar chart shows
   what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
   chart beside it for the filtered appointments when the appointment-detail filters leave at
   least 30 (not shown for the DNA Risk and Confidence filters, which select by the forecast).
 - **Weekly summary** tab: appointments and forecast DNAs by week and day.
-- **Who would we phone?** tab: choose who an admin team would phone, by the number of calls
+- **How many people should we phone?** tab: choose who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
   reach someone who then did not attend, and how many such patients would get no call. An
@@ -42,10 +48,10 @@ streamlit run streamlit_app.py
   of the missed appointments they reach and might avoid, and the **break-even effect**: the share
   of people reached a call would need to get to attend to cover its own staff time.
 
-The Appointments and Weekly summary tabs also show the expected cost of missed appointments
+Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
 
-The sidebar filters apply to the Appointments and Weekly summary tabs. On Who would we phone? they
+The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the weekly summary instead). On How many people should we phone? they
 change only the upcoming calls-per-week figures, since the chart uses past appointments. Your rule vs the
 model uses past appointments only, so the sidebar is hidden while that tab is open (a CSS rule
 in `style.css` keyed on the selected tab, so the filters keep their settings for the other tabs).

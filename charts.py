@@ -2,7 +2,7 @@
 
 waterfall() is ported from lambda_ml_streamlit_exercise/app/charts.py. guide_waterfall()
 follows guide_chart() in geographic_playground_mini/pareto.py: a small made-up example
-with numbered badges that match the steps written beside it. icon_array() is ported from
+with numbered badges that match the steps written beside it. outcome_blocks() is adapted from
 the same app's "Who would we phone?" page.
 
 Red and blue are the dataviz skill's dark-mode diverging poles, validated against the
@@ -200,11 +200,20 @@ def say_bars(order: list, labels: dict, model_say: dict, your_clues) -> go.Figur
     return fig
 
 
-def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int, n_missed: int) -> go.Figure:
+def learning_curve(
+    frames: list,
+    upto: int,
+    your_best: int | None,
+    perfect: int,
+    n_missed: int,
+    overtook: int | None = None,
+    height: int = 330,
+) -> go.Figure:
     """Missed appointments (per 1,000 past appointments) on the model's call list, by how
     many past appointments it has learnt from, drawn up to frame `upto`. The x axis is the
     full set of sizes from the start (evenly spaced, as each roughly doubles), so it doesn't
-    move while it draws. `your_best` and `perfect` are counts on the same scale."""
+    move while it draws. `your_best` and `perfect` are counts on the same scale. `overtook`
+    is the frame where the model first beats your best: marked once the line reaches it."""
     sizes = [f"{f['n']:,}" for f in frames]
     shown = frames[: upto + 1]
     fig = go.Figure(
@@ -227,8 +236,15 @@ def learning_curve(frames: list, upto: int, your_best: int | None, perfect: int,
             x=0, xref="paper", xanchor="left", y=value, yanchor="bottom",
             text=f"{label}: {value} of {n_missed}", showarrow=False, font=dict(color=colour, size=13),
         )
+    if overtook is not None and overtook <= upto:
+        fig.add_annotation(
+            # By position on the category axis: plotly reads a label such as "400" as a number
+            x=overtook, y=frames[overtook]["outcomes"]["called_dna"],
+            text="<b>Overtook you</b>", showarrow=True, arrowhead=2, arrowcolor="#ffe600",
+            ax=-60, ay=-45, font=dict(color="#1b1a1a", size=14), bgcolor="#ffe600", borderpad=4,
+        )
     fig.update_layout(
-        height=330,
+        height=height,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=FONT,
@@ -257,100 +273,101 @@ _ICON_STYLE = {
     "not_called_dna": ("#d03b3b", "x-thin-open"),
     "not_called_attended": (MUTED, "circle-open"),
 }
-_COLS = 40
 
-
-def icon_array(outcomes: dict) -> go.Figure:
-    """1,000 markers (40 x 25), one per 1,000 past appointments, grouped by outcome."""
-    fig = go.Figure()
-    start = 0
-    for key, label in GROUPS:
-        count = outcomes[key]
-        idx = range(start, start + count)
-        colour, symbol = _ICON_STYLE[key]
-        fig.add_trace(
-            go.Scatter(
-                x=[i % _COLS for i in idx],
-                y=[-(i // _COLS) for i in idx],
-                mode="markers",
-                name=f"{label}: {count}",
-                marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
-                hovertemplate=f"{label}<extra></extra>",
-            )
-        )
-        start += count
-    fig.update_layout(
-        height=560,
-        margin=dict(l=0, r=0, t=10, b=0),
-        xaxis=dict(visible=False, range=[-1, _COLS], fixedrange=True),
-        yaxis=dict(visible=False, scaleanchor="x", range=[-25, 1], fixedrange=True),
-        # Above the grid, so the key is read before the markers. The labels are too long for the side.
-        legend=dict(orientation="v", yanchor="bottom", y=1.01, x=0, itemclick=False, itemdoubleclick=False),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=FONT,
-    )
-    return fig
-
-
-# call_block(): the two blocks' heading, the groups in each and the width in markers. 100 calls
-# fill the phoned block's 10 x 10 square, and the other 900 the not-phoned block's 30 x 30.
-_BLOCKS = {
-    True: ("On the call list", ["called_dna", "called_attended"], 10),
-    False: ("Not on the list", ["not_called_dna", "not_called_attended"], 30),
+# outcome_blocks(): four tinted boxes, two per column. Left column = on the call list, right =
+# not on it. Each box says in plain words what its group means, so "attended" on the call list
+# reads as an unnecessary call. Title and explanation per group (the hover keeps the GROUPS label).
+_OUTCOME_TEXT = {
+    "called_dna": ("●", "Useful call", "They would have missed<br>without it"),
+    "called_attended": ("■", "Unnecessary call", "They would have attended<br>anyway"),
+    "not_called_dna": ("✕", "Missed, and got no call", "We never reached them"),
+    "not_called_attended": ("○", "Came, and got no call", "No call needed"),
 }
-# Short names for the key above each block (the hover keeps the full GROUPS label), with the
-# marker's look as a character so the key matches the markers
-_BLOCK_KEY = {
-    "called_dna": ("●", "Missed"),
-    "called_attended": ("■", "Attended"),
-    "not_called_dna": ("✕", "Missed"),
-    "not_called_attended": ("○", "Attended"),
-}
-# Room above each block for its heading and two key lines
-BLOCK_HEADER = 92
+_COLUMNS = [
+    ("On the call list", ["called_dna", "called_attended"]),
+    ("Not on the list", ["not_called_dna", "not_called_attended"]),
+]
+# Layout in marker-row units: a box is at least this wide for its text, and reserves room for
+# its heading (title + two explanation lines) and the column heading above
+_MIN_BOX_W = 16
+_BOX_HEAD = 5.0
+_COL_HEAD = 2.8
+_HEADING_H = 2.0  # the optional line above the column headings
+_UNIT_PX = 16
 
 
-def call_block(outcomes: dict, phoned: bool, height: int) -> go.Figure:
-    """One of two headed blocks that split icon_array()'s 1,000 markers: the appointments that
-    would be on the call list, or those that wouldn't. The heading and key sit right above the markers,
-    in place of a legend. Used on the Your rule vs the model tab, where the calls are always
-    100 per 1,000. The markers keep to the top left of the chart, so two blocks of different
-    sizes side by side line up at the top."""
-    title, keys, cols = _BLOCKS[phoned]
+def _tint(hex_colour: str, alpha: float) -> str:
+    h = hex_colour.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    return f"rgba({r},{g},{b},{alpha})"
+
+
+def outcome_blocks(outcomes: dict, left_cols: int, right_cols: int, heading: str = "") -> go.Figure:
+    """The 1,000 past appointments as four boxes, two per column: those on the call list (left)
+    and those not (right), each split into who would have missed and who would have attended.
+    Every box has its own heading and plain-words explanation in place of a legend. Markers are
+    laid out left_cols / right_cols wide, so the Your rule tab can keep its 100 calls in a 10 x 10
+    square and the phone tab can widen the columns with the number of calls. heading, if given,
+    runs across the top of both columns to say how the list was made."""
     labels = dict(GROUPS)
     fig = go.Figure()
-    start = 0
-    for key in keys:
-        idx = range(start, start + outcomes[key])
-        colour, symbol = _ICON_STYLE[key]
-        fig.add_trace(
-            go.Scatter(
-                x=[i % cols for i in idx],
-                y=[-(i // cols) for i in idx],
-                mode="markers",
-                marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
-                hovertemplate=f"{labels[key]}<extra></extra>",
-            )
+    x0 = 0.0
+    total_h = 0.0
+    top = _HEADING_H if heading else 0.0
+    if heading:
+        fig.add_annotation(
+            x=-0.4, y=0, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
+            text=f"<b>{heading}</b>", showarrow=False, font=dict(size=16, color=MUTED),
         )
-        start += outcomes[key]
-    rows = max(1, -(-start // cols))
-    key_lines = "<br>".join(
-        f"<span style='color:{_ICON_STYLE[k][0]}'>{_BLOCK_KEY[k][0]}</span> {_BLOCK_KEY[k][1]}: {outcomes[k]}"
-        for k in keys
-    )
-    fig.add_annotation(
-        x=0, xref="paper", xanchor="left", y=1, yref="paper", yanchor="bottom", align="left",
-        text=f"<span style='font-size:18px'><b>{title}: {start}</b></span><br>{key_lines}",
-        showarrow=False, font=dict(size=14, color=TEXT),
-    )
+    for (title, keys), cols in zip(_COLUMNS, (left_cols, right_cols)):
+        cols = max(1, cols)
+        box_w = max(cols, _MIN_BOX_W)
+        n_col = sum(outcomes[k] for k in keys)
+        fig.add_annotation(
+            x=x0 - 0.4, y=-top, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
+            text=f"<b>{title}: {n_col}</b>", showarrow=False, font=dict(size=22, color=TEXT),
+        )
+        y = -top - _COL_HEAD
+        for key in keys:
+            colour, symbol = _ICON_STYLE[key]
+            sym, name, why = _OUTCOME_TEXT[key]
+            count = outcomes[key]
+            rows = -(-count // cols) if count else 0
+            box_h = _BOX_HEAD + rows + 0.6
+            fig.add_shape(
+                type="rect", x0=x0 - 0.5, x1=x0 - 0.5 + box_w + 0.4, y0=y, y1=y - box_h,
+                fillcolor=_tint(colour, 0.10), line=dict(color=_tint(colour, 0.6), width=1),
+                layer="below",
+            )
+            fig.add_annotation(
+                x=x0 - 0.2, y=y - 0.3, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
+                text=(
+                    f"<span style='color:{colour};font-size:18px'>{sym}</span> "
+                    f"<b>{count} · {name}</b><br>"
+                    f"<span style='font-size:13px;color:{TEXT}'>{why}</span>"
+                ),
+                showarrow=False, font=dict(size=15, color=TEXT),
+            )
+            idx = range(count)
+            fig.add_trace(
+                go.Scatter(
+                    x=[x0 + i % cols for i in idx],
+                    y=[y - _BOX_HEAD - (i // cols) - 0.3 for i in idx],
+                    mode="markers",
+                    marker=dict(color=colour, symbol=symbol, size=9, line=dict(width=2, color=colour)),
+                    hovertemplate=f"{labels[key]}<extra></extra>",
+                )
+            )
+            y -= box_h + 0.8
+        total_h = max(total_h, -y)
+        x0 += box_w + 1.2
     fig.update_layout(
-        height=height,
-        margin=dict(l=0, r=0, t=BLOCK_HEADER, b=0),
+        height=round((total_h + 0.5) * _UNIT_PX),
+        margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
-        xaxis=dict(visible=False, range=[-0.6, cols - 0.4], fixedrange=True,
+        xaxis=dict(visible=False, range=[-0.6, x0 - 0.8], fixedrange=True,
                    constrain="domain", constraintoward="left"),
-        yaxis=dict(visible=False, scaleanchor="x", range=[-rows + 0.4, 0.6], fixedrange=True,
+        yaxis=dict(visible=False, scaleanchor="x", range=[-total_h - 0.3, 0.4], fixedrange=True,
                    constrain="domain", constraintoward="top"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",

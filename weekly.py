@@ -1,4 +1,4 @@
-"""Weekly summary: appointments and forecast missed appointments by week and weekday.
+"""Weekly summary view: appointments and forecast missed appointments by week and weekday.
 
 Pure pandas, so the Streamlit tab only lays things out. Each measure is a column of
 the forecast data whose mean is a rate: a 0/1 flag (high-risk flag, yes/no forecast)
@@ -28,38 +28,41 @@ class Measure:
 
 
 MEASURES = {
-    "High-risk flagged": Measure(
+    "Very high risk (40% or more)": Measure(
         column="High_Risk_DNA",
-        count_label="High-risk flagged",
-        cell_label="flagged",
-        day_phrase="high-risk flagged",
-        rate_phrase="{rate} of appointments are high-risk flagged",
+        count_label="Very high risk (40% or more)",
+        cell_label="at very high risk",
+        day_phrase="at very high risk of being missed (40% or more)",
+        rate_phrase="{rate} of appointments are at very high risk of being missed (40% or more)",
         thresholds=(0.02, 0.06),
         flag=True,
-        help="Predicted risk of 40% or more (the Very High risk band).",
+        help="Only appointments with a predicted risk of not attending of 40% or more (the Very High risk band). "
+        "A short, strict list: it catches the fewest missed appointments but wastes the fewest calls.",
         repeat_label="Patients flagged more than once",
     ),
-    "Forecast DNAs": Measure(
+    "Likely to be missed (20% or more)": Measure(
         column="DNA_Forecast",
-        count_label="Forecast DNAs",
-        cell_label="forecast DNAs",
-        day_phrase="forecast not to attend",
-        rate_phrase="the model forecasts that {rate} of appointments will be missed",
+        count_label="Likely to be missed (20% or more)",
+        cell_label="likely to be missed",
+        day_phrase="likely to be missed (20% or more)",
+        rate_phrase="{rate} of appointments are likely to be missed (a predicted risk of 20% or more)",
         thresholds=(0.05, 0.15),
         flag=True,
-        help="The model's yes/no forecast (a predicted risk of 20% or more), as in the "
-        "Appointments tab's 'Expected DNA' column.",
+        help="Every appointment with a predicted risk of not attending of 20% or more (about two and a half "
+        "times the average): the model's yes/no forecast, as in the 'Expected DNA' column in the "
+        "appointment list. A longer list that catches more missed appointments but takes more calls, "
+        "many to people who would have come anyway.",
         repeat_label="Patients forecast to miss more than one",
     ),
-    "Average predicted risk": Measure(
+    "All appointments, ranked by risk": Measure(
         column="DNA_Prob_Forecast",
         count_label="Expected missed appointments",
         cell_label="expected DNAs",
         rate_phrase="the average predicted risk of not attending is {rate}",
         thresholds=(0.05, 0.10),
         flag=False,
-        help="The average of the predicted risks. Adding the risks up gives the expected "
-        "number of missed appointments.",
+        help="No cut-off: every appointment is on the list, highest predicted risk first, and the team phones "
+        "as far down as time allows. The risks add up to the expected number of missed appointments.",
         repeat_label="Patients with more than one appointment",
     ),
 }

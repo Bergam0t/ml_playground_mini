@@ -75,6 +75,12 @@ def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
 
 
+# What every rule the visitor can make would catch, for "Your rule ranks #N of 255"
+@st.cache_data
+def load_rule_catches():
+    return rule_game.all_rule_catches(rule_game.load_past())
+
+
 # Fewer filtered appointments than this and their factor chart is too noisy to show
 MIN_GROUP_FOR_CHART = 30
 
@@ -238,16 +244,6 @@ def demo_notice_full():
     )
 
 
-def demo_notice_synthetic():
-    """A shorter notice for the Your rule vs the model tab, which is about the method, not
-    the real tool: just that the data is made up."""
-    st.warning(
-        "**DEMONSTRATION VERSION**\n\n"
-        "All the appointments here are synthetic. No real patients or Trust data are displayed.",
-        icon=":material/science:",
-    )
-
-
 def intro_columns(key, notice=demo_notice_full):
     """Columns for a tab's opening text (left) beside the demonstration notice (right).
 
@@ -266,30 +262,21 @@ def go_to_tab(label):
     st.session_state.scroll_to_top = True
 
 
+# Everything the Your rule vs the model tab remembers about a visitor's go
+GAME_KEYS = ("game_clues", "game_best", "game_last", "game_prev", "game_trained")
+
+
+def reset_game():
+    """Clear the game for the next person at the stand."""
+    for key in GAME_KEYS:
+        st.session_state.pop(key, None)
+    st.session_state.scroll_to_top = True
+
+
 def go_to_call_list():
     """From the bottom of the all-appointments view to the admin team's call list view."""
     st.session_state.appt_view = VIEW_WEEK
     st.session_state.scroll_to_top = True
-
-
-def call_blocks(outcomes, key, height):
-    """The Your rule vs the model tab's two blocks of past appointments, phoned (10 wide) and
-    not phoned (30 wide), side by side, or one above the other on narrower screens. The phoned
-    block is a third as tall, so both draw their markers at the same size. Its column is wider
-    than its square needs, to leave room for the heading; the not-phoned square is sized by its
-    height, so it doesn't shrink."""
-    phoned, not_phoned = st.columns([1.4, 3], gap="small")
-    rows_height = height - charts.BLOCK_HEADER
-    for column, is_phoned, block_height in (
-        (phoned, True, charts.BLOCK_HEADER + round(rows_height / 3)),
-        (not_phoned, False, height),
-    ):
-        column.plotly_chart(
-            charts.call_block(outcomes, is_phoned, block_height),
-            width="stretch",
-            config={"displayModeBar": False},
-            key=f"{key}_{'phoned' if is_phoned else 'not_phoned'}",
-        )
 
 
 # Streamlit app
@@ -732,13 +719,15 @@ with tab_appts:
             st.subheader(f"{date:%A} {date.day} {date:%B}: {len(table_data)} appointments")
 
         st.info(
-            "**Click a row in the table** to see what made the model give that "
+            "**Click a row in the table** (highest risk first) to see what made the model give that "
             "appointment its risk of not attending. Until you do, the chart below shows what the "
             "model relies on most. The coloured columns are the model's forecast.",
             icon=":material/touch_app:",
         )
 
-        # Display filtered data
+        # Highest risk first, so the first rows are the red ones worth clicking. Sorted here
+        # rather than in the grid, so the selected position still matches table_data.
+        table_data = table_data.sort_values("DNA_Prob_Forecast", ascending=False, kind="stable")
         table = st.dataframe(
             appointment_table(table_data),
             column_config=APPOINTMENT_COLUMNS,
@@ -933,7 +922,7 @@ with tab_appts:
             "more likely to reach people who really would have missed their appointment; a lower one catches "
             "more missed appointments but means more calls, many to people who would have come anyway. "
             "The right balance depends on how many calls the team can make, so choose a starting point above. "
-            "The **Who would we phone?** tab explores the trade-off.",
+            "The **How many people should we phone?** tab explores the trade-off.",
             icon=":material/balance:",
         )
         column = m.column
@@ -1243,10 +1232,17 @@ with tab_calls:
         # Keyed so style.css puts the cards under the chart on narrower screens
         left, right = st.container(key="reflow_stack_icons").columns([0.62, 0.38], gap="large")
         with left:
-            st.plotly_chart(charts.icon_array(out), width="stretch", config={"displayModeBar": False})
+            # Share the 40 markers of width between the columns in line with their sizes
+            left_cols = min(32, max(8, round(40 * out["calls"] / 1000)))
+            st.plotly_chart(
+                charts.outcome_blocks(out, left_cols, 40 - left_cols, heading="Using the model to rank the list"),
+                width="stretch",
+                config={"displayModeBar": False},
+            )
             st.caption(
-                "Each marker is one of 1,000 past appointments. \"Would get a call\" is the model's list "
-                "(no calls were made). \"In reality\" is whether the patient really attended."
+                "Each marker is one of 1,000 past appointments. \"On the call list\" is the model's list (no "
+                "calls were made); the boxes show what really happened. An unnecessary call went to "
+                "someone who would have attended anyway."
             )
             with st.expander("Show these counts as a table"):
                 st.dataframe(
@@ -1264,25 +1260,31 @@ with tab_calls:
             # Short titles on the cards, with the explanation in a caption under each number
             with st.container(border=True, gap="small"):
                 st.metric(
-                    "Precision",
+                    "Calls that reach a miss",
                     f"{out['precision']:.0%}",
                     f"{(out['precision'] - out['random_precision']) * 100:+.0f} pts vs random "
                     f"({out['random_precision']:.0%})",
                     icon=":material/call:",
+                    help="Also called precision.",
                 )
                 st.caption(
                     f"{out['called_dna']} of the {out['calls']} calls would reach someone who then did not attend."
                 )
             with st.container(border=True, gap="small"):
-                st.metric("Recall", f"{out['recall']:.0%}", icon=":material/person_search:")
+                st.metric(
+                    "Misses reached",
+                    f"{out['recall']:.0%}",
+                    icon=":material/person_search:",
+                    help="Also called recall or sensitivity.",
+                )
                 st.caption(
                     f"We would reach {out['called_dna']} of the {out['dna_total']} patients who did not attend. "
                     f"The other {out['not_called_dna']} would get no call."
                 )
             with st.container(border=True, gap="small"):
-                st.metric("Came anyway", f"{out['called_attended']}", icon=":material/event_available:")
+                st.metric("Unnecessary calls", f"{out['called_attended']}", icon=":material/event_available:")
                 st.caption(
-                    f"Calls that would go to people who attended: "
+                    f"These people would have attended anyway: "
                     f"{out['called_attended'] / out['calls']:.0%} of the {out['calls']} calls."
                 )
             st.caption(
@@ -1359,29 +1361,12 @@ with tab_calls:
                     help=f"{weekly_calls:.0f} calls at {minutes_per_call:g} minutes each.",
                 )
                 st.metric(
-                    "Cost of calls",
-                    f"£{econ['call_cost']:,.0f}",
-                    border=True,
-                    icon=":material/call:",
-                    help=f"{weekly_calls:.0f} calls at £{cost_per_call:.2f} each.",
-                )
-                st.metric(
                     "Missed appointments reached",
                     f"£{econ['value_reached']:,.0f}",
                     border=True,
                     icon=":material/person_search:",
                     help=f"About {weekly_reached:.0f} calls a week would reach someone who would "
                     f"otherwise miss their appointment, at about £{dna_cost:,.0f} each.",
-                )
-                st.metric(
-                    "Possibly saved",
-                    f"£{econ['value_avoided']:,.0f}",
-                    # Sign first, so st.metric reads a loss as negative
-                    f"{'-' if econ['net'] < 0 else '+'}£{abs(econ['net']):,.0f} after the cost of calls",
-                    border=True,
-                    icon=":material/savings:",
-                    help=f"The missed appointments reached, times your guess that a call gets {effect}% "
-                    "of them to attend.",
                 )
             st.caption(
                 "These are estimates from the assumptions in the sidebar. A missed appointment's cost "
@@ -1407,68 +1392,47 @@ with tab_calls:
 # the other tabs are drawn before it starts. The visitor builds a rule from the clues the model
 # sees, each with an equal say; then a machine learning model learns its own weighting from more and more
 # past appointments. Everything is scored on the same past appointments as tab 3, scaled to
-# 1,000, at the same number of calls (rule_game.CALL_SHARE).
+# 1,000, at the same number of calls (rule_game.CALL_SHARE). Built for a 2-5 minute visit at a
+# stand: the clues are on screen without scrolling, and "Start again" clears it for the next person.
 with tab_game:
     game_past, learning = load_rule_game()
+    all_catches = load_rule_catches()
+    n_rules = len(all_catches)
+    best_possible = max(all_catches.values())
     frames = learning["frames"]
     n_missed = round(game_past["Did_Not_Attend"].mean() * 1000)
     n_calls = round(rule_game.CALL_SHARE * 1000)
+    playing = any(k in st.session_state for k in ("game_best", "game_trained")) or bool(
+        st.session_state.get("game_clues")
+    )
 
-    with intro_columns("intro_game", notice=demo_notice_synthetic):
+    # ---- The setup: the title, the three numbers that matter, and the question
+    with st.container(horizontal=True, vertical_alignment="center", key="game_title"):
         st.subheader("Can you beat a computer?")
-        st.markdown(
-            f"A clinic team has time for **{n_calls} reminder calls** for every 1,000 appointments. They "
-            "need a <span class=\"highlight\">rule for putting the call list in order, so the people "
-            "most likely to miss their appointment are phoned first</span>.\n\n"
-            "We're going to compete with a <span class=\"pill\">machine learning model</span> to make "
-            "that rule.",
-            unsafe_allow_html=True,
-        )
-
-    # How the rules are tested, in three small boxes across the full page width (stacked on
-    # narrower screens, style.css). The icons are Font Awesome, loaded in style.css.
-    fact1, fact2, fact3 = st.container(key="reflow_stack_game_facts").columns(3, gap="small")
-    for column, icon, text in (
-        (
-            fact1,
-            "clock-rotate-left",
-            "We've got **1,000 past appointments** where no reminder calls were made.",
-        ),
-        (
-            fact2,
-            "user-xmark",
-            (
-                f"We know that in these 1,000 past appointments, **{n_missed} people missed** their "
-                "appointment."
-            ),
-        ),
-        (
-            fact3,
-            "list-check",
-            (
-                "So we can ask of any rule, made by a human or a computer:\n\n"
-                '<span class="game-fact-question">If it had made the call list back then, how many of '
-                f"those **{n_missed}** would have been on it?</span>"
-            ),
-        ),
-    ):
-        with column.container(border=True, height="stretch", key=f"game_fact_{icon}"):
-            st.markdown(f'<i class="fa-solid fa-{icon} game-fact-icon"></i>', unsafe_allow_html=True)
-            st.markdown(text, unsafe_allow_html=True)
-
-    # ---- 1. The visitor's rule, between dividers so it reads as the thing to do first
-    st.divider()
-    st.markdown("#### 1. Make your rule")
+        if playing:
+            st.button("Start again", key="game_reset_top", on_click=reset_game, icon=":material/restart_alt:")
     st.markdown(
-        '<span class="highlight">What do you think matters when predicting whether someone won\'t '
-        "attend?</span>",
+        f"""<div class="game-stats">
+        <div class="game-stat"><span class="game-stat-num">1,000</span>past appointments, when no reminder calls were made</div>
+        <div class="game-stat"><span class="game-stat-num">{n_missed}</span>of them were missed</div>
+        <div class="game-stat"><span class="game-stat-num">{n_calls}</span>calls a clinic team could have made</div>
+        </div>
+        <p class="game-question">Make a rule for who goes on the call list. <span class="highlight">How many of
+        the {n_missed} who missed can you get on it?</span> Then a machine learning model will try.</p>""",
         unsafe_allow_html=True,
     )
+    st.caption(
+        ":material/science: Demonstration version: all the appointments here are synthetic. "
+        "No real patients or Trust data are displayed."
+    )
+
+    # ---- 1. The visitor's rule
+    st.markdown("#### 1. Make your rule")
     # A tinted box (style.css) rather than st.info, which can't carry the help tooltip
     with st.container(key="game_instruction"):
         st.markdown(
-            ":material/touch_app: **Pick one clue or several.** Each clue you pick gets an equal say in "
-            "who goes first on the list.",
+            ":material/touch_app: **What makes someone likely to miss? Pick one clue or several.** "
+            "Each clue you pick gets an equal say; the model will get to choose its own.",
             # Worked example from the real scores in data/rule_game_past.csv (rule_game.rule_score)
             help=(
                 "**How an equal say works.** Each clue gives every patient a score from 0 to 1, by where "
@@ -1493,7 +1457,6 @@ with tab_game:
         key="game_clues",
     )
 
-    mine = None
     if not clues:
         st.info("Pick at least one clue to see who your rule would put on the call list.", icon=":material/touch_app:")
     else:
@@ -1512,11 +1475,15 @@ with tab_game:
 
         left, right = st.container(key="reflow_stack_game_rule").columns([0.62, 0.38], gap="large")
         with left:
-            call_blocks(mine["outcomes"], "game_rule_icons", 520)
+            st.plotly_chart(
+                charts.outcome_blocks(mine["outcomes"], 10, 30, heading="Using your rule to rank the list"),
+                width="stretch",
+                config={"displayModeBar": False},
+                key="game_rule_icons",
+            )
             st.caption(
-                f"Each marker is one of the 1,000 past appointments the rules are tested on. Nobody was "
-                f"phoned: \"On the call list\" means your rule would have put them in the first {n_calls}. "
-                "\"Missed\" and \"Attended\" are what really happened."
+                "Each marker is one of the 1,000 past appointments. Nobody was phoned: your rule would "
+                f"have put the left-hand ones in the first {n_calls}. Missed or attended is what really happened."
             )
         with right:
             st.metric(
@@ -1526,11 +1493,37 @@ with tab_game:
                 border=True,
                 icon=":material/call:",
             )
+            # What the last change did: the hook is seeing a score fall when a clue is added
+            if prev:
+                added = [c for c in rule_key if c not in prev["clues"]]
+                removed = [c for c in prev["clues"] if c not in rule_key]
+                change = (
+                    "Adding " + " and ".join(f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in added)
+                    if added and not removed
+                    else "Taking away " + " and ".join(f"*{rule_game.CLUE_SHORT[c].lower()}*" for c in removed)
+                    if removed and not added
+                    else "Changing your rule"
+                )
+                gain = caught - prev["caught"]
+                if gain < 0:
+                    st.error(
+                        f"**{change} made your list worse**, from {prev['caught']} to {caught}."
+                        + (" More information, a worse list." if added and not removed else ""),
+                        icon=":material/trending_down:",
+                    )
+                elif gain > 0:
+                    st.success(
+                        f"**{change} made your list better**, from {prev['caught']} to {caught}.",
+                        icon=":material/trending_up:",
+                    )
+                else:
+                    st.info(f"**{change} made no difference.** Still {caught}.", icon=":material/trending_flat:")
             st.metric(
-                "People on your list who attended",
-                f"{mine['outcomes']['called_attended']} of {n_calls}",
+                "Your rule ranks",
+                f"#{rule_game.rank_of(caught, all_catches)} of {n_rules}",
                 border=True,
-                icon=":material/call_end:",
+                icon=":material/leaderboard:",
+                help=f"Out of all {n_rules} rules you can make with these buttons, scored the same way.",
             )
             best = st.session_state["game_best"]
             st.markdown(
@@ -1544,11 +1537,10 @@ with tab_game:
     st.divider()
     st.markdown("#### 2. Watch a machine learning model learn its own rule")
     st.markdown(
-        f"The model gets the same eight clues, and **{learning['n_train']:,} other past appointments** to "
-        "learn from, with who missed them. Nobody tells it which way a clue points or how much it matters: "
-        "it works that out from those appointments. Then it makes its own call list for the 1,000 test "
-        "appointments above, which it has never seen, so it's tested exactly like your rule. Watch what "
-        "happens as it learns from more of them."
+        f"It gets the same eight clues, and **{learning['n_train']:,} other past appointments** with who "
+        "missed them. It adds up the clues just as your rule does, but nobody tells it how much say each "
+        "clue gets or which way it points: it works that out. Then "
+        "it makes its own list for the same 1,000 appointments, which it has never seen."
     )
     best = st.session_state.get("game_best")
     run = st.button(
@@ -1561,9 +1553,11 @@ with tab_game:
     )
     # Bars in the order of the model's final say, so they don't jump between frames
     say_order = sorted(rule_game.CLUES, key=lambda f: -frames[-1]["say"][f])
+    at = rule_game.overtook_at(frames, best["reached"]) if best else None
     slot = st.empty()
 
     def draw_model(i, phase, best):
+        """One frame: the scores, then the race (left) beside how much say each clue gets (right)."""
         f = frames[i]
         with slot.container():
             m1, m2, m3 = st.container(key=f"reflow_halves_game_{phase}_{i}").columns(3)
@@ -1580,10 +1574,23 @@ with tab_game:
                 border=True,
                 icon=":material/person:",
             )
-            left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns(2, gap="large")
+            left, right = st.container(key=f"reflow_stack_game_{phase}_{i}").columns([0.55, 0.45], gap="large")
             with left:
-                st.markdown("**The model's call list**")
-                call_blocks(f["outcomes"], f"game_icons_{phase}_{i}", 450)
+                st.markdown("**The race: missed appointments on each list**")
+                st.plotly_chart(
+                    charts.learning_curve(
+                        frames,
+                        i,
+                        best["outcomes"]["called_dna"],
+                        learning["perfect"]["outcomes"]["called_dna"],
+                        n_missed,
+                        overtook=at,
+                        height=440,
+                    ),
+                    width="stretch",
+                    config={"displayModeBar": False},
+                    key=f"game_curve_{phase}_{i}",
+                )
             with right:
                 st.markdown("**How much say each clue gets**")
                 st.plotly_chart(
@@ -1592,83 +1599,36 @@ with tab_game:
                     config={"displayModeBar": False},
                     key=f"game_say_{phase}_{i}",
                 )
-            st.plotly_chart(
-                charts.learning_curve(
-                    frames,
-                    i,
-                    best["outcomes"]["called_dna"],
-                    learning["perfect"]["outcomes"]["called_dna"],
-                    n_missed,
-                ),
-                width="stretch",
-                config={"displayModeBar": False},
-                key=f"game_curve_{phase}_{i}",
-            )
 
     if run and best:
         for i in range(len(frames)):
             draw_model(i, "run", best)
+            if i == at:
+                st.toast("The model just overtook your best rule!", icon=":material/emoji_events:")
             if i < len(frames) - 1:
-                time.sleep(0.9)
+                # Linger where the model passes you, hurry through frames where little changes
+                flat = abs(frames[i + 1]["reached"] - frames[i]["reached"]) * n_missed <= 1.5
+                time.sleep(2.0 if i == at else 0.4 if flat else 0.9)
         st.session_state["game_trained"] = True
     elif st.session_state.get("game_trained") and best:
         draw_model(len(frames) - 1, "done", best)
 
-    # ---- Why a computer? (like the geographic mini's "Why computers?", after the animation)
-    if st.session_state.get("game_trained") and best:
-        st.markdown("#### Why a computer?")
-        n_clues = len(rule_game.CLUES)
-        w1, w2, w3 = st.container(key="reflow_halves_game_why").columns(3, gap="small")
-        w1.metric(
-            f"Rules you can make with the {n_clues} buttons",
-            f"{2 ** n_clues - 1:,}",
-            border=True,
-            height="stretch",
-            help="Every combination of one or more clues, each with an equal say.",
-        )
-        w2.metric(
-            f"Ways to give {n_clues} clues 0 to 10 points each",
-            f"{11 ** n_clues:,}",
-            border=True,
-            height="stretch",
-            help="The model doesn't try these one by one: it works out the best points straight from the "
-            "past appointments.",
-        )
-        w3.metric(
-            "Past appointments the model learnt from",
-            f"{learning['n_train']:,}",
-            border=True,
-            height="stretch",
-        )
-        st.markdown(
-            "- **It weighs many clues at once.** Most of us can juggle two or three. A model weighs all "
-            f"{n_clues} for every patient, the same way every time.\n"
-            "- **It learns how much each clue counts, and which way it points,** from what really happened, "
-            "not from a hunch.\n"
-            "- **Some models can also spot clues that only matter in combination,** like a long wait "
-            "mattering more for new patients than for follow-ups.\n"
-            "- **But it only knows what's in the data.** It can't see a new job or a bus strike, and it "
-            "learns past patterns, unfair ones included. That's why its forecasts support staff judgement "
-            "rather than replace it."
-        )
-
-    # ---- 3. The verdict
+    # ---- 3. The verdict, straight after the race
     if st.session_state.get("game_trained") and best:
         st.markdown("#### 3. See whose list did best")
         final, perfect, none = frames[-1], learning["perfect"], rule_game.nobody(game_past)
-        at = rule_game.overtook_at(frames, best["reached"])
-        if at is not None:
-            st.success(
-                f"**The model overtook your best rule after learning from {at:,} past appointments.** "
-                f"With all {learning['n_train']:,}, its list would have reached {final['outcomes']['called_dna']} "
-                f"of the {n_missed} missed appointments, against your {best['outcomes']['called_dna']}.",
-                icon=":material/emoji_events:",
+        yours, theirs = best["outcomes"]["called_dna"], final["outcomes"]["called_dna"]
+        st.success(
+            (
+                f"**The model overtook your best rule after learning from {frames[at]['n']:,} past "
+                "appointments.** "
+                if at is not None
+                else ""
             )
-        else:
-            st.success(
-                "**Your rule held its own against the model.** Few rules do.",
-                icon=":material/emoji_events:",
-            )
+            + f"With all {learning['n_train']:,}, its list would have reached {theirs} of the {n_missed} "
+            f"missed appointments, against your {yours}.",
+            icon=":material/emoji_events:",
+        )
 
         rows = [
             ("Your best rule", best),
@@ -1676,47 +1636,86 @@ with tab_game:
             ("A perfect model", perfect),
             ("Phone nobody", none),
         ]
-        st.table(
+        table_col, why_col = st.container(key="reflow_stack_game_verdict").columns([0.45, 0.55], gap="large")
+        table_col.table(
             pd.DataFrame(
                 {
                     "Rule": [name for name, _ in rows],
                     f"Missed, and on the list (of {n_missed})": [r["outcomes"]["called_dna"] for _, r in rows],
-                    f"Attended, but on the list (of {n_calls})": [
-                        r["outcomes"]["called_attended"] for _, r in rows
-                    ],
                     "Accuracy": [f"{r['accuracy']:.0%}" for _, r in rows],
                 }
             ).set_index("Rule")
         )
-
         say = final["say"]
         top_two = say_order[:2]
-        st.markdown("#### Reading the results")
-        c1, c2, c3 = st.container(key="reflow_stack_game_verdict_cards").columns(3, gap="small")
-        with c1.container(border=True, key="title_card_game_why", height="stretch"):
-            st.markdown(":material/psychology: **Why did the model win here?**")
-            st.markdown(
-                "Your rule gave each of its clues an equal say. The model gives "
-                f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} of the say and "
-                f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. "
-                "With only a few hundred appointments to learn from it did worse than you: it had to "
-                "work out which way each clue points, too."
+        found = (
+            f"You found the best of all {n_rules} rules you could make ({best_possible} of {n_missed}), "
+            "and the model still beat it."
+            if yours >= best_possible
+            else f"Even the best of all {n_rules} rules you could make reaches only {best_possible} of {n_missed}."
+        )
+        why_col.markdown(
+            f"**Your rule and the model add up the same clues. The difference is how much say each gets.** {found}\n\n"
+            "Your rule gives each clue an equal say. The model learnt how much say each one should get: "
+            f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%}, "
+            f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less. "
+            "Learning that from many past appointments, then being tested on ones it hadn't seen, is what "
+            "the computer adds."
+            + (
+                f" With {frames[at - 1]['n']:,} or fewer appointments to learn from it did no better than "
+                "you: it had to work out which way each clue points, too."
+                if at
+                else ""
             )
-        with c2.container(border=True, key="title_card_game_accuracy", height="stretch"):
+        )
+
+        c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(2, gap="small")
+        with c1.container(border=True, key="title_card_game_accuracy", height="stretch"):
             st.markdown(":material/percent: **Accuracy is the wrong score.**")
             st.markdown(
                 f"Phoning nobody is the most accurate rule in the table ({none['accuracy']:.0%}), because "
                 "most patients attend, so \"everyone will come\" is usually right. It just puts nobody on "
-                "the call list. What matters is how many of the people who missed are on the list, and how "
-                "many places on it go to people who attended."
+                "the call list. Ask how many of the people who missed are on the list instead."
             )
-        with c3.container(border=True, key="title_card_game_limit", height="stretch"):
+        with c2.container(border=True, key="title_card_game_limit", height="stretch"):
             st.markdown(":material/visibility_off: **Nobody gets them all.**")
             st.markdown(
                 "Even a perfect model, which knew each patient's true chance of missing, would have put "
                 f"only {perfect['outcomes']['called_dna']} of the {n_missed} on its list. Many missed "
                 "appointments come down to things no data records."
             )
+
+        # ---- Why a computer? (like the geographic mini's "Why computers?")
+        st.markdown("#### Why a computer?")
+        n_clues = len(rule_game.CLUES)
+        w1, w2 = st.container(key="reflow_halves_game_why").columns(2, gap="small")
+        w1.metric(
+            f"Ways to give {n_clues} clues 0 to 10 points each",
+            f"{11 ** n_clues:,}",
+            border=True,
+            height="stretch",
+            help="The model doesn't try these one by one: it works out the best points straight from the "
+            "past appointments.",
+        )
+        w2.metric(
+            "Past appointments the model learnt from",
+            f"{learning['n_train']:,}",
+            border=True,
+            height="stretch",
+        )
+        st.markdown(
+            "- **It learns how much each clue counts, and which way it points,** from what really happened, "
+            f"not from a hunch, and weighs all {n_clues} the same way for every patient.\n"
+            "- **But it only knows what's in the data.** It can't see a new job or a bus strike, and it "
+            "learns past patterns, unfair ones included. That's why its forecasts support staff judgement "
+            "rather than replace it."
+        )
+        st.button(
+            "Start again for the next person",
+            key="game_reset_end",
+            on_click=reset_game,
+            icon=":material/restart_alt:",
+        )
 
     # ---- The way on: styled like the geographic mini's next-step boxes (style.css)
     st.divider()
