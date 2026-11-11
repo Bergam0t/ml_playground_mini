@@ -11,6 +11,7 @@ import calls
 import charts
 import costs
 import explain
+import pilot
 import rule_game
 import weekly
 from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
@@ -75,7 +76,7 @@ def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
 
 
-# What every rule the visitor can make would catch, for "Your rule ranks #N of 511"
+# What every rule the visitor can make would catch, for "Your rule ranks #N of 1,023"
 @st.cache_data
 def load_rule_catches():
     return rule_game.all_rule_catches(rule_game.load_past())
@@ -106,10 +107,13 @@ GUIDE_STEPS = [
 # (demo_data.DNA_RATE). The data's DNA_Forecast is a risk of FORECAST_MIN or more (set in
 # build/train_and_explain.py, which prints how the forecasts fall into all of these).
 FORECAST_MIN = 0.20  # about two and a half times the average; the live model's 50%
-HIGH_RISK_MIN = 0.40  # the Very High band
-# The assumed share of the people a call reaches, who would have missed, that it gets to
-# attend (%): the starting guess on the phone tab and in the savings on the appointments tab
-DEFAULT_CALL_EFFECT = 50
+# The Very High band and the high-risk flag: the live app's 70%. The model is calibrated, so
+# these appointments are missed about 84% of the time, like the real pilot's high-risk patients
+HIGH_RISK_MIN = 0.70
+# The share of the people a call reaches, who would have missed, that it gets to attend (%):
+# the starting value on the phone tab and in the savings on the appointments tab. The real
+# pilot's, about 80% (pilot.EFFECT), to the nearest 5 so it sits on the phone tab's slider.
+DEFAULT_CALL_EFFECT = round(pilot.EFFECT * 20) * 5
 
 
 def DNA_Risk(prob):
@@ -139,8 +143,8 @@ def Confidence_Score_Txt(confidence):
 BANDS = ["Low", "Medium", "High", "Very High"]
 RISK_HELP = (
     "The model's predicted risk that the patient won't attend.  \n"
-    "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 40%  \n"
-    "**Very High:** 40% or more  \n"
+    "**Low:** under 5%  \n**Medium:** 5% to 20%  \n**High:** 20% to 70%  \n"
+    "**Very High:** 70% or more  \n"
     "About 8% of appointments are missed. High and Very High (20% or more, about two and a half "
     "times the average) are forecast as DNAs; Very High is also flagged high-risk."
 )
@@ -281,7 +285,9 @@ def demo_notice_full():
     st.warning(
         "**DEMONSTRATION VERSION**\n\n"
         "This is a demonstration of a :blue[**real tool**], currently being piloted by "
-        "outpatient teams in a London trust, which predicts attendance for real upcoming appointments.\n\n"
+        "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
+        f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
+        f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
         "Here, all the data for training and display is synthetic: "
         "no real patients or Trust data are displayed.\n\n"
         "Read the story behind this HSMA project in this "
@@ -660,9 +666,10 @@ def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=N
         )
         saving_col.caption(caption)
         cta_col.markdown(
-            f"**{DEFAULT_CALL_EFFECT}% is a guess, not a measurement.** Nobody knows yet how "
-            "many people a reminder call would change. Try other guesses, and other numbers "
-            f"of calls, on the next tab. It uses all the upcoming appointments, {scope}."
+            f"**{DEFAULT_CALL_EFFECT}% is what the {pilot.SERVICE.lower()} pilot saw**, for patients at "
+            "very high risk, without a comparison group. Calls may change fewer people in other "
+            "services, or lower down the list. Try other values, and other numbers of calls, on the "
+            f"next tab. It uses all the upcoming appointments, {scope}."
         )
         cta_col.button(
             "Explore these assumptions",
@@ -726,7 +733,7 @@ with tab_appts:
                 )
 
         # Summary of the filtered appointments. Every card is a bordered container holding a
-        # metric and a one-line caption, so the four are the same height; the 20%+ and 40%+
+        # metric and a one-line caption, so the four are the same height; the 20%+ and 70%+
         # pills sit above two of them, so the row is bottom-aligned to keep the boxes level.
         n_filtered = len(filtered_data)
 
@@ -817,7 +824,8 @@ with tab_appts:
             filtered_data[filtered_data["DNA_Forecast"] == 1],
             FORECAST_MIN,
             f"Predicted savings over the next {length} if we phone every forecast DNA",
-            f"If half of those who would have missed attend instead, with {n_forecast:,} calls "
+            f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
+            f"pilot, with {n_forecast:,} calls "
             f"between {dates.min():%d %b} and {dates.max():%d %b}.",
             "not just your filters",
             "savings",
@@ -1226,7 +1234,8 @@ with tab_appts:
             listed,
             MEASURE_RISK_MIN[column],
             f"Predicted savings {when} if we phone everyone on this list",
-            f"If half of those who would have missed attend instead, with {len(listed):,} calls "
+            f"If {DEFAULT_CALL_EFFECT}% of those who would have missed attend instead, as in the "
+            f"pilot, with {len(listed):,} calls "
             f"in the week ending {weekly.week_label(first_week, year=True)}.",
             "not just this week or your filters",
             "week_savings",
@@ -1281,6 +1290,59 @@ with tab_calls:
             f"the chart uses {meta['n_past_test']:,} **past** appointments the model didn't learn from. Nobody "
             "in them was phoned. Imagine the model had made its list for them: we can check who it would have "
             "picked against who really did not attend."
+        )
+
+    # What happened when the real tool was piloted (pilot.py): the evidence behind the effect
+    # slider's starting value. Keyed so style.css shows the cards two per line on narrower screens.
+    with st.container(border=True):
+        st.markdown(
+            f"**What happened in the real pilot.** The {pilot.SERVICE} service phoned patients the live "
+            f"model flagged as high risk, from {pilot.PERIOD}, to confirm, rearrange or reassure."
+        )
+        p1, p2, p3, p4 = st.container(key="reflow_halves_pilot").columns(4, gap="small")
+        p1.metric(
+            "Patients phoned",
+            f"{pilot.CALLS}",
+            border=True,
+            height="stretch",
+            icon=":material/call:",
+            help="Patients the live model flagged as at high risk of not attending.",
+        )
+        p2.metric(
+            "Missed after a call",
+            f"{pilot.DNA_AFTER:.0%}",
+            f"down from {pilot.DNA_BEFORE:.0%}",
+            delta_arrow="off",
+            border=True,
+            height="stretch",
+            icon=":material/event_available:",
+            help=f"These patients typically missed {pilot.DNA_BEFORE:.0%} of their appointments. "
+            f"Those who answered and said they would come missed only {pilot.DNA_CONFIRMED:.0%}, "
+            "about the same as patients at low risk.",
+        )
+        p3.metric(
+            "Extra appointments attended",
+            f"{pilot.EXTRA_ATTENDED}",
+            f"about £{pilot.REVENUE:,.0f} not lost",
+            delta_arrow="off",
+            border=True,
+            height="stretch",
+            icon=":material/savings:",
+            help=f"Over {pilot.WEEKS} weeks: about £{pilot.VALUE_PER_APPOINTMENT:,.0f} an appointment, "
+            "in revenue the trust would otherwise have lost.",
+        )
+        p4.metric(
+            "Appointments saved per call",
+            "2 in every 3",
+            border=True,
+            height="stretch",
+            icon=":material/balance:",
+            help=f"{pilot.EXTRA_ATTENDED} extra appointments from {pilot.CALLS} calls.",
+        )
+        st.caption(
+            f"The calls also brought {pilot.EARLY_CANCELLATIONS} early cancellations, so those slots could be "
+            "offered to other patients. There was no comparison group of similar patients who weren't phoned, "
+            "and it was one service over the winter, so other services may see less."
         )
 
     # All the upcoming appointments, by week: the filters are hidden on this tab
@@ -1354,14 +1416,14 @@ with tab_calls:
     else:
         # Risk only: confidence is a function of the risk alone, so it adds nothing a risk bar doesn't, and
         # on its own it would also pick the patients the model is confident will attend.
-        # Few risks pass 60% at an 8% DNA rate, so the slider stops there, in 1% steps
+        # Few risks pass 95% at an 8% DNA rate, so the slider stops there, in 1% steps
         risk_min = (
             call_control(
                 "slider",
                 "risk_min",
                 "Phone if the predicted risk is at least",
                 0,
-                60,
+                95,
                 step=1,
                 format="%d%%",
             )
@@ -1375,7 +1437,8 @@ with tab_calls:
         how = (
             "**Here you set the bar, and the number of calls follows from it.** A lower bar means more calls, "
             f"and more of them are to people who would have come anyway. {HIGH_RISK_MIN:.0%} matches the "
-            f"app's high-risk flag; {FORECAST_MIN:.0%} phones everyone forecast as a DNA."
+            f"app's high-risk flag, the patients phoned in the pilot; {FORECAST_MIN:.0%} phones everyone "
+            "forecast as a DNA."
         )
 
     if call_controls is not None:
@@ -1388,10 +1451,15 @@ with tab_calls:
         100,
         step=5,
         format="%d%%",
-        help="An assumption, not a measurement. Try a few values: 0% means the calls make no difference.",
+        help=f"Starts at the {pilot.SERVICE.lower()} pilot's figure: of about "
+        f"{pilot.CALLS * pilot.DNA_BEFORE:.0f} patients who would have missed, {pilot.EXTRA_ATTENDED} "
+        f"attended ({pilot.EFFECT:.0%}). That was one service, for patients at very high risk, with no "
+        "comparison group, so other settings may see less. 0% means the calls make no difference.",
     )
     if call_controls is not None:
-        call_controls.caption("A guess: nobody knows yet how many a call would change.")
+        call_controls.caption(
+            f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%."
+        )
 
     out = calls.call_outcomes(called, past["Did_Not_Attend"], p_past)
 
@@ -1457,7 +1525,7 @@ with tab_calls:
                 height="stretch",
                 icon=":material/balance:",
                 help="The share of the people the calls reach, who would have missed, that the calls "
-                "must get to attend to cover their staff time. It doesn't depend on your guess.",
+                "must get to attend to cover their staff time. It doesn't depend on the effect slider.",
             )
             c3.metric(
                 "Possibly saved",
@@ -1494,12 +1562,20 @@ with tab_calls:
                 ),
             )
             st.markdown(
-                f"Your guess of {effect}% is {'above' if effect / 100 > be else 'below'} the "
-                f"break-even, so the calls would {'more than ' if effect / 100 > be else 'not '}"
+                f"At {effect}%, the calls are {'above' if effect / 100 > be else 'below'} the "
+                f"break-even, so they would {'more than ' if effect / 100 > be else 'not '}"
                 "cover their cost."
                 if be <= 1
                 else "Even if every call got the patient to attend, the calls would cost more than "
                 "the missed appointments they reach."
+            )
+            # Side by side with the pilot: appointments saved per 3 calls, and early cancellations
+            # if calls free slots as often as they did there
+            st.markdown(
+                f"That's about **{3 * weekly_avoided / weekly_calls:.1f} appointments saved for every 3 "
+                f"calls** (the pilot: {3 * pilot.SAVED_PER_CALL:.0f}). If calls bring early cancellations as "
+                f"often as in the pilot, about {weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot "
+                "for another patient."
             )
             st.caption(
                 "Estimates from the sidebar's cost assumptions. A missed appointment's cost is the value "
@@ -1596,14 +1672,16 @@ with tab_calls:
             )
 
     st.warning(
-        "**We don't know that a call will change whether someone attends.** The chart shows who the calls "
-        "would *reach*, not missed appointments they would *prevent*.\n\n"
-        "- Some people would still miss their appointment after a call, and some would have come anyway.\n"
-        "- The model picks the people most like those who missed appointments before, not the people a call "
-        "would help most. Someone at high risk may be the hardest to help with a phone call.\n"
+        f"**The {pilot.SERVICE.lower()} pilot suggests calls help a lot, but it isn't proof.** The chart shows "
+        "who the calls would *reach*, not missed appointments they would *prevent*.\n\n"
+        f"- Even in the pilot, {pilot.DNA_AFTER:.0%} of the patients phoned still missed.\n"
+        "- The pilot compared patients with how often they usually missed, not with similar patients who "
+        "weren't phoned at the same time, so some of the fall might have happened anyway.\n"
+        "- It phoned patients at very high risk in one service. Calls lower down the list, or in other "
+        "services, may change fewer people.\n"
         "- Calls to people who would have come anyway still take staff time, and could worry them.\n"
-        "- The effect slider is a guess. The only way to know is to test it: for example, randomly phone half "
-        "of the flagged patients and compare how many from each half attend.",
+        "- The surest way to know is to test it: for example, randomly phone half of the flagged patients "
+        "and compare how many from each half attend.",
         icon=":material/warning:",
     )
 
@@ -1666,12 +1744,12 @@ with tab_game:
                 "they rank on that clue: 1 is the top of the ranking. Your rule adds up the scores for the "
                 "clues you picked, and the highest totals are phoned first.\n\n"
                 "**Example:** you pick *most missed appointments before* and *being younger*.\n\n"
-                "- **Patient A** has missed 3 appointments before; only 5% of patients have missed more, "
-                "so A scores 0.95. A is 70, younger than only about 16% of patients: 0.17. "
-                "**Total 1.12.**\n"
-                "- **Patient B** has never missed one. Two-thirds of patients haven't, and they share the "
-                "bottom of that ranking: 0.33. B is 25, younger than about 93% of patients: 0.94. "
-                "**Total 1.27.**\n\n"
+                "- **Patient A** has missed 3 appointments before; only 7% of patients have missed more, "
+                "so A scores 0.93. A is 70, younger than only about 14% of patients: 0.15. "
+                "**Total 1.08.**\n"
+                "- **Patient B** has never missed one. About 70% of patients haven't, and they "
+                "share the bottom of that ranking: 0.35. B is 25, younger than about 92% of patients: 0.93. "
+                "**Total 1.28.**\n\n"
                 "So B goes above A on the list, even though A has missed 3 appointments: with an equal "
                 "say, being young counts as much as having missed before."
             ),
@@ -1768,10 +1846,10 @@ with tab_game:
                     )
             st.metric(
                 "Your rule ranks",
-                f"#{rule_game.rank_of(caught, all_catches)} of {n_rules}",
+                f"#{rule_game.rank_of(caught, all_catches)} of {n_rules:,}",
                 border=True,
                 icon=":material/leaderboard:",
-                help=f"Out of all {n_rules} rules you can make with these buttons, scored the same way.",
+                help=f"Out of all {n_rules:,} rules you can make with these buttons, scored the same way.",
             )
             best = st.session_state["game_best"]
             st.markdown(

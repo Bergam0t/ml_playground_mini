@@ -29,6 +29,7 @@ CLUES = {
     "Appointment Type": "First appointments, not follow ups",
     "Specialty": "Specialities with the highest miss rate",
     "Reporting_Site": "Sites with the highest miss rate",
+    "Journey_Time_Mins": "Longer journeys",
 }
 # Short names for the say chart
 CLUE_SHORT = {
@@ -41,6 +42,7 @@ CLUE_SHORT = {
     "Appointment Type": "New or follow-up",
     "Specialty": "Specialty",
     "Reporting_Site": "Site",
+    "Journey_Time_Mins": "Journey time",
 }
 
 
@@ -75,7 +77,7 @@ def results(past: pd.DataFrame, score) -> dict:
 
 def all_rule_catches(past: pd.DataFrame) -> dict:
     """Missed appointments on the list (per 1,000) for every rule the visitor can make:
-    each combination of one or more clues, keyed by its sorted clues. 511 for 9 clues."""
+    each combination of one or more clues, keyed by its sorted clues. 1,023 for 10 clues."""
     return {
         tuple(sorted(combo)): results(past, rule_score(past, combo))["outcomes"]["called_dna"]
         for k in range(1, len(CLUES) + 1)

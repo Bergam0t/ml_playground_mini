@@ -35,12 +35,18 @@ N_BACKGROUND = 500  # rows used as "the average appointment" for SHAP
 # The yes/no forecast. The live model says yes at 50%, but it trains with scale_pos_weight=4,
 # which inflates the odds about four times: its 50% is about a 20% true risk.
 FORECAST_MIN = 0.20
-HIGH_RISK_MIN = 0.40  # the high-risk flag, as HIGH_RISK_MIN in streamlit_app.py
+# The high-risk flag, as HIGH_RISK_MIN in streamlit_app.py: the live app's 70%. The model is
+# calibrated, so these appointments are missed about 84% of the time, as in the real pilot.
+HIGH_RISK_MIN = 0.70
+# What the real model and pilot reported (pilot.py), which the demo data is set to match:
+# test AUC about 0.86, and flagged patients missing about 84% of the time without a call
+AUC_RANGE = (0.85, 0.87)
+FLAGGED_DNA_RANGE = (0.80, 0.88)
 
 FORECAST_COLUMNS = [
     "row_id", "day_index", "Reporting_Site", "Specialty", "Appointment Type",
     "Appointment Location Text", "Day_Of_Week", "Previous_DNAs", "Lead_Time_Days", "Age",
-    "Deprivation_Decile", "Time_Slot", "Appointment_Time", "Patient Name", "MRN", "Mobile Telephone",
+    "Deprivation_Decile", "Time_Slot", "Appointment_Time", "Journey_Time_Mins", "Patient Name", "MRN", "Mobile Telephone",
     "Fin Number",
     "DNA_Prob_Forecast", "Confidence_Score", "DNA_Forecast",
 ]
@@ -132,7 +138,7 @@ def main():
 
     share = fut["DNA_Forecast"].mean()
     # Same bands and high-risk flag as DNA_Risk() and HIGH_RISK_MIN in streamlit_app.py
-    bands = pd.cut(fut["DNA_Prob_Forecast"], [0, 0.05, 0.2, 0.4, 1], right=False,
+    bands = pd.cut(fut["DNA_Prob_Forecast"], [0, 0.05, FORECAST_MIN, HIGH_RISK_MIN, 1], right=False,
                    labels=["Low", "Medium", "High", "Very High"]).value_counts().sort_index()
     high_risk = fut["DNA_Prob_Forecast"] >= HIGH_RISK_MIN
     by_day = high_risk.groupby(fut["day_index"]).mean()
@@ -140,8 +146,10 @@ def main():
     print("Risk bands:", bands.to_dict())
     print(f"High-risk rate: {high_risk.mean():.1%}; by day min {by_day.min():.1%}, "
           f"median {by_day.median():.1%}, max {by_day.max():.1%}")
-    print("DNA rate among high-risk past appointments: "
-          f"{past.loc[past['DNA_Prob_Forecast'] >= HIGH_RISK_MIN, 'Did_Not_Attend'].mean():.1%}")
+    flagged = past["DNA_Prob_Forecast"] >= HIGH_RISK_MIN
+    flagged_dna = past.loc[flagged, "Did_Not_Attend"].mean()
+    print(f"High-risk past appointments: {flagged.mean():.1%} of them, {flagged.sum()} in all; "
+          f"{flagged_dna:.1%} missed (the pilot's high-risk patients: 84%)")
     print("Mean |SHAP| (pp):", grouped.abs().mean().round(2).sort_values(ascending=False).to_dict())
     assert abs(y.mean() - DNA_RATE) < 0.01, "past DNA rate has drifted from demo_data.DNA_RATE"
     # Time-of-day checks on the past appointments: 10-12 and 3-5 miss more, Monday morning most
@@ -155,11 +163,26 @@ def main():
     assert y[peak].mean() > y[~peak].mean() + 0.01, "10-12 and 3-5 should miss more"
     assert y[mon_am].mean() > 1.5 * y[hist["Day_Of_Week"] != "Monday"].mean(), "Monday morning should be much worse"
     assert (bands > 0).all(), "every risk band should have some appointments"
+    # Match the real model and pilot
+    assert AUC_RANGE[0] <= auc <= AUC_RANGE[1], f"test AUC {auc:.3f} is outside {AUC_RANGE}"
+    assert FLAGGED_DNA_RANGE[0] <= flagged_dna <= FLAGGED_DNA_RANGE[1], (
+        f"{flagged_dna:.0%} of high-risk past appointments missed, outside {FLAGGED_DNA_RANGE}"
+    )
+    assert high_risk.mean() >= 0.015, "too few high-risk appointments for a weekly call list"
+    # Long journeys, one of the real model's common reasons, should miss more and be among the
+    # model's main reasons
+    long_journey = hist["Journey_Time_Mins"] >= 45
+    journey_rank = list(grouped.abs().mean().sort_values(ascending=False).index).index("Journey_Time_Mins") + 1
+    print(f"Journeys of 45 minutes or more: {long_journey.mean():.0%} of past appointments, "
+          f"{y[long_journey].mean():.1%} missed (others {y[~long_journey].mean():.1%}); "
+          f"journey time ranks #{journey_rank} by mean |SHAP|")
+    assert y[long_journey].mean() > 1.5 * y[~long_journey].mean(), "long journeys should miss more"
+    assert journey_rank <= 4, "journey time should be one of the model's four main reasons"
 
     # ---- Calibration on the past appointments the model didn't train on. The app adds risks
     # up (expected missed appointments, costs), so a predicted 30% must mean about 30% miss.
     # Class weighting such as scale_pos_weight would break this, while barely helping ranking.
-    band = pd.cut(past["DNA_Prob_Forecast"], [0, 0.05, 0.2, 0.4, 1], right=False,
+    band = pd.cut(past["DNA_Prob_Forecast"], [0, 0.05, FORECAST_MIN, HIGH_RISK_MIN, 1], right=False,
                   labels=["Low", "Medium", "High", "Very High"])
     cal = past.groupby(band, observed=True).agg(
         n=("Did_Not_Attend", "size"),

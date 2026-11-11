@@ -1,19 +1,19 @@
 {
-  "base_value_pp": 7.615345824263038,
-  "auc_test": 0.8640698336678538,
-  "dna_rate_history": 0.08016666666666666,
+  "base_value_pp": 8.3997922377139,
+  "auc_test": 0.8693619548788223,
+  "dna_rate_history": 0.07976666666666667,
   "n_history": 30000,
   "n_future": 3200,
   "n_past_test": 4500,
-  "dna_rate_past_test": 0.08022222222222222,
+  "dna_rate_past_test": 0.07977777777777778,
   "seed": 42,
   "history_seed": 7,
-  "shap_additivity_max_error_pp": 2.7883248286286744e-05,
+  "shap_additivity_max_error_pp": 3.155895969442213e-05,
   "versions": {
     "xgboost": "3.4.1",
-    "shap": "0.54.1",
+    "shap": "0.52.0",
     "scikit-learn": "1.9.1",
-    "pandas": "3.1.1",
+    "pandas": "3.1.0",
     "numpy": "2.5.4"
   }
 }

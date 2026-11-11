@@ -12,7 +12,8 @@ the salary against the latest pay award.
 
 Missed appointments: illustrative values for an unused outpatient slot, by specialty and
 first (New) or follow-up attendance, loosely in line with NHS Payment Scheme
-consultant-led outpatient prices. A price is not a cost, and a Trust should replace these
+consultant-led outpatient prices. Physiotherapy uses the real pilot's figure (pilot.py):
+£21,000 of revenue for 182 appointments, about £115 each. A price is not a cost, and a Trust should replace these
 with its own NHS Payment Scheme or patient-level costing (PLICS) figures.
 """
 import pandas as pd
@@ -44,6 +45,8 @@ DNA_COSTS = {
     "Gynaecology": (210, 140),
     "Ophthalmology": (170, 100),
     "Orthopaedics": (170, 110),
+    # The real pilot's £21,000 for 182 appointments (pilot.VALUE_PER_APPOINTMENT)
+    "Physiotherapy": (115, 115),
     "Respiratory": (250, 130),
     "Rheumatology": (260, 120),
     "Urology": (190, 100),

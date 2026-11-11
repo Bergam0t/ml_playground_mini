@@ -16,18 +16,18 @@ streamlit run streamlit_app.py
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
   - Using 1,000 past appointments (80 missed) and 100 calls, the visitor builds a rule for who
-    to phone from the nine clues the model sees (including *riskiest times of day*), with each
-    chosen clue getting an equal say.
+    to phone from the ten clues the model sees (including *riskiest times of day* and *longer
+    journeys*), with each chosen clue getting an equal say.
     After each change, a callout says whether the last clue added or taken away made the list
-    better or worse, and the rule is ranked against all 511 rules the buttons can make (the
-    best is five clues together: 34 of 80).
+    better or worse, and the rule is ranked against all 1,023 rules the buttons can make (the
+    best is *most missed appointments before* on its own: 43 of 80).
   - They then watch a model learn its own weighting from 0 to 22,500 past appointments: the
     race against their best rule beside how much say each clue gets. A toast and an
     "Overtook you" marker show where the model passes them (800 for the best rule).
   - The verdict follows at once: a banner saying where the model overtook them, then two short
     cards: same clues but the model learnt which matter most (no rule from the buttons can match
-    its 40), and even the best possible list (knowing each patient's true chance) reaches only
-    44 of 80. A short "Why a computer?" section comes last.
+    its 46), and even the best possible list (knowing each patient's true chance) reaches only
+    56 of 80. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
   - Two buttons lead on to the Upcoming appointments and How many people should we phone? tabs, as in the
@@ -44,12 +44,17 @@ streamlit run streamlit_app.py
 - **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
-  reach someone who then did not attend, and how many such patients would get no call. An
-  assumed-effect slider shows how many missed appointments the calls might avoid. We don't know
-  that a call changes whether someone attends, and the tab says so. A "What might the calls cost,
-  and save?" section turns the weekly figures into staff hours, the cost of the calls, the value
-  of the missed appointments they reach and might avoid, and the **break-even effect**: the share
-  of people reached a call would need to get to attend to cover its own staff time.
+  reach someone who then did not attend, and how many such patients would get no call. A panel
+  near the top shows what happened in the real Physiotherapy pilot (see **The real pilot**,
+  below). An effect slider, starting at the pilot's 80%, shows how many missed appointments the
+  calls might avoid; the tab says the pilot had no comparison group, so other settings may see
+  less. A "What this setting costs and might save" section turns the weekly figures into staff
+  hours, the cost of the calls, the value of the missed appointments they reach and might avoid,
+  and the **break-even effect**: the share of people reached a call would need to get to attend
+  to cover its own staff time. It also compares appointments saved per 3 calls with the pilot's
+  2, and estimates the early cancellations (slots freed for other patients) at the pilot's rate.
+  Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
+  per 3 calls, as in the pilot.
 
 Both views also show the expected cost of missed appointments
 (each predicted risk times that appointment's cost).
@@ -95,9 +100,10 @@ The sidebar's **Cost assumptions** section holds editable defaults, set in `cost
 - **Calls:** a band 5 admin at about £26 an hour. That's the Agenda for Change 2025/26 middle
   pay point (£33,487) plus employer National Insurance and pension, over about 1,625 productive
   hours a year. At 3 minutes a call, a call costs about £1.31.
-- **Missed appointments:** a cost by specialty and New / Follow Up, from £100 to £260
-  (about £140 on average for the current mix). These are illustrative values, loosely in line
-  with NHS Payment Scheme outpatient prices: replace them with your Trust's own costs.
+- **Missed appointments:** a cost by specialty and New / Follow Up, from £100 to £260. These are
+  illustrative values, loosely in line with NHS Payment Scheme outpatient prices: replace them
+  with your Trust's own costs. Physiotherapy is £115, the real pilot's £21,000 over 182
+  appointments.
 - **Share of the cost really lost:** 100% by default. Lower it if empty slots get re-used.
 
 A missed appointment's cost is the value of a clinic slot, not cash saved. The call cost counts
@@ -119,7 +125,11 @@ lambda_ml_streamlit_exercise:
 
 1. `demo_data.generate_appointments()` makes up past appointments with a hidden "true" chance of not attending,
    and draws whether each patient attended. The chances average `DNA_RATE` (8%: recent NHS
-   outpatient figures are about 6.4%, so the demo Trust is a little worse than average).
+   outpatient figures are about 6.4%, so the demo Trust is a little worse than average). A small
+   group of patients miss again and again (`HABITUAL_SHARE`, `HABITUAL_MEAN`), and each missed
+   appointment before counts strongly (`PREVIOUS_DNA_EFFECT`), against a lot that no clue can
+   see (`NOISE_SD`). These are set so the model matches the real pilot: a test AUC of about 0.86,
+   and about 84% of the appointments it flags as high risk missed without a call.
 2. An XGBoost model is trained on those past appointments.
 3. The model scores 3,200 future appointments. Their confidence score is worked out as in the
    live pipeline (WX-BIU/Outpatient-DNAs, `src/forecast/Outpatient_Forecast.py`): the top class
@@ -135,9 +145,19 @@ lunch). Both come from a separate random stream, so adding them left every other
 name is shown only on the call list (Show next week's call list), with the appointment time. The model sees
 the hour (`Time_Slot`, 08:00 to 16:00) as a clue: appointments starting 10-12 or 15-17 miss more
 (`TIME_EFFECT` in `demo_data.py`), and Monday before midday gets an extra push
-(`MONDAY_MORNING_EFFECT`) on top of Monday's own, so it is the worst slot of the week (about 19%
-missed, against 6% for the rest of the week). The build checks this. Explanations show the real time
+(`MONDAY_MORNING_EFFECT`) on top of Monday's own, so it is the worst slot of the week (about 15%
+missed, against 7% for the rest of the week). The build checks this. Explanations show the real time
 (`Appointment_Time`), not the hour slot.
+
+**Predicted journey time.** Long or difficult journeys were one of the real model's common reasons
+for a prediction, so each appointment has a predicted journey time (`Journey_Time_Mins`). Each patient
+has a usual journey to their usual site (about 25 minutes typically, a little longer from more
+deprived areas), and an appointment at another site takes 20 to 40 minutes more. Longer journeys
+push the risk up (`JOURNEY_EFFECT`), more slowly the longer they get. It has its own random stream,
+so adding it changed only the risk. The build checks that journeys of 45 minutes or more miss more
+often (about 13%, against 7%) and that journey time is one of the model's four main reasons (it is
+second, after missed appointments before). It shows in the explanations and as a clue in Your rule
+vs the model, not as a column in the appointment tables.
 
 Dates are not stored. `demo_data.load_forecast()` dates the appointments from next Monday onwards,
 so they always roll forward from today while each appointment keeps its weekday.
@@ -167,32 +187,52 @@ data has only one interaction between clues, Monday mornings (below), which the 
 learn, but it is a small part of the risk, so the simpler model loses almost nothing.
 
 The build checks that the SHAP values add up to each prediction, that the past DNA rate is
-within a point of `DNA_RATE` and that every risk band has some appointments. It prints how the
+within a point of `DNA_RATE` and that every risk band has some appointments. It also checks the
+match with the real pilot: a test AUC from 0.85 to 0.87 (the "around 86%" the real model is
+quoted at), 80% to 88% of high-risk past appointments missed (the pilot's 84%), and at least 1.5%
+of upcoming appointments flagged. It prints how the
 forecasts fall into the risk bands and the high-risk flag.
 
 It also checks **calibration** on the past appointments the model didn't train on: in each risk
 band, the average predicted risk must be close to the share who really missed. The app adds risks
 up (expected missed appointments, costs), so they must be true probabilities. That's why the
 demo model isn't class-weighted. The live model trains with `scale_pos_weight=4`, which makes its
-risks roughly four times the true odds, and that is why its thresholds (15/50/80% bands, a 70%
-flag) sit so much higher than the demo's.
+risks roughly four times the true odds, and that is why its yes/no line (50%) and bands (15/50/80%)
+sit higher than the demo's.
 
 ## Risk bands and the high-risk flag
 
-The live app's thresholds were set for much higher risks than an 8% DNA rate produces (its
-high-risk flag, risk over 70% and confidence over 70%, would catch almost nobody). The demo uses:
-
 - **Risk bands** (`DNA_Risk()` in `streamlit_app.py`): Low under 5%, Medium 5% to 20%, High 20% to
-  40%, Very High 40% or more.
+  70%, Very High 70% or more.
 - **Yes/no forecast** ("Expected DNA", `FORECAST_MIN` in the build and the app): a predicted risk
   of 20% or more, about two and a half times the average. The live model says yes at 50%, which
-  with its `scale_pos_weight=4` is about a 20% true risk. That's about 9% of appointments; about
-  40% of those past patients missed, and they include about half of everyone who missed.
-- **High-risk flag** (`HIGH_RISK_MIN`): the Very High band, 40% or more, so it stays stricter than
-  the forecast as in the live app. About 3% of appointments; about 58% of those past patients
-  missed.
+  with its `scale_pos_weight=4` is about a 20% true risk. That's about 8% of appointments; about
+  half of those past patients missed, and they include about half of everyone who missed.
+- **High-risk flag** (`HIGH_RISK_MIN`): the Very High band, 70% or more, the live app's flag. About
+  3% of upcoming appointments (2% of past ones); about 87% of those past patients missed (the real
+  pilot's high-risk patients: 84%), and they include about a quarter of everyone who missed.
 - **Weekly summary colours** (`weekly.MEASURES`): green below and red above 2% and 6% for the
   flag, and 5% and 15% for the yes/no forecast.
+
+## The real pilot
+
+The figures in `pilot.py` are from the real tool's pilot in a Physiotherapy service, from 24
+December 2025 to 2 February 2026. Staff phoned 273 patients the model flagged as high risk, to
+confirm attendance, rearrange if needed and reassure.
+
+- These patients typically missed 84% of their appointments. After a call, 17% missed; among those
+  who answered and confirmed they'd come, 8%, about the same as patients at low risk.
+- 182 more appointments were attended, about £21,000 of revenue not lost: two appointments saved
+  for every three calls. The calls also brought 29 early cancellations, slots offered to others.
+- So of about 229 patients who would have missed, 182 attended: an effect of about 80%, the phone
+  tab's starting value (`DEFAULT_CALL_EFFECT`, worked out from `pilot.EFFECT`).
+
+The demo is set to match: the model's test AUC is about 0.86 (the real model is quoted as
+"accurately predicting in around 86% of cases"), the high-risk flag catches patients who miss about
+84% of the time, Physiotherapy is one of the specialties, and long journeys (one of the real
+model's common reasons) are one of the model's main reasons. The pilot had no comparison group
+(it compared these patients with how often they usually missed), so the tab says the true effect
+may be lower, especially lower down the list or in other services.
 
 To go back to live data, replace `load_forecast()` in `demo_data.py` with a read of the combined
 forecast view. You would also need SHAP values from the live model for the waterfalls.

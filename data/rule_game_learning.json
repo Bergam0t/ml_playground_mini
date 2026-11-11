@@ -14,289 +14,301 @@
     "Specialty": 0.0,
     "Reporting_Site": 0.0,
     "Day_Of_Week": 0.0,
-    "Time_Slot": 0.0
+    "Time_Slot": 0.0,
+    "Journey_Time_Mins": 0.0
    },
    "outcomes": {
-    "called_dna": 6,
-    "called_attended": 94,
-    "not_called_dna": 74,
-    "not_called_attended": 826
+    "called_dna": 8,
+    "called_attended": 92,
+    "not_called_dna": 72,
+    "not_called_attended": 828
    },
-   "reached": 0.08033240997229917,
-   "accuracy": 0.8326666666666667
+   "reached": 0.10027855153203342,
+   "accuracy": 0.8362222222222222
   },
   {
    "n": 25,
-   "misses_seen": 1,
+   "misses_seen": 2,
    "say": {
-    "Previous_DNAs": 0.10802196536297723,
-    "Lead_Time_Days": 0.06782229264358554,
-    "Age": 0.12468877282998468,
-    "Deprivation_Decile": 0.024901378592175966,
-    "Appointment Type": 0.05020094945450967,
-    "Specialty": 0.1442510073669322,
-    "Reporting_Site": 0.13544596959753702,
-    "Day_Of_Week": 0.1273439648653436,
-    "Time_Slot": 0.21732369928695414
+    "Previous_DNAs": 0.05840743208027465,
+    "Lead_Time_Days": 0.023890513425836906,
+    "Age": 0.03533358331398714,
+    "Deprivation_Decile": 0.12606446900962062,
+    "Appointment Type": 0.022700054358961965,
+    "Specialty": 0.25356463711907623,
+    "Reporting_Site": 0.08117833564716587,
+    "Day_Of_Week": 0.14447972757279667,
+    "Time_Slot": 0.2253544316512629,
+    "Journey_Time_Mins": 0.029026815821017127
    },
    "outcomes": {
-    "called_dna": 9,
-    "called_attended": 91,
-    "not_called_dna": 71,
-    "not_called_attended": 829
+    "called_dna": 14,
+    "called_attended": 86,
+    "not_called_dna": 66,
+    "not_called_attended": 834
    },
-   "reached": 0.11634349030470914,
-   "accuracy": 0.8384444444444444
+   "reached": 0.16991643454038996,
+   "accuracy": 0.8473333333333334
   },
   {
    "n": 50,
-   "misses_seen": 3,
+   "misses_seen": 8,
    "say": {
-    "Previous_DNAs": 0.11311324090811721,
-    "Lead_Time_Days": 0.0010171750498320846,
-    "Age": 0.09211664590464136,
-    "Deprivation_Decile": 0.018160397486828413,
-    "Appointment Type": 0.10718088205474757,
-    "Specialty": 0.2050130230009715,
-    "Reporting_Site": 0.13984485147574505,
-    "Day_Of_Week": 0.11678309754731064,
-    "Time_Slot": 0.20677068657180625
+    "Previous_DNAs": 0.113178572554595,
+    "Lead_Time_Days": 0.01936203672476363,
+    "Age": 0.050400963330504506,
+    "Deprivation_Decile": 0.036405462636134416,
+    "Appointment Type": 0.09645824645748703,
+    "Specialty": 0.160501263384349,
+    "Reporting_Site": 0.08779058146163347,
+    "Day_Of_Week": 0.16997939440592102,
+    "Time_Slot": 0.14159271631144918,
+    "Journey_Time_Mins": 0.12433076273316275
    },
    "outcomes": {
-    "called_dna": 11,
-    "called_attended": 89,
-    "not_called_dna": 69,
-    "not_called_attended": 831
+    "called_dna": 26,
+    "called_attended": 74,
+    "not_called_dna": 54,
+    "not_called_attended": 846
    },
-   "reached": 0.14127423822714683,
-   "accuracy": 0.8424444444444444
+   "reached": 0.3286908077994429,
+   "accuracy": 0.8726666666666667
   },
   {
    "n": 100,
-   "misses_seen": 10,
+   "misses_seen": 13,
    "say": {
-    "Previous_DNAs": 0.12921651522219288,
-    "Lead_Time_Days": 0.07556642530951062,
-    "Age": 0.012665472750485704,
-    "Deprivation_Decile": 0.007172243011980213,
-    "Appointment Type": 0.017928654356984392,
-    "Specialty": 0.22921296781806533,
-    "Reporting_Site": 0.19074237664260818,
-    "Day_Of_Week": 0.08707098437002019,
-    "Time_Slot": 0.2504243605181525
+    "Previous_DNAs": 0.2348685383320838,
+    "Lead_Time_Days": 0.00846473321395002,
+    "Age": 0.04633228571825831,
+    "Deprivation_Decile": 0.019834205839618285,
+    "Appointment Type": 0.0010529723615062413,
+    "Specialty": 0.1680352785404159,
+    "Reporting_Site": 0.0927565175113787,
+    "Day_Of_Week": 0.14193199474738052,
+    "Time_Slot": 0.154892295682701,
+    "Journey_Time_Mins": 0.13183117805270722
    },
    "outcomes": {
-    "called_dna": 13,
-    "called_attended": 87,
-    "not_called_dna": 67,
-    "not_called_attended": 833
+    "called_dna": 37,
+    "called_attended": 63,
+    "not_called_dna": 43,
+    "not_called_attended": 857
    },
-   "reached": 0.1634349030470914,
-   "accuracy": 0.846
+   "reached": 0.467966573816156,
+   "accuracy": 0.8948888888888888
   },
   {
    "n": 200,
    "misses_seen": 19,
    "say": {
-    "Previous_DNAs": 0.18432294669666577,
-    "Lead_Time_Days": 0.00639553657704896,
-    "Age": 0.1068635811882712,
-    "Deprivation_Decile": 0.10231171926272713,
-    "Appointment Type": 0.06194291290921551,
-    "Specialty": 0.1452078138870164,
-    "Reporting_Site": 0.0754403833777281,
-    "Day_Of_Week": 0.09490040972993634,
-    "Time_Slot": 0.2226146963713906
+    "Previous_DNAs": 0.20630093961166746,
+    "Lead_Time_Days": 0.124556840413744,
+    "Age": 0.04484707342771562,
+    "Deprivation_Decile": 0.06138743108075521,
+    "Appointment Type": 0.023682461919703104,
+    "Specialty": 0.1425031111042708,
+    "Reporting_Site": 0.04148221647625478,
+    "Day_Of_Week": 0.13663972250918474,
+    "Time_Slot": 0.12666439002490004,
+    "Journey_Time_Mins": 0.09193581343180429
    },
    "outcomes": {
-    "called_dna": 27,
-    "called_attended": 73,
-    "not_called_dna": 53,
-    "not_called_attended": 847
+    "called_dna": 35,
+    "called_attended": 65,
+    "not_called_dna": 45,
+    "not_called_attended": 855
    },
-   "reached": 0.3379501385041551,
-   "accuracy": 0.874
+   "reached": 0.4373259052924791,
+   "accuracy": 0.89
   },
   {
    "n": 400,
-   "misses_seen": 36,
+   "misses_seen": 38,
    "say": {
-    "Previous_DNAs": 0.1793896232340052,
-    "Lead_Time_Days": 0.0037809169890304253,
-    "Age": 0.13121848943756947,
-    "Deprivation_Decile": 0.15671168442351466,
-    "Appointment Type": 0.032786344176622274,
-    "Specialty": 0.08145622889524308,
-    "Reporting_Site": 0.07307974273036202,
-    "Day_Of_Week": 0.21489257795236305,
-    "Time_Slot": 0.12668439216128974
+    "Previous_DNAs": 0.1859580522425061,
+    "Lead_Time_Days": 0.1250201035893808,
+    "Age": 0.08333129305728021,
+    "Deprivation_Decile": 0.05967091216125231,
+    "Appointment Type": 0.004740541752755428,
+    "Specialty": 0.12637962455295185,
+    "Reporting_Site": 0.06557144891925175,
+    "Day_Of_Week": 0.16173817211486577,
+    "Time_Slot": 0.10128323350628111,
+    "Journey_Time_Mins": 0.08630661810347463
    },
    "outcomes": {
-    "called_dna": 33,
-    "called_attended": 67,
-    "not_called_dna": 47,
-    "not_called_attended": 853
+    "called_dna": 37,
+    "called_attended": 63,
+    "not_called_dna": 43,
+    "not_called_attended": 857
    },
-   "reached": 0.41274238227146814,
-   "accuracy": 0.886
+   "reached": 0.46518105849582175,
+   "accuracy": 0.8944444444444445
   },
   {
    "n": 800,
-   "misses_seen": 66,
+   "misses_seen": 68,
    "say": {
-    "Previous_DNAs": 0.1930241404017645,
-    "Lead_Time_Days": 0.05412299201425943,
-    "Age": 0.16898685360882176,
-    "Deprivation_Decile": 0.12076418578395687,
-    "Appointment Type": 0.08318876935025081,
-    "Specialty": 0.08563018143327183,
-    "Reporting_Site": 0.029792310594627634,
-    "Day_Of_Week": 0.15420999108595787,
-    "Time_Slot": 0.11028057572708932
+    "Previous_DNAs": 0.2271496455655678,
+    "Lead_Time_Days": 0.1035544085304549,
+    "Age": 0.08278852018885662,
+    "Deprivation_Decile": 0.033490052793673425,
+    "Appointment Type": 0.0009762728744194423,
+    "Specialty": 0.1077618916140942,
+    "Reporting_Site": 0.07640685496612941,
+    "Day_Of_Week": 0.18194925313208554,
+    "Time_Slot": 0.10334458867018495,
+    "Journey_Time_Mins": 0.08257851166453378
    },
    "outcomes": {
-    "called_dna": 38,
-    "called_attended": 62,
-    "not_called_dna": 42,
-    "not_called_attended": 858
+    "called_dna": 44,
+    "called_attended": 56,
+    "not_called_dna": 36,
+    "not_called_attended": 864
    },
-   "reached": 0.4709141274238227,
-   "accuracy": 0.8953333333333333
+   "reached": 0.5515320334261838,
+   "accuracy": 0.9082222222222223
   },
   {
    "n": 1600,
-   "misses_seen": 132,
+   "misses_seen": 134,
    "say": {
-    "Previous_DNAs": 0.22871457033425116,
-    "Lead_Time_Days": 0.1045856759308259,
-    "Age": 0.16579929227054574,
-    "Deprivation_Decile": 0.07089584877218374,
-    "Appointment Type": 0.035649626836653986,
-    "Specialty": 0.06806204937906964,
-    "Reporting_Site": 0.06116229634115415,
-    "Day_Of_Week": 0.15976079128991716,
-    "Time_Slot": 0.10536984884539852
+    "Previous_DNAs": 0.23014013387938756,
+    "Lead_Time_Days": 0.08781864432876071,
+    "Age": 0.08127825022599032,
+    "Deprivation_Decile": 0.04657685229759922,
+    "Appointment Type": 0.049929854677531506,
+    "Specialty": 0.08693196054718874,
+    "Reporting_Site": 0.04628599694439812,
+    "Day_Of_Week": 0.16249601002452152,
+    "Time_Slot": 0.09889870524963747,
+    "Journey_Time_Mins": 0.10964359182498486
    },
    "outcomes": {
-    "called_dna": 38,
-    "called_attended": 62,
-    "not_called_dna": 42,
-    "not_called_attended": 858
+    "called_dna": 45,
+    "called_attended": 55,
+    "not_called_dna": 35,
+    "not_called_attended": 865
    },
-   "reached": 0.4792243767313019,
-   "accuracy": 0.8966666666666666
+   "reached": 0.5598885793871866,
+   "accuracy": 0.9095555555555556
   },
   {
    "n": 3200,
-   "misses_seen": 271,
+   "misses_seen": 260,
    "say": {
-    "Previous_DNAs": 0.22575947771378183,
-    "Lead_Time_Days": 0.12892791849061372,
-    "Age": 0.15319134975867893,
-    "Deprivation_Decile": 0.09216638089297675,
-    "Appointment Type": 0.06803723937465554,
-    "Specialty": 0.07216736577661768,
-    "Reporting_Site": 0.03703846085254224,
-    "Day_Of_Week": 0.1379863821614993,
-    "Time_Slot": 0.08472542497863397
+    "Previous_DNAs": 0.25972364780135465,
+    "Lead_Time_Days": 0.09524782368541225,
+    "Age": 0.0892480759368013,
+    "Deprivation_Decile": 0.061674574957215476,
+    "Appointment Type": 0.04406181519298804,
+    "Specialty": 0.0726308694174535,
+    "Reporting_Site": 0.03706733975724167,
+    "Day_Of_Week": 0.13762829996208908,
+    "Time_Slot": 0.07270257454649132,
+    "Journey_Time_Mins": 0.13001497874295267
    },
    "outcomes": {
-    "called_dna": 39,
-    "called_attended": 61,
-    "not_called_dna": 41,
-    "not_called_attended": 859
+    "called_dna": 45,
+    "called_attended": 55,
+    "not_called_dna": 35,
+    "not_called_attended": 865
    },
-   "reached": 0.4903047091412742,
-   "accuracy": 0.8984444444444445
+   "reached": 0.5598885793871866,
+   "accuracy": 0.9095555555555556
   },
   {
    "n": 6400,
-   "misses_seen": 517,
+   "misses_seen": 520,
    "say": {
-    "Previous_DNAs": 0.213442200268975,
-    "Lead_Time_Days": 0.14331897168473273,
-    "Age": 0.15670925549200607,
-    "Deprivation_Decile": 0.10950134805115588,
-    "Appointment Type": 0.05844155723632589,
-    "Specialty": 0.046168040223796884,
-    "Reporting_Site": 0.038933275834334834,
-    "Day_Of_Week": 0.14602841630761168,
-    "Time_Slot": 0.08745693490106107
+    "Previous_DNAs": 0.2637249169290446,
+    "Lead_Time_Days": 0.1024962922744568,
+    "Age": 0.08920994919152889,
+    "Deprivation_Decile": 0.0694693660059471,
+    "Appointment Type": 0.03480756736872276,
+    "Specialty": 0.05842503271475786,
+    "Reporting_Site": 0.03856608779153046,
+    "Day_Of_Week": 0.12034189645353252,
+    "Time_Slot": 0.07974256439083106,
+    "Journey_Time_Mins": 0.14321632687964797
    },
    "outcomes": {
-    "called_dna": 40,
-    "called_attended": 60,
-    "not_called_dna": 40,
-    "not_called_attended": 860
+    "called_dna": 47,
+    "called_attended": 53,
+    "not_called_dna": 33,
+    "not_called_attended": 867
    },
-   "reached": 0.4986149584487535,
-   "accuracy": 0.8997777777777778
+   "reached": 0.5933147632311978,
+   "accuracy": 0.9148888888888889
   },
   {
    "n": 12800,
-   "misses_seen": 1003,
+   "misses_seen": 1052,
    "say": {
-    "Previous_DNAs": 0.216402726135359,
-    "Lead_Time_Days": 0.1622668435145744,
-    "Age": 0.16788191854216475,
-    "Deprivation_Decile": 0.10365920658679666,
-    "Appointment Type": 0.053578533728474514,
-    "Specialty": 0.03376603440219235,
-    "Reporting_Site": 0.04296626264588851,
-    "Day_Of_Week": 0.14580518463979406,
-    "Time_Slot": 0.07367328980475571
+    "Previous_DNAs": 0.2655941740845089,
+    "Lead_Time_Days": 0.09747276701206843,
+    "Age": 0.0966483910852338,
+    "Deprivation_Decile": 0.06951875044172802,
+    "Appointment Type": 0.03628634347108259,
+    "Specialty": 0.05440635427201113,
+    "Reporting_Site": 0.05057687220532194,
+    "Day_Of_Week": 0.11115805524939659,
+    "Time_Slot": 0.08087078914083685,
+    "Journey_Time_Mins": 0.13746750303781183
    },
    "outcomes": {
-    "called_dna": 40,
-    "called_attended": 60,
-    "not_called_dna": 40,
-    "not_called_attended": 860
+    "called_dna": 47,
+    "called_attended": 53,
+    "not_called_dna": 33,
+    "not_called_attended": 867
    },
-   "reached": 0.4930747922437673,
-   "accuracy": 0.8988888888888888
+   "reached": 0.5877437325905293,
+   "accuracy": 0.914
   },
   {
    "n": 22500,
-   "misses_seen": 1804,
+   "misses_seen": 1795,
    "say": {
-    "Previous_DNAs": 0.21683429353910622,
-    "Lead_Time_Days": 0.15165104987441927,
-    "Age": 0.15859659909091436,
-    "Deprivation_Decile": 0.10228108834167125,
-    "Appointment Type": 0.05661497092558755,
-    "Specialty": 0.035887486162565596,
-    "Reporting_Site": 0.04476251978750861,
-    "Day_Of_Week": 0.1490314555999939,
-    "Time_Slot": 0.0843405366782332
+    "Previous_DNAs": 0.26473270493493145,
+    "Lead_Time_Days": 0.10183814465959057,
+    "Age": 0.0945074882279108,
+    "Deprivation_Decile": 0.07857992317720597,
+    "Appointment Type": 0.04126973418160813,
+    "Specialty": 0.03977985787506299,
+    "Reporting_Site": 0.04610072876690717,
+    "Day_Of_Week": 0.12389429107288395,
+    "Time_Slot": 0.07370636294014289,
+    "Journey_Time_Mins": 0.13559076416375615
    },
    "outcomes": {
-    "called_dna": 40,
-    "called_attended": 60,
-    "not_called_dna": 40,
-    "not_called_attended": 860
+    "called_dna": 46,
+    "called_attended": 54,
+    "not_called_dna": 34,
+    "not_called_attended": 866
    },
-   "reached": 0.4986149584487535,
-   "accuracy": 0.8997777777777778
+   "reached": 0.5793871866295265,
+   "accuracy": 0.9126666666666666
   }
  ],
  "app_model": {
   "outcomes": {
-   "called_dna": 40,
-   "called_attended": 60,
-   "not_called_dna": 40,
-   "not_called_attended": 860
+   "called_dna": 46,
+   "called_attended": 54,
+   "not_called_dna": 34,
+   "not_called_attended": 866
   },
-  "reached": 0.4930747922437673,
-  "accuracy": 0.8988888888888888
+  "reached": 0.5738161559888579,
+  "accuracy": 0.9117777777777778
  },
  "perfect": {
   "outcomes": {
-   "called_dna": 44,
-   "called_attended": 56,
-   "not_called_dna": 36,
-   "not_called_attended": 864
+   "called_dna": 56,
+   "called_attended": 44,
+   "not_called_dna": 24,
+   "not_called_attended": 876
   },
-  "reached": 0.5484764542936288,
-  "accuracy": 0.9077777777777778
+  "reached": 0.7019498607242339,
+  "accuracy": 0.9322222222222222
  }
 }

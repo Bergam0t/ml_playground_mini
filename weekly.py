@@ -25,14 +25,15 @@ class Measure:
 
 
 MEASURES = {
-    "Very high risk (40% risk or more)": Measure(
+    "Very high risk (70% risk or more)": Measure(
         column="High_Risk_DNA",
         cell_label="at very high risk",
-        day_phrase="at very high risk of being missed (40% risk or more)",
-        rate_phrase="{rate} of appointments are at very high risk of being missed (40% or more)",
+        day_phrase="at very high risk of being missed (70% risk or more)",
+        rate_phrase="{rate} of appointments are at very high risk of being missed (70% or more)",
         thresholds=(0.02, 0.06),
-        help="Only appointments with a predicted risk of not attending of 40% or more (the Very High risk band). "
-        "A short, strict list: it catches the fewest missed appointments but wastes the fewest calls.",
+        help="Only appointments with a predicted risk of not attending of 70% or more (the Very High risk band), "
+        "the patients phoned in the real Physiotherapy pilot. A short, strict list: it catches the fewest "
+        "missed appointments but wastes the fewest calls.",
         repeat_label="Patients flagged more than once",
     ),
     "Likely to be missed (20% risk or more)": Measure(

@@ -28,7 +28,7 @@ SPECIALTIES = {
     "Cardiology": -0.25, "Dermatology": 0.10, "Diabetes & Endocrine": 0.20,
     "ENT": 0.05, "Gastroenterology": -0.05, "General Surgery": -0.15,
     "Gynaecology": 0.00, "Ophthalmology": 0.25, "Orthopaedics": -0.05,
-    "Respiratory": -0.10, "Rheumatology": -0.20, "Urology": -0.10,
+    "Physiotherapy": 0.20, "Respiratory": -0.10, "Rheumatology": -0.20, "Urology": -0.10,
 }
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
 DAY_EFFECT = dict(zip(DAYS, [0.60, 0.05, -0.40, -0.15, 0.45]))
@@ -68,6 +68,7 @@ FEATURES = {
     "Reporting_Site": "Site",
     "Day_Of_Week": "Day of the week",
     "Time_Slot": "Appointment time",
+    "Journey_Time_Mins": "Predicted journey time (minutes)",
 }
 # Categorical model inputs and their categories (fixed, so one-hot columns always line up)
 CATEGORIES = {
@@ -85,6 +86,24 @@ SITE_P = [0.35, 0.25, 0.20, 0.20]
 DNA_RATE = 0.08
 # How many appointments a patient has in the period, and how likely each count is
 VISITS_PER_PATIENT, VISITS_P = [1, 2, 3], [0.75, 0.19, 0.06]
+# Patients who often miss: about this share of them, with this many missed appointments in
+# the last 12 months on average (others average 0.25)
+HABITUAL_SHARE = 0.08
+HABITUAL_MEAN = 5.0
+# Missed appointments before: the strongest clue, adding this much to the log-odds for each
+# one (times 1.5, below). With the habitual missers above and the noise below, this is set so
+# that, as in the real Physiotherapy pilot (pilot.py), about 84% of the appointments the model
+# flags as high risk (70% or more) are missed without a call, while the model's test AUC
+# stays about 0.86 (the "around 86%" the real model is quoted at). The build checks both.
+PREVIOUS_DNA_EFFECT = 0.7
+# Predicted journey time to the appointment: one of the common reasons the real model gave
+# ("long or difficult journeys"). Adds this much to the log-odds (times 1.5) for each step
+# of the log of the journey time away from a typical 25 minutes, so it counts more and more
+# slowly as journeys get longer.
+JOURNEY_EFFECT = 1.0
+TYPICAL_JOURNEY_MINS = 25
+# What the clues can't see: the spread of each appointment's chance around them
+NOISE_SD = 1.9
 
 
 def generate_appointments(n=3200, seed=42, weeks=6):
@@ -97,6 +116,7 @@ def generate_appointments(n=3200, seed=42, weeks=6):
 
     Patient names and appointment times come from a separate random stream, so adding them
     left every other column as it was. A patient keeps their name across appointments.
+    Journey times have a stream of their own too, so adding them changed only the risk.
 
     Each row has a `day_index` (0 = the first Monday) rather than a date, so the
     weekday of a row never changes when the dates roll forward.
@@ -153,11 +173,19 @@ def generate_appointments(n=3200, seed=42, weeks=6):
     # which makes the weekly DNA rates vary. A patient counts in the week of their
     # first appointment.
     week_mix = np.exp(rng.normal(0, 0.45, weeks))[di[visit_no == 0] // 5]
-    habitual = rng.random(m) < np.clip(0.16 * week_mix, 0, 0.6)
-    df["Previous_DNAs"] = np.minimum(rng.poisson(np.where(habitual, 2.2, 0.25)), 8)[patient]
+    habitual = rng.random(m) < np.clip(HABITUAL_SHARE * week_mix, 0, 0.6)
+    df["Previous_DNAs"] = np.minimum(rng.poisson(np.where(habitual, HABITUAL_MEAN, 0.25)), 8)[patient]
     df["Lead_Time_Days"] = np.clip(np.round(rng.lognormal(np.log(35), 0.75, n)), 2, 200).astype(int)
     df["Age"] = age[patient]
     df["Deprivation_Decile"] = decile[patient]
+
+    # Predicted journey time: own random stream (see above). Each patient has a usual journey
+    # to their usual site, a little longer from more deprived areas (more often by bus), and
+    # an appointment at another site takes 20 to 40 minutes more.
+    rng_journey = np.random.default_rng([seed, 2])
+    usual = rng_journey.lognormal(np.log(TYPICAL_JOURNEY_MINS), 0.45, m) * np.exp(0.04 * (5.5 - decile))
+    extra = np.where(same_site, 0, rng_journey.uniform(20, 40, n))
+    df["Journey_Time_Mins"] = np.clip(np.round(usual[patient] + extra), 5, 120).astype(int)
 
     logit = 1.5 * (
         df["Reporting_Site"].map(SITES).to_numpy()
@@ -166,11 +194,12 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         + df["Day_Of_Week"].map(DAY_EFFECT).to_numpy()
         + df["Time_Slot"].map(TIME_EFFECT).to_numpy()
         + MONDAY_MORNING_EFFECT * ((df["Day_Of_Week"] == "Monday") & (df["Time_Slot"] < "12:00")).to_numpy()
-        + 0.65 * np.minimum(df["Previous_DNAs"].to_numpy(), 5)
+        + PREVIOUS_DNA_EFFECT * df["Previous_DNAs"].to_numpy()
         + 0.55 * (np.log(df["Lead_Time_Days"].to_numpy()) - np.log(35))
         - 0.025 * (df["Age"].to_numpy() - 52)
         - 0.10 * (df["Deprivation_Decile"].to_numpy() - 5.5)
-    ) + rng.normal(0, 0.5, n)
+        + JOURNEY_EFFECT * (np.log(df["Journey_Time_Mins"].to_numpy()) - np.log(TYPICAL_JOURNEY_MINS))
+    ) + rng.normal(0, NOISE_SD, n)
     # calibrate the intercept so the average true DNA chance is DNA_RATE
     lo, hi = -12.0, 4.0
     for _ in range(50):
