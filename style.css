@@ -453,8 +453,8 @@ select.mobile-nav,
 	}
 }
 
-/* The phone tab's three rate cards: smaller numbers and padding, so the cards end level
-	with the short dot chart beside them and the results fit on one 1080p screen. */
+/* The phone tab's rate cards: smaller numbers and padding, so they sit beside the short
+	dot chart and the results fit on one 1080p screen. */
 .st-key-phone_rates [data-testid="stMetricValue"],
 .st-key-phone_rates [data-testid="stMetricValue"] * {
 	font-size: 1.9rem;

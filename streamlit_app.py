@@ -1427,9 +1427,15 @@ with tab_calls:
             minutes_per_call,
             dna_cost,
         )
-        # None when the calls reach nobody who would miss: no effect could pay for them
-        be = econ["break_even_effect"]
+        # Missed appointments a week the calls must save to cover their cost. They can only save
+        # the ones they reach, so past that no effect could pay for them.
+        be = econ["break_even_saved"]
         be = float("inf") if be is None else be
+        can_break_even = be <= weekly_reached
+
+        def appointments(n):
+            """A weekly count of appointments: one decimal place under 10."""
+            return f"{n:.1f}" if n < 10 else f"{n:.0f}"
 
     # The cut-off and the costs side by side, so the results fit on one screen. Keyed so
     # style.css stacks them on narrower screens.
@@ -1485,16 +1491,9 @@ with tab_calls:
                 help=f"{weekly_calls:.0f} calls at £{cost_per_call:.2f} each: "
                 f"{econ['staff_hours']:.1f} hours of staff time.",
             )
+            # The two pound figures, then the two counts of appointments, so the break-even sits
+            # beside the number the calls might save
             c2.metric(
-                "Pays for itself at",
-                f"{be:.1%}" if be <= 1 else "more than everyone",
-                border=True,
-                height="stretch",
-                icon=":material/balance:",
-                help="The share of the people the calls reach, who would have missed, that the calls "
-                "must get to attend to cover their staff time. It doesn't depend on the effect slider.",
-            )
-            c3.metric(
                 "Possibly saved",
                 f"£{econ['value_avoided']:,.0f}",
                 # A minus only for a loss, so st.metric still colours it red; no plus or arrow
@@ -1508,11 +1507,27 @@ with tab_calls:
                 f"about £{dna_cost:,.0f} on average. Change this and the call cost under **Cost "
                 "assumptions** in the sidebar.",
             )
+            # The words in the label, not the value: a longer value is cut short on the card,
+            # and a label longer than this wraps and drops the number below its neighbours'
+            c3.metric(
+                "To break even",
+                appointments(be) if can_break_even else "too many",
+                border=True,
+                height="stretch",
+                icon=":material/balance:",
+                help=(
+                    f"The missed appointments a week the calls must save to cover their staff time: "
+                    f"£{econ['call_cost']:,.0f} of calls, at about £{dna_cost:,.0f} a missed appointment. "
+                    "It doesn't depend on the effect slider."
+                    if can_break_even
+                    else f"The calls would need to save {appointments(be)} missed appointments a week to "
+                    f"cover their staff time, but they only reach about {appointments(weekly_reached)} "
+                    "people who would miss."
+                ),
+            )
             c4.metric(
                 "Appointments saved",
-                f"{weekly_avoided:.1f}"
-                if weekly_avoided < 10
-                else f"{weekly_avoided:.0f}",
+                appointments(weekly_avoided),
                 border=True,
                 height="stretch",
                 icon=":material/event_available:",
@@ -1533,17 +1548,19 @@ with tab_calls:
             # to keep the box short.
             st.markdown(
                 (
-                    f"At {effect}%, the calls are {'above' if effect / 100 > be else 'below'} the "
-                    f"break-even, so they would {'more than ' if effect / 100 > be else 'not '}"
-                    "cover their cost."
-                    if be <= 1
+                    f"The calls cost £{econ['call_cost']:,.0f} a week, which saving about "
+                    f"{appointments(be)} missed appointments would cover. At {effect}%, they would save "
+                    f"about {appointments(weekly_avoided)}, so they would "
+                    f"{'more than ' if weekly_avoided > be else 'not '}cover their cost."
+                    if can_break_even
                     else "Even if every call got the patient to attend, the calls would cost more "
                     "than the missed appointments they reach."
                 )
+                # The pilot itself is explained at the bottom of the tab, so name it here
                 + f" That's about **{3 * weekly_avoided / weekly_calls:.1f} appointments saved for "
-                f"every 3 calls** (the pilot: {3 * pilot.SAVED_PER_CALL:.0f}). If calls bring early "
-                f"cancellations as often as in the pilot, about {weekly_calls * pilot.CANCEL_RATE:.0f} a "
-                "week would free a slot for another patient."
+                f"every 3 calls**; in a real-service pilot it was {3 * pilot.SAVED_PER_CALL:.0f}. If calls "
+                f"bring early cancellations as often as they did there, about "
+                f"{weekly_calls * pilot.CANCEL_RATE:.0f} a week would free a slot for another patient."
             )
     elif out["calls"] > 0:
         summary_right.info(
@@ -1562,7 +1579,7 @@ with tab_calls:
         )
         # Keyed so style.css puts the cards under the chart on narrower screens
         left, right = st.container(key="reflow_stack_icons").columns(
-            [0.58, 0.42], gap="large"
+            [0.68, 0.32], gap="large"
         )
         with left:
             # Share 84 small markers of width between the columns in line with their sizes: the
@@ -1577,9 +1594,8 @@ with tab_calls:
             )
             st.caption(
                 'Each marker is one of 1,000 past appointments. "On the call list" is the model\'s list (no '
-                "calls were made); the boxes show what really happened. An unnecessary call went to "
-                f"someone who would have attended anyway. Counts are scaled from {meta['n_past_test']:,} "
-                "past appointments to 1,000, so they can be out by a few."
+                "calls were made); the boxes show what really happened. Counts are scaled from "
+                f"{meta['n_past_test']:,} past appointments to 1,000, so they can be out by a few."
             )
         # Keyed so style.css makes these cards more compact, to sit beside the short chart
         with right.container(key="phone_rates", gap="small"):
@@ -1606,16 +1622,6 @@ with tab_calls:
                 st.caption(
                     f"{out['called_dna']} of the {out['dna_total']} patients who did not attend would get a "
                     f"call; {out['not_called_dna']} would not."
-                )
-            with st.container(border=True, gap="small", key="rate_card_unnecessary"):
-                st.metric(
-                    "Unnecessary calls",
-                    f"{out['called_attended']}",
-                    icon=":material/event_available:",
-                )
-                st.caption(
-                    f"These people would have attended anyway: "
-                    f"{out['called_attended'] / out['calls']:.0%} of the {out['calls']} calls."
                 )
 
     # What happened when the real tool was piloted (pilot.py): the evidence behind the effect

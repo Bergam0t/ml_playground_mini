@@ -108,9 +108,9 @@ def call_economics(calls, reached, effect, cost_per_call, minutes_per_call, dna_
 
     `reached` is how many calls reach someone who would otherwise miss; `effect` is the
     assumed share of them a call gets to attend (0 to 1); `dna_cost` is the average cost
-    of a missed appointment among those reached. The break-even effect is the share the
-    calls would need to get to attend to cover their own staff cost (None if they reach
-    nobody, or over 1 if no effect could).
+    of a missed appointment among those reached. The break-even is how many missed
+    appointments the calls would need to save to cover their own staff cost (None if a missed
+    appointment has no value); if it is more than `reached`, no effect could cover it.
     """
     call_cost = calls * cost_per_call
     value_reached = reached * (dna_cost or 0)
@@ -121,5 +121,5 @@ def call_economics(calls, reached, effect, cost_per_call, minutes_per_call, dna_
         value_reached=value_reached,
         value_avoided=value_avoided,
         net=value_avoided - call_cost,
-        break_even_effect=call_cost / value_reached if value_reached > 0 else None,
+        break_even_saved=call_cost / dna_cost if dna_cost else None,
     )

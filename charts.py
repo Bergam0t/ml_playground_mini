@@ -305,7 +305,7 @@ _COLUMNS = [
 _SIZES = {
     False: dict(unit=16, marker=9, line=2, col_font=22, sym_font=18, title_font=15, why_font=13,
                 col_head=44.8, box_head=80, min_box=256),
-    True: dict(unit=10, marker=6, line=1.5, col_font=18, sym_font=15, title_font=14, why_font=12,
+    True: dict(unit=12, marker=7, line=1.5, col_font=18, sym_font=15, title_font=14, why_font=12,
                col_head=30, box_head=48, min_box=230),
 }
 _HEADING_H = 2.0  # the optional line above the column headings, in units
@@ -330,7 +330,7 @@ def outcome_blocks(
     laid out left_cols / right_cols wide, so the Your rule tab can keep its 100 calls in a 10 x 10
     square and the phone tab can widen the columns with the number of calls. heading, if given,
     runs across the top of both columns to say how the list was made. compact draws it smaller
-    and shorter (see _SIZES); give it about 85 columns in all to fill a 860px-wide column."""
+    and shorter (see _SIZES); give it about 85 columns in all to fill a 1,030px-wide column."""
     size = _SIZES[compact]
     unit = size["unit"]
     min_box_w, box_head, col_head = (size[k] / unit for k in ("min_box", "box_head", "col_head"))
