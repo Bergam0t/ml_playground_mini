@@ -351,14 +351,15 @@ with st.sidebar.container(key="nihr_logo"):
 # Which view the Upcoming appointments tab shows. Only offered on that tab; the tabs are
 # keyed, so the page state says which one is open.
 VIEW_ALL = "Show all appointments"
-VIEW_WEEK = "Show next week call list"
+VIEW_WEEK = "Show next week's call list"
+VIEW_ICONS = {VIEW_ALL: ":material/table_rows:", VIEW_WEEK: ":material/call:"}
 DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
 if st.session_state.get("page") == TAB_LABELS[1]:
     st.sidebar.segmented_control(
-        "View",
+        "Click the buttons below to change the view",
         [VIEW_ALL, VIEW_WEEK],
         key="appt_view",
-        help="What the Upcoming appointments tab shows: the list of appointments, or a summary by week and day.",
+        format_func=lambda v: f"{VIEW_ICONS[v]} {v}",
     )
 view = st.session_state.get("appt_view") or VIEW_ALL
 

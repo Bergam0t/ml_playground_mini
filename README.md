@@ -130,7 +130,7 @@ lambda_ml_streamlit_exercise:
 **Patient name and appointment time.** Each patient has a made-up name (the same on all their
 appointments), and each appointment a clinic time from 08:30 to 16:45 in 15-minute steps (fewer over
 lunch). Both come from a separate random stream, so adding them left every other column unchanged. The
-name is shown only on the call list (Show next week call list), with the appointment time. The model sees
+name is shown only on the call list (Show next week's call list), with the appointment time. The model sees
 the hour (`Time_Slot`, 08:00 to 16:00) as a clue: appointments starting 10-12 or 15-17 miss more
 (`TIME_EFFECT` in `demo_data.py`), and Monday before midday gets an extra push
 (`MONDAY_MORNING_EFFECT`) on top of Monday's own, so it is the worst slot of the week (about 19%
