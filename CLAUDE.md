@@ -12,6 +12,14 @@ Headless runs need **both** of these, because two things resolve paths against d
   `resources/fonts/...` relative to the *working directory* (streamlit_app.py, near the top), so
   it breaks if the test is started from anywhere else.
 
+Also:
+
+- **Use the project's virtual environment**, `.venv/Scripts/python.exe`. It has the pinned
+  Streamlit (1.66.1). The system Python has an older Streamlit that fails on
+  `st.html(..., unsafe_allow_javascript=True)`.
+- **Put the repo on `sys.path`** (`sys.path.insert(0, "C:/ml_playground_mini")`) at the top of a
+  test script kept outside the repo. Otherwise the app's own imports (`import calls`) fail.
+
 A first `at.run()` takes about 4 seconds; use `default_timeout=60` or so. If a headless run
 hangs with no output at all, check the command itself (e.g. something reading stdin) before
 blaming the app: the app's only `time.sleep` loop is the model "race" on the first tab, which

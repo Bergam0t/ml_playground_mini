@@ -11,51 +11,42 @@ streamlit run streamlit_app.py
 
 ## What's in the app
 
-The tabs are in the order a senior visitor with a couple of minutes needs them: the real tool and
-why it helps first, then how many calls to make, then a game as a bonus for those who stay.
+The tabs are in the order a senior visitor with a couple of minutes needs them: why the model
+helps and how it reaches a risk first, then how many calls to make, then a game as a bonus for those
+who stay, and last a demo of the real tool's dashboard for those who want to try it.
 
-- **Upcoming appointments** tab (the landing page), with three views picked by the stacked switch at
-  the top of the sidebar: **All appointments**, **Weekly summary** and **Next week's call list**.
-  All appointments puts the table, the thing to click, as high on the page as it can:
-  - A short introduction and the three forecast cards, beside the demonstration notice (which
-    gives the real pilot's result): forecast DNAs, confident DNAs (the best return on staff time
-    when only a few calls can be made) and the value of appointments kept if every forecast DNA
-    is phoned (`forecast_savings`; the value of clinic slots, not cash).
-  - The appointment table, highest risk first, 6 rows at a time (`TABLE_ROWS`); it scrolls.
-    Click a row to open an overlay (`explain_appointment`, an `st.dialog`) with a SHAP waterfall
-    explaining that appointment's predicted risk of not attending and a "How to read this chart"
-    guide (a small made-up example). A switch at the top of the overlay changes it to **Overall**:
-    what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
-    chart beside it for the filtered appointments when the sidebar filters leave at least 30
-    (`overall_importance`). The switch is a segmented control, not `st.tabs`, because style.css
-    turns every top-level tab bar into the page navbar. The overlay opens only on the click, not on later reruns, and dismissing it clears the
-    selection so the same row can be clicked again. The table is a fragment
-    (`appointments_table`), so a click reruns just that part and the overlay opens in about a
-    second; the sidebar filters are outside it and rerun the page. Its DNA Risk and Confidence
-    filters sit above it, on one row with a "What does confidence mean?" popover, and narrow
-    only the table: in the sidebar they would fight the forecast cards and call list, and the
-    chart below would go round in circles (they select by the forecast it explains).
+- **Why use a model?** tab (the landing page). Uses all the upcoming appointments: the sidebar shows
+  only the cost assumptions here, not the filters.
+  - A short introduction beside the demonstration notice (which gives the real pilot's result).
   - **Why not just phone those who've missed before?**: of 1,000 past appointments (79
     missed), how many would 100 calls have reached who then missed, phoning the model's list
     (41), phoning those who missed most before (23) and at random (8, a quieter tile, as the
     baseline). The question sits in bold right above the tiles, and each tile reads as a sentence
     ("41 / of 100 calls / reached someone who would have missed") so it makes sense on its own.
     It leads with what the simple rule can't do: 6 in 10 missed appointments are by people who'd
-    never missed before. A yellow box (like the demonstration
-    notice) says the appointments are synthetic: the factors reflect what the real model found
-    (its common reasons), but not exactly, as how much each one counts is made up (the bonus
-    game's demonstration caption says the same about its clues). The model tile's help adds that the
-    model gives every patient a risk and the reasons behind it. Worked out by
-    `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv` (the same
-    rows). Each tile also shows the same in £ over the upcoming weeks: the value of appointments
-    kept by phoning every forecast DNA (the model's tile), or the same number of patients chosen
-    by the simple rule or at random (valued the same way). A note under the tiles says what the £
-    is and gives the cost of the calls once, as it's the same all three ways (clinic time kept,
-    not cash). Buttons lead to the phone tab ("Explore these
-    assumptions") and the bonus game.
-- **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
-  every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
-  under the grid, highest risk first. The call list view covers just next week.
+    never missed before. A yellow box (like the demonstration notice) says the appointments are
+    synthetic: the factors reflect what the real model found (its common reasons), but not
+    exactly, as how much each one counts is made up (the bonus game's demonstration caption says
+    the same about its clues). Worked out by `rule_game.three_ways()` from `rule_game_past.csv`
+    and `past_predictions.csv` (the same rows). Each tile also shows the same in £ over the
+    upcoming weeks: the value of appointments kept by phoning every forecast DNA (the model's
+    tile), or the same number of patients chosen by the simple rule or at random (valued the same
+    way). A note under the tiles says what the £ is and gives the cost of the calls once, as it's
+    the same all three ways (clinic time kept, not cash).
+  - **Each tile is clickable** (an invisible button stretched over it by `style.css`; the chosen
+    tile is outlined in teal). Under the tiles, the phone tab's **Are we calling the right
+    people?** chart and rate cards (`calling_right_people`) show that way's 100 calls: who they'd
+    reach and who they'd miss. The outcomes come from `rule_game.three_ways_outcomes()`; at random
+    has no list of its own, so it shows the counts expected on average. The box is a fragment
+    (`compare_ways`), so a click reruns just that part.
+  - **Why does the model give a patient their risk?**: a SHAP waterfall for one upcoming
+    appointment, always on show, with big buttons to swap between a high-risk (70% or more, the
+    high-risk flag), medium-risk (20% to 70%, forecast as a DNA but not flagged) and low-risk
+    (under 5%) patient (`RISK_GROUPS`), and **Show a different patient** for another from the
+    same group. The page opens on the same high-risk patient for every visitor (a fixed seed).
+    The "How to read this chart" guide sits in a column beside it. A fragment
+    (`explain_a_patient`).
+  - A button leads on to the phone tab.
 - **How many people should we phone?** tab: choose in the sidebar who an admin team would phone, by the number of calls
   the team can make each week or by minimum predicted risk. A 1,000-marker chart
   (ported from lambda_ml_streamlit_exercise) shows, for past appointments, how many calls would
@@ -70,7 +61,7 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
   2, and estimates the early cancellations (slots freed for other patients) at the pilot's rate.
   Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
   per 3 calls, as in the pilot.
-- **Bonus: beat the model** tab (last): a short game to show how a machine learning model learns to
+- **Bonus: beat the model** tab: a short game to show how a machine learning model learns to
   beat a person's rule.
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
@@ -97,18 +88,46 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
   - The verdict names the best rule the buttons can make and how far the model is ahead of it.
     It says a simple rule does most of the work only when the model is 3 or fewer ahead, so it
     stays true if the data changes.
-  - Two buttons lead back to the Upcoming appointments and How many people should we phone? tabs, as in the
-    geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
+  - Two buttons lead on to the demo dashboard and back to How many people should we phone?, as in
+    the geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
+- **Try a demo dashboard** tab (last): the real tool's screens on synthetic data, with three views
+  picked by the stacked switch at the top of the sidebar: **All appointments**, **Weekly summary**
+  and **Next week's call list**. Last on the bar but drawn before the phone tab and the game in
+  the script, as the game's training animation must come last.
+  All appointments puts the table, the thing to click, as high on the page as it can:
+  - A short introduction and the three forecast cards, beside the demonstration notice:
+    forecast DNAs, confident DNAs (the best return on staff time when only a few calls can be
+    made) and the value of appointments kept if every forecast DNA is phoned
+    (`forecast_savings`; the value of clinic slots, not cash).
+  - The appointment table, highest risk first, 10 rows at a time (`TABLE_ROWS`); it scrolls.
+    Click a row to open an overlay (`explain_appointment`, an `st.dialog`) with a SHAP waterfall
+    explaining that appointment's predicted risk of not attending and a "How to read this chart"
+    guide (a small made-up example). A switch at the top of the overlay changes it to **Overall**:
+    what the model relies on most (mean |SHAP|) across all upcoming appointments, with a second
+    chart beside it for the filtered appointments when the sidebar filters leave at least 30
+    (`overall_importance`). The switch is a segmented control, not `st.tabs`, because style.css
+    turns every top-level tab bar into the page navbar. The overlay opens only on the click, not
+    on later reruns, and dismissing it clears the selection so the same row can be clicked again.
+    The table is a fragment (`appointments_table`), so a click reruns just that part and the
+    overlay opens in about a second; the sidebar filters are outside it and rerun the page. Its
+    DNA Risk and Confidence filters sit above it, on one row with a "What does confidence mean?"
+    popover, and narrow only the table: in the sidebar they would fight the forecast cards and
+    call list, and the chart below would go round in circles (they select by the forecast it
+    explains).
+  - **Weekly summary**: appointments and forecast DNAs for every upcoming week, by weekday,
+    coloured by either list. Click a day to list its appointments under the grid, highest risk
+    first. The call list view covers just next week.
+  - **Next week's call list**: what the admin team would work from, earliest first, with each
+    patient's name and appointment time.
 
-Both views also show the expected cost of missed appointments
-(each predicted risk times that appointment's cost).
-
-The sidebar filters apply to the Upcoming appointments tab (there is no date filter: click a day in the Weekly summary view instead). How many people should we phone?
-hides them and shows its own controls (who to phone, and the assumed effect of a call) and the cost assumptions: its calls-per-week figures use all the upcoming
-appointments, and the chart uses past appointments. The filters keep their settings for the other
-tabs (the script checks the open tab, which it can since the tabs are keyed). The bonus game
-uses past appointments only, so the sidebar is hidden while that tab (the last) is open (a CSS rule
-in `style.css` keyed on the selected tab, so the filters keep their settings for the other tabs).
+The sidebar filters apply to the demo dashboard only (there is no date filter: click a day in the
+Weekly summary view instead). The other tabs use all the upcoming appointments and hide them: How
+many people should we phone? shows its own controls (who to phone, and the assumed effect of a call)
+and the cost assumptions, and Why use a model? only the cost assumptions (they set the £ in its
+tiles). The filters keep their settings while another tab is open (the script checks the open tab,
+which it can since the tabs are keyed). The bonus game uses past appointments only, so the sidebar
+is hidden while that tab (the third) is open (a CSS rule in `style.css` keyed on the selected tab,
+so the sidebar's settings are kept for the other tabs).
 
 ## Screen size
 
@@ -244,7 +263,7 @@ python build/train_and_explain.py
 python build/rule_game_data.py
 ```
 
-`build/rule_game_data.py` makes the two files for the bonus game tab (and the landing page's "Why not just phone those who've missed before?" box). It uses the same
+`build/rule_game_data.py` makes the two files for the bonus game tab (and the first tab's "Why not just phone those who've missed before?" box). It uses the same
 split as the main build, and checks that its test appointments match `past_predictions.csv`.
 
 - `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a

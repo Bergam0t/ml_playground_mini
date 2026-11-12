@@ -141,17 +141,16 @@ section[data-testid="stSidebar"] hr {
 [data-testid="stExpandSidebarButton"] {
 	transform: translateY(2.15rem);
 }
-/* ---- No sidebar on the last tab ---- */
+/* ---- No sidebar on the bonus game ---- */
 /* The filters and cost assumptions don't apply to the bonus game ("Bonus: beat the model",
-	the last tab), so while that tab is open, hide the sidebar and (when it's shut) its
-	re-expand button, and give the title its usual padding back. Done in CSS because Streamlit
-	draws every tab in one run, so the script can't tell which tab is open; hiding also keeps
-	the filters' settings for the other tabs. */
-[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-last-child(1 of [data-testid="stTab"])[data-selected="true"])
+	the third tab), so while that tab is open, hide the sidebar and (when it's shut) its
+	re-expand button, and give the title its usual padding back. Done in CSS so the sidebar's
+	widgets are still drawn, and keep their settings for the other tabs. */
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-child(3 of [data-testid="stTab"])[data-selected="true"])
 	:is([data-testid="stSidebar"], [data-testid="stExpandSidebarButton"]) {
 	display: none;
 }
-[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-last-child(1 of [data-testid="stTab"])[data-selected="true"])
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-child(3 of [data-testid="stTab"])[data-selected="true"])
 	[role="tablist"]:not([data-testid="stTabPanel"] *) {
 	padding-left: 2rem;
 }
@@ -198,10 +197,10 @@ section[data-testid="stSidebar"] hr {
 
 /* ---- The way on from the bonus game ---- */
 /* Ported from the geographic mini's next-step boxes: a lightly outlined box, split in two
-	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or
+	("Try a demo dashboard" and "Plan the calls"), divided by a line beside them, or
 	above the second when they stack below 1300px. Both halves are full height with the
 	buttons pinned to the bottom, so the buttons line up if one heading wraps.
-	The views of the Upcoming appointments tab end in the same box with a single button
+	The first tab and the views of the demo dashboard end in the same box with a single button
 	(view_next_*), so there is no split to style for them. */
 :is(.st-key-game_next, [class*="st-key-view_next_"]:not([class*="st-key-view_next_btn_"])) {
 	padding: 1.25rem 1.5rem;
@@ -219,16 +218,16 @@ section[data-testid="stSidebar"] hr {
 .st-key-reflow_stack_game_next [data-testid="stHorizontalBlock"] { align-items: stretch; }
 .st-key-reflow_stack_game_next [data-testid="stColumn"] { display: flex; flex-direction: column; }
 .st-key-reflow_stack_game_next [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
-:is(.st-key-to_appts, .st-key-to_calls),
+:is(.st-key-to_dash, .st-key-to_calls),
 [class*="st-key-view_next_btn_"] {
 	margin: auto 0 0;
 }
-:is(.st-key-to_appts, .st-key-to_calls) button,
+:is(.st-key-to_dash, .st-key-to_calls) button,
 [class*="st-key-view_next_btn_"] button {
 	min-height: 3.5rem;
 	padding: 0 1.5rem;
 }
-:is(.st-key-to_appts, .st-key-to_calls) button p,
+:is(.st-key-to_dash, .st-key-to_calls) button p,
 [class*="st-key-view_next_btn_"] button p {
 	font-family: "HSMA Display", sans-serif;
 	font-size: 1.1rem;
@@ -567,10 +566,11 @@ select.mobile-nav,
 	}
 }
 
-/* The phone tab's rate cards: smaller numbers and padding, so they sit beside the short
-	dot chart and the results fit on one 1080p screen. */
-.st-key-phone_rates [data-testid="stMetricValue"],
-.st-key-phone_rates [data-testid="stMetricValue"] * {
+/* The rate cards beside the "Are we calling the right people?" chart (on the phone tab and
+	the first tab): smaller numbers and padding, so they sit beside the short dot chart and
+	the phone tab's results fit on one 1080p screen. */
+[class*="st-key-rates_"] [data-testid="stMetricValue"],
+[class*="st-key-rates_"] [data-testid="stMetricValue"] * {
 	font-size: 1.9rem;
 	line-height: 1.2;
 }
@@ -580,13 +580,13 @@ select.mobile-nav,
 	gap: 0.25rem;
 }
 /* The "+22 pts vs random" pill beside the number, not on a line of its own */
-.st-key-phone_rates [data-testid="stMetric"] > div {
+[class*="st-key-rates_"] [data-testid="stMetric"] > div {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	column-gap: 0.75rem;
 }
-.st-key-phone_rates [data-testid="stMetricLabel"] { flex-basis: 100%; }
+[class*="st-key-rates_"] [data-testid="stMetricLabel"] { flex-basis: 100%; }
 
 /* The phone tab's "Who are we calling?" box: numbers the size of the rate cards', so
 	"about 100" fits its half of the narrow box, and the "19% of appointments" pill on one line */
@@ -607,10 +607,9 @@ select.mobile-nav,
 	align-items: start;
 }
 
-/* The landing page's "Why not just phone those who've missed before?" box: the model's tile
-	picked out in the primary colour, and the random tile quieter, as the baseline rather than
-	the eye-catcher. Equal shares so all three sit on one row on a wide screen, and a minimum
-	width so they stack, one per row, on a phone. */
+/* The first tab's "Why not just phone those who've missed before?" box. Equal shares so all
+	three tiles sit on one row on a wide screen, and a minimum width so they stack, one per row,
+	on a phone. */
 .st-key-landing_ways > div { flex: 1 1 0; min-width: 9rem; }
 /* The tiles the same height, with the £ line at the foot of each, so they sit level */
 .st-key-landing_ways { align-items: stretch; }
@@ -630,8 +629,70 @@ select.mobile-nav,
 	text-overflow: clip;
 	overflow: visible;
 }
-.st-key-ways_model { border-color: #1fb1b9; }
+/* The random tile quieter, as the baseline rather than the eye-catcher, unless it is chosen */
 .st-key-ways_random { opacity: 0.6; }
+/* Each tile is one big button: an invisible st.button (pick_way_*) stretched over it, so a
+	click anywhere on it shows that way's calls under the tiles. The metric's help icon sits
+	above it, so its tooltip still opens. */
+.st-key-landing_ways [class*="st-key-ways_"] {
+	position: relative;
+	cursor: pointer;
+	transition: border-color 0.15s, background-color 0.15s;
+}
+.st-key-landing_ways [class*="st-key-ways_"]:hover {
+	border-color: rgba(31, 177, 185, 0.6);
+	background-color: rgba(31, 177, 185, 0.06);
+}
+[class*="st-key-pick_way_"] {
+	position: absolute;
+	inset: 0;
+	z-index: 1;
+	margin: 0;
+}
+[class*="st-key-pick_way_"] .stButton,
+[class*="st-key-pick_way_"] button {
+	width: 100%;
+	height: 100%;
+}
+[class*="st-key-pick_way_"] button {
+	opacity: 0;
+	cursor: pointer;
+}
+.st-key-landing_ways [data-testid="stTooltipIcon"],
+.st-key-landing_ways [data-testid="stTooltipHoverTarget"] {
+	position: relative;
+	z-index: 2;
+}
+/* The chosen tile: the app's teal, so it reads as picked */
+.st-key-landing_ways [class*="st-key-ways_"][class*="_chosen"] {
+	border: 2px solid #1fb1b9;
+	background-color: rgba(31, 177, 185, 0.12);
+	opacity: 1;
+}
+
+/* ---- The first tab's explanation chart ---- */
+/* Big buttons to choose a high-, medium- or low-risk patient: the chosen one filled, the
+	others outlined, and "Show a different patient" at the far end of the row */
+.st-key-intro_risk_buttons { flex-wrap: wrap; gap: 0.75rem; }
+.st-key-intro_risk_buttons .stButton button {
+	min-height: 3.25rem;
+	padding: 0.5rem 1.4rem;
+}
+.st-key-intro_risk_buttons .stButton button p {
+	font-size: 1.1rem;
+	font-weight: 600;
+}
+.st-key-intro_risk_buttons [data-testid="stBaseButton-secondary"] {
+	background-color: transparent;
+	border: 2px solid #076b72;
+}
+.st-key-intro_risk_buttons [data-testid="stBaseButton-primary"] {
+	background-color: #1fb1b9;
+	border: 2px solid #1fb1b9;
+}
+.st-key-intro_shuffle { margin-left: auto; }
+/* The "How to read this chart" column beside it, tinted like the overlay's guide */
+.st-key-intro_guide { background-color: rgba(255, 255, 255, 0.04); }
 
 /* Toasts (only "The model just overtook your best rule!" in the bonus game): the app's teal,
 	the colour of the active tab, with dark bold text, so it stands out during the race */
@@ -648,7 +709,7 @@ select.mobile-nav,
 	font-weight: 700;
 }
 
-/* The muted note beside a section's question title on the phone tab (section_title) */
+/* The muted note beside a section's question title (section_title) */
 .title-note {
 	font-size: 0.9rem;
 	font-weight: 400;

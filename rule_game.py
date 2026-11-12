@@ -1,4 +1,5 @@
-"""Bonus: beat the model: the logic behind the game on the last tab.
+"""Bonus: beat the model: the logic behind the game on the third tab, and the
+three ways to choose who to phone on the first.
 
 A visitor picks clues to phone by; each clue they pick gets an equal say. Their rule is
 scored on the 4,500 past appointments the model didn't learn from, at the same number of
@@ -111,6 +112,36 @@ def three_ways(past: pd.DataFrame, model_risk) -> dict:
         "model": caught(np.asarray(model_risk, dtype=float)),
         "never_missed_share": float(y[past["Previous_DNAs"].to_numpy() == 0].sum() / y.sum()),
     }
+
+
+def three_ways_outcomes(past: pd.DataFrame, model_risk) -> dict:
+    """The full calls.call_outcomes() dict for each of three_ways(): the same CALL_SHARE calls
+    by the model, by SIMPLE_RULE and at random, for charts.outcome_blocks and the rate cards.
+    At random has no list of its own, so it is built from the expected counts (CALL_SHARE of
+    the misses reached), the same figure three_ways() gives."""
+    y = past["Did_Not_Attend"].to_numpy()
+    model_risk = np.asarray(model_risk, dtype=float)
+    rule = rule_score(past, SIMPLE_RULE)
+    ways = {
+        name: calls.call_outcomes(calls.called_by_share(score, CALL_SHARE), y, score)
+        for name, score in (("model", model_risk), ("rule", rule))
+    }
+    n_calls = round(CALL_SHARE * 1000)
+    would_miss = round(y.mean() * 1000)
+    called_dna = round(would_miss * CALL_SHARE)
+    ways["random"] = {
+        "called_dna": called_dna,
+        "called_attended": n_calls - called_dna,
+        "not_called_dna": would_miss - called_dna,
+        "not_called_attended": 1000 - n_calls - (would_miss - called_dna),
+        "calls": n_calls,
+        "dna_total": would_miss,
+        "cutoff": None,
+        "precision": called_dna / n_calls,
+        "recall": called_dna / would_miss if would_miss else None,
+        "random_precision": would_miss / 1000,
+    }
+    return ways
 
 
 def all_rule_catches(past: pd.DataFrame) -> dict:
