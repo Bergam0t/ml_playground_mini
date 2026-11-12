@@ -1175,14 +1175,14 @@ def forecast_savings(called, risk_min, weeks=None):
         "random": kept(random_reached),
         "help": f"{n_calls:,} calls at £{cost_per_call:.2f} each: £{saving['call_cost']:,.0f}, "
         f"or {few(saving['staff_hours'])} hours of staff time, so about "
-        f"£{saving['net']:,.0f} after the cost of the calls. In past appointments, "
+        f"£{saving['net']:,.0f} after the cost of the calls.\n\nIn past appointments, "
         f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
-        f"someone who would otherwise miss. If {DEFAULT_CALL_EFFECT}% of them attend instead "
+        f"someone who would otherwise miss.\n\nIf {DEFAULT_CALL_EFFECT}% of them attend instead "
         f"(what the {pilot.SERVICE.lower()} pilot saw, with no comparison group, so calls may "
         f"change fewer people here), that's about {few(reached * effect)} fewer missed "
-        f"appointments, each valued at about £{dna_cost:,.0f}.{per_week} This is the value of "
-        "the clinic slots kept, not cash: a Trust may not be paid more when a patient attends. "
-        "The costs come from **Cost assumptions** in the sidebar.",
+        f"appointments, each valued at about £{dna_cost:,.0f}.{per_week}\n\nThis is the value "
+        "of the clinic slots kept, not cash: a Trust may not be paid more when a patient "
+        "attends.\n\nThe costs come from **Cost assumptions** in the sidebar.",
         "compare_help": f"In past appointments, the same share of calls would have reached "
         f"someone who then missed {precision:.0%} of the time with the model's list, "
         f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
@@ -1345,58 +1345,45 @@ with tab_appts:
                 f"**If the team made {n_calls} calls, how many would reach a patient who then "
                 "missed their appointment?**"
             )
+            # One tile per way: the number reached per 100 calls, then the same in £ over the
+            # upcoming weeks (the value of the appointments kept by phoning every forecast DNA,
+            # the third card at the top, and by the same number of calls made the other two
+            # ways). The £ is before the cost of the calls, which is the same all three ways and
+            # is given once under the tiles.
+            tiles = [
+                ("model", "The model's list", ways["model"], ":material/smart_toy:", "value",
+                 (f"Phoning the {n_calls} appointments with the highest predicted risk. The model "
+                  "also gives every patient a risk, so the list fits the calls the team can make, "
+                  "and the reasons behind each one (click a row in the table).")),
+                ("rule", "Missed most before", ways["rule"], ":material/history:", "rule",
+                 (f"Phoning the {n_calls} patients who had missed the most appointments before: "
+                  "the simple rule most people would choose. Patients who've never missed look "
+                  "the same to it.")),
+                ("random", "At random", round(ways["random"]), None, "random",
+                 (f"Phoning {n_calls} appointments picked at random: the baseline, with no way "
+                  "of choosing who to call.")),
+            ]
             with ways_numbers.container(horizontal=True, key="landing_ways"):
-                with st.container(key="ways_model"):
-                    st.metric(
-                        "The model's list",
-                        f"{ways['model']}",
-                        f"of {n_calls} calls",
-                        delta_color="off",
-                        delta_arrow="off",
-                        delta_description=reached,
-                        border=True,
-                        icon=":material/smart_toy:",
-                        help=f"Phoning the {n_calls} appointments with the highest predicted "
-                        "risk. The model also gives every patient a risk, so the list fits the "
-                        "calls the team can make, and the reasons behind each one (click a row "
-                        "in the table).",
-                    )
-                st.metric(
-                    "Missed most before",
-                    f"{ways['rule']}",
-                    f"of {n_calls} calls",
-                    delta_color="off",
-                    delta_arrow="off",
-                    delta_description=reached,
-                    border=True,
-                    icon=":material/history:",
-                    help=f"Phoning the {n_calls} patients who had missed the most appointments "
-                    "before: the simple rule most people would choose. Patients who've never "
-                    "missed look the same to it.",
-                )
-                with st.container(key="ways_random"):
-                    st.metric(
-                        "At random",
-                        f"{ways['random']:.0f}",
-                        f"of {n_calls} calls",
-                        delta_color="off",
-                        delta_arrow="off",
-                        delta_description=reached,
-                        border=True,
-                        help=f"Phoning {n_calls} appointments picked at random: the baseline, "
-                        "with no way of choosing who to call.",
-                    )
-            # The same in £: the value of the appointments kept by phoning every forecast DNA
-            # (the third card at the top), and by the same calls made the other two ways, in the
-            # tiles' order. Before the cost of the calls, which is the same all three ways.
+                for key, label, value, icon, pounds, help_text in tiles:
+                    with st.container(border=True, key=f"ways_{key}"):
+                        st.metric(
+                            label,
+                            f"{value}",
+                            f"of {n_calls} calls",
+                            delta_color="off",
+                            delta_arrow="off",
+                            delta_description=reached,
+                            icon=icon,
+                            help=help_text,
+                        )
+                        if savings is not None:
+                            st.markdown(f"**£{savings[pounds]:,.0f}** kept over {length}")
             if savings is not None:
-                ways_numbers.markdown(
-                    f"**Value of appointments kept over the next {length}**, phoning all "
-                    f"{savings['n_calls']:,} forecast DNAs: **£{savings['value']:,.0f}** with the "
-                    f"model's list · £{savings['rule']:,.0f} by those who missed before · "
-                    f"£{savings['random']:,.0f} at random. The calls cost "
-                    f"£{savings['call_cost']:,.0f} whichever way you choose; the value is clinic "
-                    "time kept, not cash.",
+                ways_numbers.caption(
+                    f"**£ in each box:** the value of appointments kept over the next {length} if "
+                    f"the team phoned {savings['n_calls']:,} patients chosen that way (as many as "
+                    f"the model forecasts as DNAs). The calls cost £{savings['call_cost']:,.0f} "
+                    "whichever way you choose; the value is clinic time kept, not cash.",
                     help=savings["compare_help"],
                 )
 
@@ -2385,7 +2372,6 @@ with tab_game:
                         frames,
                         i,
                         best["outcomes"]["called_dna"],
-                        learning["perfect"]["outcomes"]["called_dna"],
                         n_missed,
                         overtook=at,
                         height=440,
@@ -2412,9 +2398,11 @@ with tab_game:
         for i in range(len(frames)):
             draw_model(i, "run", best)
             if i == at:
+                # Teal and bold (style.css), and up for longer, so it isn't missed mid-race
                 st.toast(
                     "The model just overtook your best rule!",
                     icon=":material/emoji_events:",
+                    duration="long",
                 )
             if i < len(frames) - 1:
                 # Linger where the model passes you, hurry through frames where little changes
@@ -2430,7 +2418,7 @@ with tab_game:
     # ---- 3. The verdict, straight after the race
     if st.session_state.get("game_trained") and best:
         st.markdown("#### 3. See whose list did best")
-        final, perfect = frames[-1], learning["perfect"]
+        final = frames[-1]
         yours, theirs = best["outcomes"]["called_dna"], final["outcomes"]["called_dna"]
         st.success(
             (
@@ -2476,8 +2464,9 @@ with tab_game:
             else "Your rule uses one clue on its own."
         )
 
+        # The model's card wider: it has more to say than the short "nobody gets them all" card
         c1, c2 = st.container(key="reflow_stack_game_verdict_cards").columns(
-            2, gap="small"
+            [0.62, 0.38], gap="small"
         )
         with c1.container(border=True, key="title_card_game_say", height="stretch"):
             st.markdown(
@@ -2487,14 +2476,20 @@ with tab_game:
                 f"{equal_say} The model gives "
                 f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
                 f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less."
-                f"\n\n{found} {verdict}"
+                f"\n\n{found}\n\n{verdict}"
             )
         with c2.container(border=True, key="title_card_game_limit", height="stretch"):
-            st.markdown(":material/visibility_off: **Nobody gets them all.**")
             st.markdown(
-                "Even a perfect list, one that knows each patient's true chance of missing, reaches only "
-                f"{perfect['outcomes']['called_dna']} of {n_missed}."
-                "\n\nMany misses come down to things no data records, like bad weather or bus delays."
+                ":material/visibility_off: **Nobody – not even the best computer model – gets "
+                "them all.**"
+            )
+            # The weather forecast as the everyday picture of a risk, not a certainty
+            st.markdown(
+                "A 70% chance of rain doesn't mean it will rain. Missed appointments work the "
+                "same way: some high-risk patients turn up, and some low-risk ones miss because "
+                "of <span class='highlight'>things no data records</span>, like a bus delay or a "
+                "poorly child.",
+                unsafe_allow_html=True,
             )
 
         # ---- Why a computer? (like the geographic mini's "Why computers?")
@@ -2507,10 +2502,14 @@ with tab_game:
             border=True,
             height="stretch",
         )
+        # The two points picked out in the app's yellow highlight (style.css), as in the intro
         w2.markdown(
-            "- Computers can re-learn when things change, like a new site or new booking habits. "
-            "\n- Some models can also spot clues that matter more in combination, like a long gap mattering more "
-            "before a first appointment, or Monday mornings being worse than other days.",
+            "- Computers can <span class='highlight'>re-learn when things change</span>, like a new "
+            "site or new booking habits. "
+            "\n- Some models can also <span class='highlight'>spot clues that matter more in "
+            "combination</span>, like a long gap mattering more before a first appointment, or "
+            "Monday mornings being worse than other days.",
+            unsafe_allow_html=True,
         )
 
         # st.markdown(

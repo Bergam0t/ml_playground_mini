@@ -47,10 +47,11 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     game's demonstration caption says the same about its clues). The model tile's help adds that the
     model gives every patient a risk and the reasons behind it. Worked out by
     `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv` (the same
-    rows). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
-    kept by phoning every forecast DNA, against the same number of calls made by the simple rule and
-    at random (valued the same way, before the cost of the calls, which the line gives once as
-    it's the same all three ways; clinic time kept, not cash). Buttons lead to the phone tab ("Explore these
+    rows). Each tile also shows the same in £ over the upcoming weeks: the value of appointments
+    kept by phoning every forecast DNA (the model's tile), or the same number of patients chosen
+    by the simple rule or at random (valued the same way). A note under the tiles says what the £
+    is and gives the cost of the calls once, as it's the same all three ways (clinic time kept,
+    not cash). Buttons lead to the phone tab ("Explore these
     assumptions") and the bonus game.
 - **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
   every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
@@ -86,8 +87,11 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     "Overtook you" marker show where the model passes them (800 for the best rule).
   - The verdict follows at once: a banner saying where the model overtook them, then two short
     cards: same clues but the model learnt which matter most (no rule from the buttons can match
-    its 42), and even the best possible list (knowing each patient's true chance) reaches only
-    55 of 79. A short "Why a computer?" section comes last.
+    its 42), and nobody, not even the best computer model, gets them all (a risk is like a
+    chance of rain: some high-risk patients turn up and some low-risk ones miss). The race chart
+    shows only the model's line and the visitor's best rule: the best possible list (knowing
+    each patient's true chance, 55 of 79, still in `rule_game_learning.json` as `perfect`) was
+    taken off as too abstract for a stand. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
   - The verdict names the best rule the buttons can make and how far the model is ahead of it.

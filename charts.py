@@ -289,7 +289,6 @@ def learning_curve(
     frames: list,
     upto: int,
     your_best: int | None,
-    perfect: int,
     n_missed: int,
     overtook: int | None = None,
     height: int = 330,
@@ -297,7 +296,7 @@ def learning_curve(
     """Missed appointments (per 1,000 past appointments) on the model's call list, by how
     many past appointments it has learnt from, drawn up to frame `upto`. The x axis is the
     full set of sizes from the start (evenly spaced, as each roughly doubles), so it doesn't
-    move while it draws. `your_best` and `perfect` are counts on the same scale. `overtook`
+    move while it draws. `your_best` is a count on the same scale. `overtook`
     is the frame where the model first beats your best: marked once the line reaches it. The
     newest point is labelled with the model's score."""
     sizes = [f"{f['n']:,}" for f in frames]
@@ -313,14 +312,12 @@ def learning_curve(
             hovertemplate=f"After %{{x}} past appointments: %{{y}} of the {n_missed} missed appointments correctly predicted<extra></extra>",
         )
     )
-    lines = [(perfect, "Best possible list", MUTED, "dot")]
     if your_best is not None:
-        lines.append((your_best, "Your best rule", YOU, "dash"))
-    for value, label, colour, dash in lines:
-        fig.add_hline(y=value, line=dict(color=colour, dash=dash, width=2))
+        fig.add_hline(y=your_best, line=dict(color=YOU, dash="dash", width=2))
         fig.add_annotation(
-            x=0, xref="paper", xanchor="left", y=value, yanchor="bottom",
-            text=f"{label}: {value} of {n_missed}", showarrow=False, font=dict(color=colour, size=13),
+            x=0, xref="paper", xanchor="left", y=your_best, yanchor="bottom",
+            text=f"Your best rule: {your_best} of {n_missed}", showarrow=False,
+            font=dict(color=YOU, size=13),
         )
     # The model's latest score, beside its newest point: to the right while there is room, under
     # it for the last two points (the line is flat there, so nothing is in the way)

@@ -595,6 +595,9 @@ select.mobile-nav,
 	the eye-catcher. Equal shares so all three sit on one row on a wide screen, and a minimum
 	width so they stack, one per row, on a phone. */
 .st-key-landing_ways > div { flex: 1 1 0; min-width: 9rem; }
+/* The tiles the same height, with the £ line at the foot of each, so they sit level */
+.st-key-landing_ways { align-items: stretch; }
+.st-key-landing_ways [class*="st-key-ways_"] > :last-child { margin-top: auto; }
 /* "reached someone who would have missed" on its own line under the "of 100 calls" pill, in full */
 .st-key-landing_ways div:has(> [data-testid="stMetricDeltaDescription"]) {
 	flex-wrap: wrap;
@@ -610,8 +613,23 @@ select.mobile-nav,
 	text-overflow: clip;
 	overflow: visible;
 }
-.st-key-ways_model [data-testid="stMetric"] { border-color: #1fb1b9; }
+.st-key-ways_model { border-color: #1fb1b9; }
 .st-key-ways_random { opacity: 0.6; }
+
+/* Toasts (only "The model just overtook your best rule!" in the bonus game): the app's teal,
+	the colour of the active tab, with dark bold text, so it stands out during the race */
+[data-testid="stToast"] {
+	background-color: #1fb1b9;
+	box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+[data-testid="stToast"],
+[data-testid="stToast"] * {
+	color: #0e1117 !important;
+}
+[data-testid="stToast"] [data-testid="stMarkdownContainer"] p {
+	font-size: 1.2rem;
+	font-weight: 700;
+}
 
 /* The muted note beside a section's question title on the phone tab (section_title) */
 .title-note {
