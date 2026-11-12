@@ -738,10 +738,7 @@ def appointments_table(table_data, filter_key, sidebar_choices):
         )
         # The table's selection from the click that caused this run, to shade that row
         picked = st.session_state.get(table_key)
-        picked_rows = [
-            *(picked.selection.rows if picked else []),
-            *(r for r, _ in (picked.selection.cells if picked else [])),
-        ]
+        picked_rows = [r for r, _ in (picked.selection.cells if picked else [])]
         # Keyed so style.css can keep this table's scrollbar visible
         with st.container(key="appointments_grid"):
             table = st.dataframe(
@@ -752,7 +749,8 @@ def appointments_table(table_data, filter_key, sidebar_choices):
                 hide_index=True,
                 alt="Upcoming appointments with the forecast risk of not attending",
                 on_select=open_explanation,
-                selection_mode=["single-row", "single-cell"],
+                # Cells only: row selection would add a column of tickboxes
+                selection_mode="single-cell",
                 # A fixed number of rows; it scrolls
                 row_height=TABLE_ROW_HEIGHT,
                 height=(TABLE_ROWS + 1) * TABLE_ROW_HEIGHT + 3,
@@ -760,13 +758,9 @@ def appointments_table(table_data, filter_key, sidebar_choices):
                 # different appointment, and when the explanation is dismissed, to clear it
                 key=table_key,
             )
-        # A ticked row or a clicked cell both select. Positions refer to the rows as passed
-        # in, whatever sorting the user applies
-        selected_rows = [
-            r
-            for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
-            if r < len(table_data)
-        ]
+        # A clicked cell selects its row. Positions refer to the rows as passed in, whatever
+        # sorting the user applies
+        selected_rows = [r for r, _ in table.selection.cells if r < len(table_data)]
         # Only on the run the click caused, so it doesn't reopen on later reruns
         if st.session_state.pop("explain_open", False) and selected_rows:
             explain_appointment(
@@ -800,10 +794,7 @@ def explainable_table(
     table_key = f"{name}_{filter_key}_{unique}_{st.session_state.get('table_nonce', 0)}"
     # The table's selection from the click that caused this run, to shade that row
     picked = st.session_state.get(table_key)
-    picked_rows = [
-        *(picked.selection.rows if picked else []),
-        *(r for r, _ in (picked.selection.cells if picked else [])),
-    ]
+    picked_rows = [r for r, _ in (picked.selection.cells if picked else [])]
     # Keyed so style.css can keep this table's scrollbar visible
     with st.container(key=f"{name}_grid"):
         table = st.dataframe(
@@ -816,15 +807,13 @@ def explainable_table(
             column_config=CALL_LIST_COLUMNS if call_list else APPOINTMENT_COLUMNS,
             hide_index=True,
             on_select=open_explanation,
-            selection_mode=["single-row", "single-cell"],
+            # Cells only: row selection would add a column of tickboxes
+            selection_mode="single-cell",
             # A new key when the explanation is dismissed, to clear the selection
             key=table_key,
         )
-    selected_rows = [
-        r
-        for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
-        if r < len(rows)
-    ]
+    # A clicked cell selects its row
+    selected_rows = [r for r, _ in table.selection.cells if r < len(rows)]
     # Only on the run the click caused, so it doesn't reopen on later reruns
     if st.session_state.pop("explain_open", False) and selected_rows:
         explain_appointment(
