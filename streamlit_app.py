@@ -201,20 +201,23 @@ def in_words(share):
 def bars_caveat():
     """What an explanation chart's bars mean, for a non-technical reader."""
     return (
-        "These bars show patterns the model spotted, not causes: changing one of these facts "
-        "wouldn't necessarily make a patient more likely to attend."
+        "\n\nThese bars show :yellow[**patterns**] the model spotted, :yellow[**not causes**]: "
+        "changing one of these facts wouldn't necessarily make a patient more likely to attend. "
+        "For that, we need a different kind of machine learning."
     )
 
 
 def model_accuracy(question="How good is the model?"):
     """How good the model is, for a non-technical reader: how often a Very High flag was right,
-    and how many missed appointments it caught, on past appointments the model hadn't seen."""
-    recall, precision = catch_rates(HIGH_RISK_MIN)
+    on past appointments the model hadn't seen, and why the records can't explain every missed
+    appointment."""
+    _, precision = catch_rates(HIGH_RISK_MIN)
     return (
         f"{question} We checked it on past appointments it hadn't seen. Of the patients it "
         f"rated Very High risk ({HIGH_RISK_MIN:.0%} or more), about {in_words(precision)} did "
-        f"miss. But it can't spot everyone: only about {in_words(recall)} missed "
-        "appointments had a risk that high."
+        "miss.\n\nBut it only knows what's in the records. :yellow[**Many appointments are missed "
+        "for reasons the records don't show**], such as a sudden illness or a problem with transport, "
+        "so plenty of patients who miss never get a high risk."
     )
 
 
@@ -538,7 +541,8 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
             f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
             f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
         )
-    st.info(model_caveat())
+    # Keyed "caveat" so style.css colours its highlight
+    st.container(key=f"caveat_{filter_key}").info(model_caveat())
     st.warning(
         "This is a synthetic dataset, so these results should not be used for service planning.",
         icon=":material/science:",
@@ -649,7 +653,8 @@ def this_appointment(row, expl):
         how_to_read("guide")
 
     patient_waterfall(expl, f"waterfall_{row['row_id']}")
-    st.info(
+    # Keyed "caveat" so style.css colours its highlight
+    st.container(key="caveat_appointment").info(
         "A predicted risk is an estimate based on similar appointments in past data, not a "
         f"forecast of what this one person will do. {model_caveat()}"
     )

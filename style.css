@@ -405,6 +405,11 @@ select.mobile-nav,
 
 /* ---- Tab 1 intro: highlighted text and threshold pills (from the geographic playground mini) ---- */
 .highlight { color: #ffe600; font-weight: 700; }
+/* The same highlight where HTML can't go: st.info and the other alert boxes don't render a
+   <span class='highlight'>, so the text there uses Markdown's :yellow[**...**] instead (see
+   bars_caveat). Streamlit sets its own yellow as an inline style, so this needs !important.
+   Only inside containers keyed "caveat", so the :red[...] in the demo notices stays red. */
+[class*="st-key-"][class*="caveat"] .stMarkdownColoredText { color: #ffe600 !important; }
 /* A term being defined in passing (DNA): the theme teal, so it differs from the yellow highlight */
 .term { color: #1fb1b9; font-weight: 700; }
 .threshold-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
