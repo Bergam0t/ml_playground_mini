@@ -609,16 +609,18 @@ def demo_notice_full(key):
     Its poster and video open in pop-ups (show_poster, show_video). The notice is drawn
     on several tabs, so key keeps each tab's buttons apart.
     """
-    st.warning(
-        "**DEMONSTRATION VERSION**\n\n"
-        "This is a demonstration of a :red[**real tool**], currently being piloted by "
-        "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
-        f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
-        f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
-        "Here, all the data for training and display is synthetic: "
-        "no real patients or Trust data are displayed.",
-        icon=":material/science:",
-    )
+    # In a keyed container so style.css can make the notice's text smaller
+    with st.container(key=f"demo_notice_{key}"):
+        st.warning(
+            "**DEMONSTRATION VERSION**\n\n"
+            "This is a demonstration of a :red[**real tool**], currently being piloted by "
+            "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
+            f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
+            f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
+            "Here, all the data for training and display is synthetic: "
+            "no real patients or Trust data are displayed.",
+            icon=":material/science:",
+        )
     # One per line: the labels are too long to sit side by side in the narrow column
     with st.container(key=f"demo_links_{key}"):
         if st.button(
