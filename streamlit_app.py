@@ -500,7 +500,11 @@ def learn_more():
     )
 
 
-@st.dialog("Impact poster", width="large")
+@st.dialog(
+    "Read about the impact of the real tool this is based on, made by a member of the "
+    "6th cohort of the Health Service Modelling Associates (HSMA) programme",
+    width="large",
+)
 def show_poster():
     """The HSMA impact poster, in a pop-up so the visitor stays in the app."""
     st.image(POSTER_URL)
