@@ -375,11 +375,7 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
                 f"**{data['DNA_Prob_Forecast'].mean():.0%}** for all upcoming appointments."
             )
         ]
-        same_value = [
-            label
-            for label, choice in sidebar_choices
-            if choice != "All"
-        ]
+        same_value = [label for label, choice in sidebar_choices if choice != "All"]
         if same_value:
             listed = " and ".join(same_value)
             notes.append(
@@ -399,6 +395,10 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
         "The model is reasonably but not perfectly accurate: tested on past appointments it "
         "hadn't seen, it gave a missed appointment a higher risk than an attended one about "
         f"{meta['auc_test'] * 100:.0f} times in 100."
+    )
+    st.warning(
+        "This is a synthetic dataset, so these results should not be used for service planning.",
+        icon=":material/science:",
     )
 
 
@@ -424,7 +424,7 @@ def explain_appointment(row, overall):
         row, load_shap().loc[row["row_id"]], meta["base_value_pp"]
     )
     title = (
-        f"Patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y}: a "
+        f"Patient {row['MRN']} on {row['Activity_Date']:%d/%m/%Y} has a "
         f"{expl['fx']:.0f}% risk of not attending: why?"
     )
     st.dialog(title, width="large", on_dismiss=close_explanation)(explanation_body)(
@@ -460,12 +460,11 @@ def this_appointment(row, expl, meta):
 
     # Starts open; collapse it once you have the idea (it stays collapsed between patients)
     with st.expander(
-        "How to read this chart",
+        "How to read this chart (a made-up example)",
         expanded=True,
         key="chart_guide",
         icon=":material/help:",
     ):
-        st.caption("A made-up example.")
         # Keyed so style.css stacks the example above the steps on narrower screens
         example_col, steps_col = st.container(key="reflow_stack_guide").columns(
             [4, 5], vertical_alignment="center"
@@ -504,6 +503,11 @@ def this_appointment(row, expl, meta):
         f"perfectly accurate: tested on past appointments it hadn't seen, it gave a missed "
         f"appointment a higher risk than an attended one about {meta['auc_test'] * 100:.0f} "
         f"times in 100."
+    )
+    st.warning(
+        "This is not a real patient, and the factors shown here should not be used for "
+        "service planning.",
+        icon=":material/science:",
     )
 
 
@@ -1108,7 +1112,9 @@ with tab_appts:
             n_past_dnas = int(past["Did_Not_Attend"].sum())
             dates = pd.to_datetime(filtered_data["Activity_Date"])
             days = (dates.max() - dates.min()).days + 1
-            weeks = -(-days // 7)  # whole weeks, rounded up (appointments run Monday to Friday)
+            weeks = -(
+                -days // 7
+            )  # whole weeks, rounded up (appointments run Monday to Friday)
             length = f"{days} day{'s' * (days != 1)}" if days <= 7 else f"{weeks} weeks"
             n_forecast = int(filtered_data["DNA_Forecast"].sum())
             # The value of the appointments kept by phoning every forecast DNA, and the same
@@ -1151,7 +1157,9 @@ with tab_appts:
                     )
                 with st.container(border=True, height="stretch"):
                     if savings is None:
-                        st.metric("Value of appointments kept", "–", icon=":material/savings:")
+                        st.metric(
+                            "Value of appointments kept", "–", icon=":material/savings:"
+                        )
                         st.caption(
                             "None of the appointments in your filters is forecast as a DNA, so "
                             "there are no calls to cost."
@@ -1184,9 +1192,9 @@ with tab_appts:
         # ---- Why use the model: the same calls three ways, under the table
         ways, _, _ = load_comparison()
         with st.container(border=True, key="landing_compare"):
-            ways_text, ways_numbers = st.container(key="reflow_stack_landing_ways").columns(
-                [0.45, 0.55], gap="large", vertical_alignment="center"
-            )
+            ways_text, ways_numbers = st.container(
+                key="reflow_stack_landing_ways"
+            ).columns([0.45, 0.55], gap="large", vertical_alignment="center")
             with ways_text:
                 st.markdown("#### Same calls, three ways")
                 st.caption(
@@ -1202,7 +1210,10 @@ with tab_appts:
                 with st.container(horizontal=True):
                     if savings is not None:
                         explore_button(
-                            FORECAST_MIN, "savings", "not just your filters", primary=False
+                            FORECAST_MIN,
+                            "savings",
+                            "not just your filters",
+                            primary=False,
                         )
                     st.button(
                         "Bonus: can you beat the model?",

@@ -38,6 +38,21 @@ def _waterfall_trace(labels, values, measure, texts):
     )
 
 
+VALUE = "#f2c14e"  # a patient's own figure in a row label: warm, so not mistaken for red or blue
+
+
+def _highlight_values(fig, labels, size):
+    """Show the figure after " = " in each row label bigger and in VALUE colour. Only the axis
+    text changes: the labels the hover uses stay plain."""
+    styled = []
+    for label in labels:
+        name, sep, value = label.partition(" = ")
+        styled.append(
+            f'{name} = <span style="color:{VALUE};font-size:{size}px">{value}</span>' if sep else label
+        )
+    fig.update_yaxes(tickmode="array", tickvals=labels, ticktext=styled)
+
+
 def _layout(fig, height, **kwargs):
     fig.update_layout(
         height=height,
@@ -66,6 +81,7 @@ def waterfall(expl: dict) -> go.Figure:
     for s in steps:
         running.append(running[-1] + s["value"])
     x_max = max(running) * 1.15 + 3
+    _highlight_values(fig, labels, 18)
     return _layout(
         fig,
         120 + 40 * len(labels),
@@ -157,6 +173,7 @@ def guide_waterfall() -> go.Figure:
         xaxis=dict(visible=False, range=[0, badge_x + 4], fixedrange=True),
     )
     fig.update_layout(font_size=12)  # smaller than the real chart: it is only a guide
+    _highlight_values(fig, labels, 15)
     return fig
 
 
