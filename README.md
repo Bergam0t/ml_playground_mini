@@ -164,6 +164,11 @@ model tab (described below).
   tested on (not trained on), with whether each patient really attended
 - `model_meta.json`: the average (base) risk, test AUC and package versions
 
+The appointments belong to a fictional trust, Riverbourne Hospitals (`TRUST_NAME` in
+`demo_data.py`), with four made-up sites. These replaced real hospital names one for one: each
+site kept its place in `SITES` and `LOCATIONS`, its number of locations and its alphabetical
+order, so the random draws, the model and every number stayed exactly the same.
+
 They are made offline by `build/train_and_explain.py`, which follows the pipeline in
 lambda_ml_streamlit_exercise:
 

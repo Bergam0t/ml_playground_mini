@@ -14,7 +14,7 @@ import explain
 import pilot
 import rule_game
 import weekly
-from demo_data import DATA_DIR, load_forecast  # DEMO: synthetic data replaces SQL
+from demo_data import DATA_DIR, TRUST_NAME, load_forecast  # DEMO: synthetic data replaces SQL
 from mobile_nav import add_mobile_nav
 
 HSMA_URL = "https://hsma.co.uk"
@@ -772,8 +772,8 @@ def demo_notice_full(key):
             "outpatient teams in a London trust, which predicts attendance for real upcoming appointments. "
             f"In a {pilot.SERVICE} pilot, phoning the patients it flagged as high risk cut missed "
             f"appointments among them from {pilot.DNA_BEFORE:.0%} to {pilot.DNA_AFTER:.0%}.\n\n"
-            "Here, all the data for training and display is synthetic: "
-            "no real patients or Trust data are displayed.",
+            f"Here, all the data for training and display is synthetic, from a fictional trust "
+            f"({TRUST_NAME}): no real patients or Trust data are displayed.",
             icon=":material/science:",
         )
     # One per line: the labels are too long to sit side by side in the narrow column
@@ -2190,7 +2190,8 @@ with tab_game:
         unsafe_allow_html=True,
     )
     st.caption(
-        ":material/science: Demonstration version: all the appointments here are synthetic. The "
+        ":material/science: Demonstration version: all the appointments here are synthetic, from a "
+        f"fictional trust ({TRUST_NAME}). The "
         "clues reflect what the real model found, but not exactly: how much each one counts is made "
         "up. No real patients or Trust data are displayed."
     )

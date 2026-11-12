@@ -1,7 +1,8 @@
 """Synthetic stand-in for [dbo].[vw_Combined_Future_OP_Forecast].
 
-Everything is randomly generated - no real patient or Trust data. Mobile numbers are
-random UK mobile numbers, so some may happen to match real ones.
+Everything is randomly generated - no real patient or Trust data. The trust and its sites
+are fictional (TRUST_NAME, SITES). Mobile numbers are random UK mobile numbers, so some may
+happen to match real ones.
 
 Two parts:
 - generate_appointments() makes appointments and a hidden "true" chance of not attending.
@@ -17,12 +18,18 @@ import pandas as pd
 
 DATA_DIR = Path(__file__).parent / "data"
 
-SITES = {"Royal London": 0.10, "Newham": 0.20, "Whipps Cross": 0.05, "St Bart's": -0.25}
+# A fictional trust and its sites, so the made-up differences between sites can't be read as
+# findings about real hospitals. They replaced real hospital names one for one: each site keeps
+# its place in these lists and its number of locations (the random draws pick by position), and
+# the sites sort in the same alphabetical order, so every number, and the order of rows, stayed
+# exactly as it was. Keep both true if you rename them again.
+TRUST_NAME = "Riverbourne Hospitals"
+SITES = {"Brenmoor": 0.10, "Ashby Vale": 0.20, "Dunmere": 0.05, "Calderwood": -0.25}
 LOCATIONS = {
-    "Royal London": ["RL Outpatients Zone A", "RL Outpatients Zone B", "RL Cardiac Centre"],
-    "Newham": ["Newham Outpatients", "Newham Diagnostic Hub"],
-    "Whipps Cross": ["WX Outpatients Zone 1", "WX Outpatients Zone 2", "WX Eye Unit"],
-    "St Bart's": ["Bart's Heart Centre", "Bart's Outpatients"],
+    "Brenmoor": ["BM Outpatients Zone A", "BM Outpatients Zone B", "BM Cardiac Centre"],
+    "Ashby Vale": ["Ashby Vale Outpatients", "Ashby Vale Diagnostic Hub"],
+    "Dunmere": ["DM Outpatients Zone 1", "DM Outpatients Zone 2", "DM Eye Unit"],
+    "Calderwood": ["Calderwood Heart Centre", "Calderwood Outpatients"],
 }
 SPECIALTIES = {
     "Cardiology": -0.25, "Dermatology": 0.10, "Diabetes & Endocrine": 0.20,
