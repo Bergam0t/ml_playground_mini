@@ -2484,15 +2484,20 @@ with tab_calls:
         if moved:
             st.session_state.phone_move = st.session_state.get("phone_move", 0) + 1
         st.session_state.phone_shown = counts
-        calling_right_people(
-            out,
-            "the model's list",
-            # The bridge from the per-week figures above to the past appointments below
-            f"the same setting replayed on 1,000 past appointments: {out['calls']:,} calls",
-            "phone",
-            previous=shown if moved else None,
-            token=st.session_state.get("phone_move", 0),
-        )
+        # The rate cards' numbers flash yellow on a change too (style.css), as on the first
+        # tab: the key swaps between two names on each change, each with its own copy of the
+        # animation, so it plays again every time; before any change, no flash.
+        flash = st.session_state.get("phone_move", 0)
+        with st.container(key=f"phone_calling_flash{flash % 2}" if flash else "phone_calling"):
+            calling_right_people(
+                out,
+                "the model's list",
+                # The bridge from the per-week figures above to the past appointments below
+                f"the same setting replayed on 1,000 past appointments: {out['calls']:,} calls",
+                "phone",
+                previous=shown if moved else None,
+                token=flash,
+            )
 
     # What happened when the real tool was piloted (pilot.py): the evidence behind the effect
     # slider's starting value. Full width at the bottom, in an expander, so the results above
