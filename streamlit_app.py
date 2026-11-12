@@ -1483,9 +1483,18 @@ def compare_ways(savings, length):
                 f"Tested on {1000:,} past appointments (synthetic)",
                 icon=":material/science:",
             ):
+                # The counts from the build (build/train_and_explain.py splits the past
+                # appointments: the model learns from one part and is tested on another)
+                n_learnt = load_rule_game()[1]["n_train"]
+                n_tested = load_model_meta()["n_past_test"]
                 st.caption(
-                    f"The model didn't learn from these {1000:,} past appointments, of which "
-                    f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed.\n\n"
+                    f"The model learnt from **{n_learnt:,} past appointments**. It's tested "
+                    f"fairly, on **{n_tested:,} others it never saw** while learning, so it "
+                    "can't just remember who missed: like an exam with questions the student "
+                    "hasn't seen before.\n\n"
+                    f"To make them easy to read, the figures here are scaled from those "
+                    f"{n_tested:,} to {1000:,} appointments: {ways['n_missed']} in every "
+                    f"{1000:,} ({past_dna_rate:.0%}) were missed.\n\n"
                     "**They are synthetic.** The factors reflect what the real model found "
                     "(long journeys, long waits between appointments, appointments after "
                     "treatment had finished), but not exactly: how much each one counts here "
