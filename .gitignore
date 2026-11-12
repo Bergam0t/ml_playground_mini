@@ -3,3 +3,6 @@ __pycache__
 *.pyc
 
 prototypes/
+
+# Claude Code / Playwright MCP testing output
+.playwright-mcp/

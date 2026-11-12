@@ -488,10 +488,10 @@ select.mobile-nav,
 }
 
 /* ---- "Click a row" in the call to action above the appointment tables ---- */
-/* The site's highlight yellow and a bit bigger, so the instruction is the first thing read. */
+/* The site's highlight yellow and much bigger, so the instruction is the first thing read. */
 [class*="st-key-click_cta_"] strong {
 	color: #ffe600;
-	font-size: 1.2em;
+	font-size: 1.6em;
 }
 
 /* ---- The All appointments and call list tables' scrollbars ---- */
@@ -712,13 +712,15 @@ select.mobile-nav,
 		animation: none;
 	}
 }
-/* The scripts for the marker animation and the explanation chart's (grow_waterfall.py): they
-	run, but take no space (nor their wrappers' flex gap, which would push what follows down
-	for the length of the run) */
+/* The scripts for the marker animation, the explanation chart's (grow_waterfall.py) and the
+	pointers that show what to click (click_hint.py): they run, but take no space (nor their
+	wrappers' flex gap, which would push what follows down for the length of the run) */
 [class*="st-key-marker_move_"],
 [data-testid="stLayoutWrapper"]:has(> [class*="st-key-marker_move_"]),
 .st-key-intro_grow,
-[data-testid="stLayoutWrapper"]:has(> .st-key-intro_grow) {
+[data-testid="stLayoutWrapper"]:has(> .st-key-intro_grow),
+[class*="st-key-click_hint_"],
+[data-testid="stLayoutWrapper"]:has(> [class*="st-key-click_hint_"]) {
 	display: none;
 }
 

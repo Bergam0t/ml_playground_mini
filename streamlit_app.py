@@ -12,6 +12,7 @@ import pandas as pd
 
 import calls
 import charts
+import click_hint
 import costs
 import explain
 import grow_waterfall
@@ -19,7 +20,11 @@ import move_markers
 import pilot
 import rule_game
 import weekly
-from demo_data import DATA_DIR, TRUST_NAME, load_forecast  # DEMO: synthetic data replaces SQL
+from demo_data import (
+    DATA_DIR,
+    TRUST_NAME,
+    load_forecast,
+)  # DEMO: synthetic data replaces SQL
 from mobile_nav import add_mobile_nav
 
 HSMA_URL = "https://hsma.co.uk"
@@ -52,7 +57,9 @@ def fitted_image(path):
 
 
 st.logo(
-    fitted_image("resources/Chalky HSMA-07-wide white logo tall with tagline - new tagline.png"),
+    fitted_image(
+        "resources/Chalky HSMA-07-wide white logo tall with tagline - new tagline.png"
+    ),
     size="large",
     link=HSMA_URL,
 )
@@ -871,7 +878,9 @@ def demo_notice_short():
     with st.container(key="demo_links_intro", horizontal=True):
         if st.button(":material/image: Poster", key="poster_intro", width="stretch"):
             show_poster()
-        if st.button(":material/play_circle: Video", key="video_intro", width="stretch"):
+        if st.button(
+            ":material/play_circle: Video", key="video_intro", width="stretch"
+        ):
             show_video()
 
 
@@ -880,7 +889,9 @@ def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
 
     Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
     """
-    if notice is None:  # the notice is elsewhere (the sidebar): the text takes the full width
+    if (
+        notice is None
+    ):  # the notice is elsewhere (the sidebar): the text takes the full width
         return st.container(key=f"reflow_stack_{key}")
     left, right = st.container(key=f"reflow_stack_{key}").columns(
         list(widths), gap="large"
@@ -1004,7 +1015,9 @@ data["Probabilty"] = data["DNA_Prob_Forecast"] * 100
 # hover "fullscreen" button.
 with st.sidebar.container(key="nihr_logo"):
     st.image(
-        fitted_image("resources/NIHR_APPLIED_RESEARCH_COLLABORATION_Logo_Horizontal_RGB_WHITE.png"),
+        fitted_image(
+            "resources/NIHR_APPLIED_RESEARCH_COLLABORATION_Logo_Horizontal_RGB_WHITE.png"
+        ),
         width="stretch",
         link="https://arc-sw.nihr.ac.uk/",
     )
@@ -1151,7 +1164,9 @@ st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
 st.session_state["call_effect"] = st.session_state["call_effect"]
 if page == TAB_INTRO:
     st.sidebar.slider(key="call_effect", **CALL_EFFECT_SLIDER)
-    st.sidebar.caption(f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%.")
+    st.sidebar.caption(
+        f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%."
+    )
 
 # Cost assumptions: not filters, so they stay out of filter_key below and editing them
 # never clears a table selection
@@ -1169,9 +1184,12 @@ minutes_per_call = st.sidebar.number_input(
     help="On average, including unanswered attempts and noting the outcome.",
 )
 # Keyed so style.css can hide the advanced settings on the first tab; the widgets are still drawn
-with st.sidebar.container(key="cost_advanced"), st.expander(
-    "Advanced settings for calls and missed appointment costs",
-    icon=":material/payments:",
+with (
+    st.sidebar.container(key="cost_advanced"),
+    st.expander(
+        "Advanced settings for calls and missed appointment costs",
+        icon=":material/payments:",
+    ),
 ):
     hourly = st.number_input(
         "Admin staff cost per hour (£)",
@@ -1391,7 +1409,7 @@ def outcome_cols(n_calls):
 
 
 def calling_right_people(out, list_name, note, key, previous=None, token=None):
-    """"Are we calling the right people?": the past appointments as four boxes (on the call list
+    """ "Are we calling the right people?": the past appointments as four boxes (on the call list
     or not, missed or not) beside the two rate cards, for the calls in `out`
     (calls.call_outcomes). `list_name` says how the call list was made, for the caption; `key`
     keeps the phone tab's copy and the first tab's apart (and keys them for style.css).
@@ -1414,7 +1432,9 @@ def calling_right_people(out, list_name, note, key, previous=None, token=None):
         )
         if previous is not None:
             move_markers.animate_moves(
-                move_markers.outcome_moves(previous, out, outcome_cols(previous["calls"]), cols),
+                move_markers.outcome_moves(
+                    previous, out, outcome_cols(previous["calls"]), cols
+                ),
                 token,
                 f"outcome_blocks_{key}",
             )
@@ -1477,11 +1497,13 @@ def compare_ways(savings, length):
     if chosen not in ("model", "rule", "random"):
         chosen = "model"
     with st.container(border=True, key="landing_compare"):
-        ways_text, ways_numbers = st.container(
-            key="reflow_stack_landing_ways"
-        ).columns([0.35, 0.65], gap="large", vertical_alignment="center")
+        ways_text, ways_numbers = st.container(key="reflow_stack_landing_ways").columns(
+            [0.35, 0.65], gap="large", vertical_alignment="center"
+        )
         with ways_text:
-            st.markdown("#### Why bother with machine learning, rather than just phoning those who've missed before?")
+            st.markdown(
+                "#### Why bother with machine learning, rather than just phoning those who've missed before?"
+            )
             st.markdown(
                 f"**{ways['never_missed_share'] * 10:.0f} in 10 missed appointments are by people "
                 "who'd never missed before.** That simple rule alone can't spot them, but the model can."
@@ -1538,17 +1560,41 @@ def compare_ways(savings, length):
         # and by the same number of calls made the other two ways). The £ is after the cost
         # of the calls, which is the same all three ways and is also given once above the tiles.
         tiles = [
-            ("model", "The model's list", ways["model"], ":material/smart_toy:", "value",
-             (f"Phoning the {n_calls} appointments with the highest predicted risk. The model "
-              "also gives every patient a risk, so the list fits the calls the team can make, "
-              "and the reasons behind each one (see the chart further down).")),
-            ("rule", "Missed most before", ways["rule"], ":material/history:", "rule",
-             (f"Phoning the {n_calls} patients who had missed the most appointments before: "
-              "the simple rule most people would choose. Patients who've never missed look "
-              "the same to it.")),
-            ("random", "At random", round(ways["random"]), None, "random",
-             (f"Phoning {n_calls} appointments picked at random: the baseline, with no way "
-              "of choosing who to call.")),
+            (
+                "model",
+                "The model's list",
+                ways["model"],
+                ":material/smart_toy:",
+                "value",
+                (
+                    f"Phoning the {n_calls} appointments with the highest predicted risk. The model "
+                    "also gives every patient a risk, so the list fits the calls the team can make, "
+                    "and the reasons behind each one (see the chart further down)."
+                ),
+            ),
+            (
+                "rule",
+                "Missed most before",
+                ways["rule"],
+                ":material/history:",
+                "rule",
+                (
+                    f"Phoning the {n_calls} patients who had missed the most appointments before: "
+                    "the simple rule most people would choose. Patients who've never missed look "
+                    "the same to it."
+                ),
+            ),
+            (
+                "random",
+                "At random",
+                round(ways["random"]),
+                None,
+                "random",
+                (
+                    f"Phoning {n_calls} appointments picked at random: the baseline, with no way "
+                    "of choosing who to call."
+                ),
+            ),
         ]
         with ways_numbers.container(horizontal=True, key="landing_ways"):
             for key, label, value, icon, pounds, help_text in tiles:
@@ -1582,6 +1628,13 @@ def compare_ways(savings, length):
                             f"**{'-' if net < 0 else ''}£{abs(net):,.0f}** kept over {length}, "
                             "after call costs"
                         )
+        # The first time a visitor opens this tab, a pointer shows them clicking a box: one
+        # that isn't chosen, so the click visibly would change something. After a pause, so
+        # they've read the question first. Only once the tab is open (see show_click_hint)
+        if page == TAB_INTRO:
+            click_hint.show_click_hint(
+                "ways", f"ways_{'rule' if chosen == 'model' else 'model'}", delay=1500
+            )
 
         # Who the chosen tile's calls would reach, as on the phone tab. No divider above, so
         # the chart a click changes stays close to the tiles.
@@ -1599,7 +1652,9 @@ def compare_ways(savings, length):
         flash = st.session_state.get("landing_flash", 0)
         moved_from = st.session_state.pop("landing_move", None)
         outcomes = load_way_outcomes()
-        with st.container(key=f"landing_who_flash{flash % 2}" if flash else "landing_who"):
+        with st.container(
+            key=f"landing_who_flash{flash % 2}" if flash else "landing_who"
+        ):
             calling_right_people(
                 outcomes[chosen],
                 list_names[chosen],
@@ -1616,7 +1671,12 @@ def compare_ways(savings, length):
 LOW_RISK_MAX = 0.05
 RISK_GROUPS = {
     "high": ("High risk", f"{HIGH_RISK_MIN:.0%} or more", HIGH_RISK_MIN, 1.01),
-    "medium": ("Medium risk", f"{FORECAST_MIN:.0%} to {HIGH_RISK_MIN:.0%}", FORECAST_MIN, HIGH_RISK_MIN),
+    "medium": (
+        "Medium risk",
+        f"{FORECAST_MIN:.0%} to {HIGH_RISK_MIN:.0%}",
+        FORECAST_MIN,
+        HIGH_RISK_MIN,
+    ),
     "low": ("Low risk", f"under {LOW_RISK_MAX:.0%}", 0.0, LOW_RISK_MAX),
 }
 
@@ -1870,6 +1930,10 @@ with tab_dash:
                 ("appointment type", selected_appointment_type),
             ],
         )
+        # The first time a visitor opens this view, a pointer shows them clicking a row. Only
+        # once the tab is open (see show_click_hint)
+        if page == TAB_DASH:
+            click_hint.show_click_hint("appointments", "appointments_grid", TABLE_ROW_HEIGHT)
 
         # ---- The way on: one button, to the next view (style.css)
         next_step(
@@ -2482,7 +2546,9 @@ with tab_calls:
         # tab: the key swaps between two names on each change, each with its own copy of the
         # animation, so it plays again every time; before any change, no flash.
         flash = st.session_state.get("phone_move", 0)
-        with st.container(key=f"phone_calling_flash{flash % 2}" if flash else "phone_calling"):
+        with st.container(
+            key=f"phone_calling_flash{flash % 2}" if flash else "phone_calling"
+        ):
             calling_right_people(
                 out,
                 "the model's list",
@@ -2698,7 +2764,12 @@ with tab_game:
             if moved:
                 move_markers.animate_moves(
                     move_markers.outcome_moves(
-                        shown, mine["outcomes"], game_cols, game_cols, game_heading, compact=False
+                        shown,
+                        mine["outcomes"],
+                        game_cols,
+                        game_cols,
+                        game_heading,
+                        compact=False,
                     ),
                     game_token,
                     "game_rule_icons",
