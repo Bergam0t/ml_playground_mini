@@ -3,6 +3,7 @@ import hashlib
 import json
 import random
 import time
+from typing import Any
 from pathlib import Path
 
 import streamlit as st
@@ -150,6 +151,19 @@ HIGH_RISK_MIN = 0.70
 # the starting value on the phone tab and in the savings on the first tab and the demo dashboard. The real
 # pilot's, about 80% (pilot.EFFECT), to the nearest 5 so it sits on the phone tab's slider.
 DEFAULT_CALL_EFFECT = round(pilot.EFFECT * 20) * 5
+# Its slider, the same on the first tab and the phone tab (both under the key call_effect)
+CALL_EFFECT_SLIDER: dict[str, Any] = {
+    "label": "Suppose a call gets this share of the people it reaches, who would have missed, "
+    "to attend instead",
+    "min_value": 0,
+    "max_value": 100,
+    "step": 5,
+    "format": "%d%%",
+    "help": f"Starts at the {pilot.SERVICE.lower()} pilot's figure: of about "
+    f"{pilot.CALLS * pilot.DNA_BEFORE:.0f} patients who would have missed, {pilot.EXTRA_ATTENDED} "
+    f"attended ({pilot.EFFECT:.0%}). That was one service, for patients at very high risk, with no "
+    "comparison group, so other settings may see less. 0% means the calls make no difference.",
+}
 
 
 def in_words(share):
@@ -811,11 +825,30 @@ def demo_notice_full(key):
             show_video()
 
 
+def demo_notice_short():
+    """A slimmed-down notice for the first tab's sidebar: what this is in one line, then the
+    poster and video buttons side by side (keyed like demo_notice_full's, so style.css styles
+    them the same)."""
+    with st.container(key="demo_notice_intro"):
+        st.warning(
+            "**Demonstration version** of a :red[**real tool**] piloted in a London trust. "
+            "All the data here is synthetic.",
+            icon=":material/science:",
+        )
+    with st.container(key="demo_links_intro", horizontal=True):
+        if st.button(":material/image: Poster", key="poster_intro", width="stretch"):
+            show_poster()
+        if st.button(":material/play_circle: Video", key="video_intro", width="stretch"):
+            show_video()
+
+
 def intro_columns(key, notice=demo_notice_full, widths=(0.65, 0.35)):
     """Columns for a tab's opening text (left) beside the demonstration notice (right).
 
     Returns the left column. The reflow_stack_ key stacks them on narrower screens (style.css).
     """
+    if notice is None:  # the notice is elsewhere (the sidebar): the text takes the full width
+        return st.container(key=f"reflow_stack_{key}")
     left, right = st.container(key=f"reflow_stack_{key}").columns(
         list(widths), gap="large"
     )
@@ -1078,6 +1111,15 @@ call_controls = None
 if page == TAB_CALLS:
     call_controls = st.sidebar.container()
 
+# How many of those reached a call gets to attend: on the first tab and the phone tab, one setting
+# for both. Set through the session state rather than value=, and set again on every run, as
+# Streamlit forgets a widget's value on a run that doesn't draw it.
+st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
+st.session_state["call_effect"] = st.session_state["call_effect"]
+if page == TAB_INTRO:
+    st.sidebar.slider(key="call_effect", **CALL_EFFECT_SLIDER)
+    st.sidebar.caption(f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%.")
+
 # Cost assumptions: not filters, so they stay out of filter_key below and editing them
 # never clears a table selection
 st.sidebar.divider()
@@ -1093,7 +1135,8 @@ minutes_per_call = st.sidebar.number_input(
     key="cost_minutes",
     help="On average, including unanswered attempts and noting the outcome.",
 )
-with st.sidebar.expander(
+# Keyed so style.css can hide the advanced settings on the first tab; the widgets are still drawn
+with st.sidebar.container(key="cost_advanced"), st.expander(
     "Advanced settings for calls and missed appointment costs",
     icon=":material/payments:",
 ):
@@ -1169,6 +1212,13 @@ st.sidebar.button(
     help="Put every cost assumption back to its starting value.",
 )
 
+# The demonstration notice, under the cost assumptions in the sidebar on the first tab (the other
+# tabs draw it beside their opening text, see intro_columns)
+if page == TAB_INTRO:
+    with st.sidebar:
+        st.divider()
+        demo_notice_short()
+
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
     st.stop()
@@ -1202,9 +1252,9 @@ MEASURE_RISK_MIN = {
 }
 
 
-def forecast_savings(called, risk_min, weeks=None):
+def forecast_savings(called, risk_min, weeks=None, effect_pct=DEFAULT_CALL_EFFECT):
     """Predicted value of the appointments kept by phoning every appointment in `called` (all
-    those at or above `risk_min`), if a call gets DEFAULT_CALL_EFFECT% of those who would have
+    those at or above `risk_min`), if a call gets `effect_pct`% of those who would have
     missed to attend, with the same number of calls made by the simple rule and at random.
     Worked out as the phone tab does: calls reach a would-be DNA as often as they did in the
     past appointments at the same cut-off. None when nobody would be phoned. `weeks` adds a
@@ -1215,7 +1265,15 @@ def forecast_savings(called, risk_min, weeks=None):
         return None
     past = load_past()
     precision = past.loc[past["DNA_Prob_Forecast"] >= risk_min, "Did_Not_Attend"].mean()
-    effect = DEFAULT_CALL_EFFECT / 100
+    effect = effect_pct / 100
+    # Where the share came from, for the help text
+    effect_source = (
+        f"what the {pilot.SERVICE.lower()} pilot saw, with no comparison group, so calls may "
+        "change fewer people here"
+        if effect_pct == DEFAULT_CALL_EFFECT
+        else f"as set in the sidebar; the {pilot.SERVICE.lower()} pilot saw about "
+        f"{DEFAULT_CALL_EFFECT}%"
+    )
     reached = n_calls * precision
     saving = costs.call_economics(
         n_calls, reached, effect, cost_per_call, minutes_per_call, dna_cost
@@ -1256,9 +1314,8 @@ def forecast_savings(called, risk_min, weeks=None):
         f"or {few(saving['staff_hours'])} hours of staff time, so about "
         f"£{saving['net']:,.0f} after the cost of the calls.\n\nIn past appointments, "
         f"{precision:.0%} of {who} were missed, so about {reached:,.0f} calls would reach "
-        f"someone who would otherwise miss.\n\nIf {DEFAULT_CALL_EFFECT}% of them attend instead "
-        f"(what the {pilot.SERVICE.lower()} pilot saw, with no comparison group, so calls may "
-        f"change fewer people here), that's about {few(reached * effect)} fewer missed "
+        f"someone who would otherwise miss.\n\nIf {effect_pct}% of them attend instead "
+        f"({effect_source}), that's about {few(reached * effect)} fewer missed "
         f"appointments, each valued at about £{dna_cost:,.0f}.{per_week}\n\nThis is the value "
         "of the clinic slots kept, not cash: a Trust may not be paid more when a patient "
         "attends.\n\nThe costs come from **Cost assumptions** in the sidebar.",
@@ -1266,7 +1323,7 @@ def forecast_savings(called, risk_min, weeks=None):
         f"someone who then missed {precision:.0%} of the time with the model's list, "
         f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
         f"and {random_reached / n_calls:.0%} at random. Each is valued the same way, if "
-        f"{DEFAULT_CALL_EFFECT}% of those reached who would have missed attend instead.",
+        f"{effect_pct}% of those reached who would have missed attend instead.",
     }
 
 
@@ -1369,7 +1426,7 @@ def compare_ways(savings, length):
     with st.container(border=True, key="landing_compare"):
         ways_text, ways_numbers = st.container(
             key="reflow_stack_landing_ways"
-        ).columns([0.45, 0.55], gap="large", vertical_alignment="center")
+        ).columns([0.35, 0.65], gap="large", vertical_alignment="center")
         with ways_text:
             st.markdown("#### Why not just phone those who've missed before?")
             st.markdown(
@@ -1380,14 +1437,15 @@ def compare_ways(savings, length):
                 f"Tested on {1000:,} past appointments the model didn't learn from, of which "
                 f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed."
             )
-            # Yellow, like the demonstration notice at the top
-            st.warning(
-                "**These appointments are synthetic.** The factors reflect what the real "
-                "model found (long journeys, long waits between appointments, appointments "
-                "after treatment had finished), but not exactly: how much each one counts "
-                "here is made up.",
-                icon=":material/science:",
-            )
+            # Yellow, like the demonstration notice; keyed so style.css can make its text smaller
+            with st.container(key="synthetic_note"):
+                st.warning(
+                    "**These appointments are synthetic.** The factors reflect what the real "
+                    "model found (long journeys, long waits between appointments, appointments "
+                    "after treatment had finished), but not exactly: how much each one counts "
+                    "here is made up.",
+                    icon=":material/science:",
+                )
         # The question the tiles answer, right above them, and the same words under each
         # number ("46 / of 100 calls / reached someone who would have missed"), so a tile makes
         # sense to someone who reads nothing else
@@ -1396,9 +1454,12 @@ def compare_ways(savings, length):
             f"**If the team made {n_calls} calls, how many would reach a patient who then "
             "missed their appointment?**"
         )
-        ways_numbers.caption(
-            ":material/touch_app: Click a box to see who those calls would reach."
-        )
+        # The same call to action as above the appointment tables ("Click" in yellow, style.css)
+        with ways_numbers.container(key="click_cta_ways"):
+            st.info(
+                "**Click a box** to see who those calls would reach.",
+                icon=":material/touch_app:",
+            )
         # One tile per way: the number reached per 100 calls, then the same in £ over the
         # upcoming weeks (the value of the appointments kept by phoning every forecast DNA,
         # and by the same number of calls made the other two ways). The £ is before the cost
@@ -1564,7 +1625,7 @@ def explain_a_patient():
 # What the model does better than the obvious rule, and how it reaches one patient's risk. Uses all
 # the upcoming appointments: the dashboard's filters are hidden here.
 with tab_intro:
-    with intro_columns("intro"):
+    with intro_columns("intro", notice=None):  # its notice is in the sidebar
         st.markdown(
             """
             ### Which appointments are patients most likely to miss?
@@ -1585,7 +1646,10 @@ with tab_intro:
     _, intro_weeks, intro_length = period_length(upcoming_all)
     compare_ways(
         forecast_savings(
-            upcoming_all[upcoming_all["DNA_Forecast"] == 1], FORECAST_MIN, intro_weeks
+            upcoming_all[upcoming_all["DNA_Forecast"] == 1],
+            FORECAST_MIN,
+            intro_weeks,
+            effect_pct=st.session_state["call_effect"],  # the slider in the sidebar
         ),
         intro_length,
     )
@@ -2044,10 +2108,10 @@ with tab_calls:
     )
     st.session_state.setdefault("calls_per_week", min(50, busiest))
     st.session_state.setdefault("risk_min", round(HIGH_RISK_MIN * 100))
-    st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
     # Streamlit forgets a widget's value on a run that doesn't draw it: the controls are only
-    # in the sidebar while this tab is open, and only one of the two sliders shows at a time
-    for key in ("call_mode", "calls_per_week", "risk_min", "call_effect"):
+    # in the sidebar while this tab is open, and only one of the two sliders shows at a time.
+    # (call_effect is kept further up, before the first tab can draw its slider.)
+    for key in ("call_mode", "calls_per_week", "risk_min"):
         st.session_state[key] = st.session_state[key]
 
     def call_control(widget, key, *args, **kwargs):
@@ -2122,19 +2186,7 @@ with tab_calls:
 
     if call_controls is not None:
         call_controls.divider()
-    effect = call_control(
-        "slider",
-        "call_effect",
-        "Suppose a call gets this share of the people it reaches, who would have missed, to attend instead",
-        0,
-        100,
-        step=5,
-        format="%d%%",
-        help=f"Starts at the {pilot.SERVICE.lower()} pilot's figure: of about "
-        f"{pilot.CALLS * pilot.DNA_BEFORE:.0f} patients who would have missed, {pilot.EXTRA_ATTENDED} "
-        f"attended ({pilot.EFFECT:.0%}). That was one service, for patients at very high risk, with no "
-        "comparison group, so other settings may see less. 0% means the calls make no difference.",
-    )
+    effect = call_control("slider", "call_effect", **CALL_EFFECT_SLIDER)
     if call_controls is not None:
         call_controls.caption(
             f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%."

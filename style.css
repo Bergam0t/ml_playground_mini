@@ -108,6 +108,13 @@ section[data-testid="stSidebar"] hr {
 	sidebar with data-collapsed="false", not aria-expanded, and phones need
 	min-width: 0 so Streamlit's ~90% cap still wins.) */
 
+/* On the first tab ("Why use a model?") only: no advanced cost settings. They are only hidden,
+	so their values still apply. */
+[data-testid="stApp"]:has([role="tablist"]:not([data-testid="stTabPanel"] *) > [data-testid="stTab"]:nth-child(1 of [data-testid="stTab"])[data-selected="true"])
+	.st-key-cost_advanced {
+	display: none;
+}
+
 /* ---- Sidebar logo (st.logo) ---- */
 /* st.logo caps the height even at size="large"; the HSMA asset is a square
 	canvas with a landscape mark, so scale it up and let the header grow. */
@@ -511,7 +518,8 @@ select.mobile-nav,
 /* ---- The demonstration notice's poster and video buttons (demo_notice_full) ---- */
 /* Pulled up under the yellow notice and outlined in its yellow, so they read as the notice's
 	own links rather than the page's teal actions. They open pop-ups, not new pages. */
-[class*="st-key-demo_notice_"] [data-testid="stAlert"] p {
+[class*="st-key-demo_notice_"] [data-testid="stAlert"] p,
+.st-key-synthetic_note [data-testid="stAlert"] p {
 	font-size: 0.875rem;
 }
 [class*="st-key-demo_links_"] {
@@ -522,6 +530,12 @@ select.mobile-nav,
 	background-color: transparent;
 	border: 1px solid rgba(255, 230, 0, 0.6);
 	color: #ffe600;
+}
+/* The first tab's short notice, in the sidebar: its two buttons side by side, so smaller */
+.st-key-demo_links_intro .stButton button {
+	min-height: 0;
+	padding: 0.2rem 0.5rem;
+	font-size: 0.8rem;
 }
 [class*="st-key-demo_links_"] .stButton button:hover,
 [class*="st-key-demo_links_"] .stButton button:focus:not(:active) {
