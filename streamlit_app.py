@@ -828,6 +828,24 @@ def reset_costs():
         del st.session_state[key]
 
 
+# Every filter on the Upcoming appointments tab: the sidebar's four and the table's two
+FILTER_KEYS = (
+    "filter_site",
+    "filter_specialty",
+    "filter_type",
+    "filter_location",
+    "filter_risk",
+    "filter_confidence",
+)
+
+
+def clear_filters():
+    """Put every appointment filter (the sidebar's and the table's) back to All. Set rather
+    than deleted: the page sets these keys again on every run, and All is always an option."""
+    for key in FILTER_KEYS:
+        st.session_state[key] = "All"
+
+
 def go_to_view(view):
     """From the bottom of one Upcoming appointments view to the next (the sidebar's switch)."""
     st.session_state.appt_view = view
@@ -998,6 +1016,19 @@ if selected_appointment_location != "All":
     filtered_data = filtered_data[
         filtered_data["Appointment Location Text"] == selected_appointment_location
     ]
+
+# Before the empty check below, so a combination that matches nothing can still be cleared.
+# Greyed out while nothing is filtered.
+if show_filters:
+    st.sidebar.button(
+        "Clear filters",
+        key="clear_filters",
+        on_click=clear_filters,
+        icon=":material/filter_alt_off:",
+        width="stretch",
+        disabled=all(st.session_state.get(k, "All") == "All" for k in FILTER_KEYS),
+        help="Show all upcoming appointments again.",
+    )
 
 if filtered_data.empty:  # DEMO: avoid crashing on empty filter combinations
     st.info("No appointments match the selected filters.")
