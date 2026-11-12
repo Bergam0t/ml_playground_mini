@@ -17,7 +17,8 @@ def patient_explanation(row: pd.Series, shap_row: pd.Series, base_pp: float, top
     """Contributions in percentage points for one appointment. base + sum(contributions) = f(x).
 
     `row` is the appointment's row from the forecast, `shap_row` its row from shap_values.csv.
-    The `top` biggest contributions are shown; the rest are rolled into one "other factors" bar.
+    The `top` biggest contributions are shown; the rest are rolled into one "other factors" bar,
+    and listed under "rest" (the waterfall's hover on that bar names them).
     """
     items = [
         {
@@ -27,6 +28,19 @@ def patient_explanation(row: pd.Series, shap_row: pd.Series, base_pp: float, top
         }
         for k in FEATURES
     ]
+    # Switched off for now: each factor compared with every upcoming appointment, for a richer
+    # waterfall hover (see charts._waterfall_hover). Left out because, at the stand, a third kind
+    # of percentage beside the risk and the bars was more likely to confuse than help. To bring it
+    # back, add `shap_all: pd.DataFrame | None = None` to the arguments, pass
+    # `shap_all=load_shap()` at both calls in streamlit_app.py, and uncomment this and
+    # "n_compared" below. "share" is the fraction of appointments the factor pushes less far in
+    # the same direction; "range" is its (lowest, highest) contribution across them all.
+    # if shap_all is not None:
+    #     for i in items:
+    #         col = shap_all[i["feature"]]
+    #         further = col < i["value"] if i["value"] >= 0 else col > i["value"]
+    #         i["share"] = float(further.mean())
+    #         i["range"] = (float(col.min()), float(col.max()))
     items.sort(key=lambda i: abs(i["value"]), reverse=True)
     shown, rest = items[:top], items[top:]
     other = (
@@ -39,7 +53,9 @@ def patient_explanation(row: pd.Series, shap_row: pd.Series, base_pp: float, top
         "fx": float(row["DNA_Prob_Forecast"]) * 100,
         "shown": shown,
         "other": other,
+        "rest": rest,
         "all": items,
+        # "n_compared": None if shap_all is None else len(shap_all),
     }
 
 

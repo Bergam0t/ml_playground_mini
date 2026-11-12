@@ -22,12 +22,21 @@ MUTED = "#898781"
 FONT = dict(family="Space Grotesk, sans-serif", color=TEXT, size=15)
 
 
-def _waterfall_trace(labels, values, measure, texts, size, big):
+def _waterfall_trace(labels, values, measure, texts, size, big, hover=None):
     """`big` is the text size for the average and total rows, whose figures also take VALUE
-    colour; `size` is for the factor rows."""
+    colour; `size` is for the factor rows. `hover` is one hover text per row, None for a row
+    with no hover; without it the hover repeats the label and figure."""
     is_end = [m != "relative" for m in measure]
     # Only the patient's own total takes VALUE colour; the average stays in plain text colour
     colours = [VALUE if m == "total" else TEXT for m in measure]
+    hover_args = (
+        dict(
+            hovertext=[h or "" for h in hover],
+            hoverinfo=["text" if h else "none" for h in hover],
+        )
+        if hover
+        else dict(hovertemplate="%{y}: %{text}<extra></extra>")
+    )
     return go.Waterfall(
         orientation="h",
         y=labels,
@@ -43,8 +52,43 @@ def _waterfall_trace(labels, values, measure, texts, size, big):
         decreasing=dict(marker=dict(color=DOWN)),
         totals=dict(marker=dict(color=TOTAL)),
         connector=dict(line=dict(color=MUTED, width=1)),
-        hovertemplate="%{y}: %{text}<extra></extra>",
+        **hover_args,
     )
+
+
+def _points(value: float) -> str:
+    """A signed figure in percentage points, with a true minus sign."""
+    return f"{value:+.1f}".replace("-", "−")
+
+
+def _waterfall_hover(expl: dict, steps: list) -> list:
+    """What the waterfall's hover says for each row, top to bottom, or None for no hover. Only
+    the "other factors" bar has one, naming the factors it rolls together: every other row's
+    label and figure are already on show, so a hover there would only get in the way."""
+    out = [None]  # the average
+    # out = [f"The average predicted risk the model starts from: <b>{expl['base']:.1f}%</b>"]
+    for s in steps:
+        if s is expl["other"]:
+            lines = [f"{i['label']}: {_points(i['value'])}" for i in expl["rest"]]
+            out.append(f"<b>{s['label']}: {_points(s['value'])} points in all</b><br>" + "<br>".join(lines))
+        # Switched off for now (see explain.patient_explanation, which must supply "share" and
+        # "range"): each factor compared with every upcoming appointment.
+        # elif "share" in s and expl.get("n_compared"):
+        #     n = expl["n_compared"]
+        #     # Rounded down, so a push bigger than for 99.9% of appointments never reads "100%"
+        #     pct = int(s["share"] * 100)
+        #     verb = "Pushes up" if s["value"] >= 0 else "Pulls down"
+        #     low, high = s["range"]
+        #     out.append(
+        #         f"<b>{s['label']}: {_points(s['value'])} points</b><br>"
+        #         f"{verb} more than for {pct}% of {n:,} upcoming appointments<br>"
+        #         f"Range across them: {_points(low)} to {_points(high)} points"
+        #     )
+        else:
+            out.append(None)
+    out.append(None)  # this appointment
+    # out.append(f"The average plus every factor above: <b>{expl['fx']:.1f}%</b>")
+    return out
 
 
 VALUE = "#f2c14e"  # a patient's own figure in a row label: warm, so not mistaken for red or blue
@@ -90,7 +134,9 @@ def waterfall(expl: dict, meta=None) -> go.Figure:
     values = [expl["base"]] + [s["value"] for s in steps] + [expl["fx"]]
     measure = ["absolute"] + ["relative"] * len(steps) + ["total"]
     texts = [f"{expl['base']:.1f}%"] + [f"{s['value']:+.1f}%" for s in steps] + [f"{expl['fx']:.1f}%"]
-    fig = go.Figure(_waterfall_trace(labels, values, measure, texts, 15, 20))
+    fig = go.Figure(
+        _waterfall_trace(labels, values, measure, texts, 15, 20, hover=_waterfall_hover(expl, steps))
+    )
     # Room past the furthest bar end for its outside label
     running = [expl["base"]]
     for s in steps:
@@ -107,6 +153,12 @@ def waterfall(expl: dict, meta=None) -> go.Figure:
             gridcolor="rgba(255,255,255,0.1)",
             zeroline=False,
             range=[min(0, min(running)), x_max],
+        ),
+        hoverlabel=dict(
+            bgcolor="#1b1a1a",
+            bordercolor=MUTED,
+            font=dict(family=FONT["family"], color=TEXT, size=14),
+            align="left",
         ),
         meta=meta,
     )
