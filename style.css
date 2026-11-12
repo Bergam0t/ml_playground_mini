@@ -96,6 +96,12 @@ section[data-testid="stSidebar"] h3 {
 	padding-top: 0;
 	margin-top: -0.6rem;
 }
+/* The first tab's opening heading ("Can we reduce missed appointments..."): a little less
+	space between it and the tab bar */
+.st-key-reflow_stack_intro h3:first-child {
+	padding-top: 0;
+	margin-top: -0.9rem;
+}
 
 section[data-testid="stSidebar"] hr {
 	margin-top: 0.8rem;
@@ -631,6 +637,31 @@ select.mobile-nav,
 	three tiles sit on one row on a wide screen, and a minimum width so they stack, one per row,
 	on a phone. */
 .st-key-landing_ways > div { flex: 1 1 0; min-width: 9rem; }
+/* A line between the text and the tiles, as in the bonus game's next-step box; above the
+	tiles instead when the two stack below 1300px. Only the row's own two columns, not any
+	inside them. */
+.st-key-reflow_stack_landing_ways > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] + [data-testid="stColumn"] {
+	border-left: 1px solid rgba(31, 177, 185, 0.35);
+	padding-left: 2rem;
+}
+@media (max-width: 1299.98px) {
+	.st-key-reflow_stack_landing_ways > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] + [data-testid="stColumn"] {
+		border-left: none;
+		padding-left: 0;
+		border-top: 1px solid rgba(31, 177, 185, 0.35);
+		padding-top: 1.25rem;
+	}
+}
+/* The "Tested on 1,000 past appointments" popover's label wraps in the narrow column, rather
+	than being cut off */
+.st-key-landing_compare [data-testid="stPopover"] button { height: auto; }
+.st-key-landing_compare [data-testid="stPopover"] button [data-testid="stMarkdownContainer"],
+.st-key-landing_compare [data-testid="stPopover"] button p {
+	white-space: normal;
+	text-overflow: clip;
+	overflow: visible;
+	text-align: left;
+}
 /* The tiles the same height, with the £ line at the foot of each, so they sit level */
 .st-key-landing_ways { align-items: stretch; }
 .st-key-landing_ways [class*="st-key-ways_"] > :last-child { margin-top: auto; }

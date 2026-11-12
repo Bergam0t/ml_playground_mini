@@ -1163,6 +1163,11 @@ if page == TAB_CALLS:
 st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
 st.session_state["call_effect"] = st.session_state["call_effect"]
 if page == TAB_INTRO:
+    # The demonstration notice, at the top of the sidebar on the first tab, above the slider
+    # (the other tabs draw it beside their opening text, see intro_columns)
+    with st.sidebar:
+        demo_notice_short()
+        st.divider()
     st.sidebar.slider(key="call_effect", **CALL_EFFECT_SLIDER)
     st.sidebar.caption(
         f"The {pilot.SERVICE.lower()} pilot saw about {DEFAULT_CALL_EFFECT}%."
@@ -1181,7 +1186,10 @@ minutes_per_call = st.sidebar.number_input(
     step=0.5,
     format="%.1f",
     key="cost_minutes",
-    help="On average, including unanswered attempts and noting the outcome.",
+    help=(
+        "On average, including unanswered attempts and noting the outcome. "
+        "Costed assuming a band 5 admin makes the calls."
+    ),
 )
 # Keyed so style.css can hide the advanced settings on the first tab; the widgets are still drawn
 with (
@@ -1262,13 +1270,6 @@ st.sidebar.button(
     width="stretch",
     help="Put every cost assumption back to its starting value.",
 )
-
-# The demonstration notice, under the cost assumptions in the sidebar on the first tab (the other
-# tabs draw it beside their opening text, see intro_columns)
-if page == TAB_INTRO:
-    with st.sidebar:
-        st.divider()
-        demo_notice_short()
 
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
@@ -1498,7 +1499,7 @@ def compare_ways(savings, length):
         chosen = "model"
     with st.container(border=True, key="landing_compare"):
         ways_text, ways_numbers = st.container(key="reflow_stack_landing_ways").columns(
-            [0.35, 0.65], gap="large", vertical_alignment="center"
+            [0.27, 0.73], gap="large", vertical_alignment="center"
         )
         with ways_text:
             st.markdown(
@@ -1509,8 +1510,9 @@ def compare_ways(savings, length):
                 "who'd never missed before.** That simple rule alone can't spot them, but the model can."
             )
             # What the figures were tested on, and that the data is synthetic: the gist in the
-            # label, the details folded away (the sidebar notice also says it's synthetic)
-            with st.expander(
+            # label, the details in a popover (the sidebar notice also says it's synthetic). A
+            # popover floats over the page, so opening it doesn't push the tiles beside it about
+            with st.popover(
                 f"Tested on {1000:,} past appointments (synthetic)",
                 icon=":material/science:",
             ):
@@ -1622,11 +1624,13 @@ def compare_ways(savings, length):
                     )
                     if savings is not None:
                         # After the cost of the calls, so the minutes per call count too; a
-                        # minus where the calls cost more than they keep
+                        # minus where the calls cost more than they keep. "After call costs" is
+                        # left to the caption above the tiles, so this fits on fewer lines; a
+                        # non-breaking space keeps "6 weeks" together
                         net = savings[pounds] - savings["call_cost"]
                         st.markdown(
-                            f"**{'-' if net < 0 else ''}£{abs(net):,.0f}** kept over {length}, "
-                            "after call costs"
+                            f"**{'-' if net < 0 else ''}£{abs(net):,.0f}** kept over "
+                            f"{length.replace(' ', chr(160))}"
                         )
         # The first time a visitor opens this tab, a pointer shows them clicking a box: one
         # that isn't chosen, so the click visibly would change something. After a pause, so
