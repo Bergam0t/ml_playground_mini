@@ -18,7 +18,7 @@ who stay, and last a demo of the real tool's dashboard for those who want to try
 - **Why use a model?** tab (the landing page). Uses all the upcoming appointments: the sidebar shows
   only the cost assumptions here, not the filters.
   - A short introduction beside the demonstration notice (which gives the real pilot's result).
-  - **Why not just phone those who've missed before?**: of 1,000 past appointments (79
+  - **Why bother with machine learning, rather than just phoning those who've missed before?**: of 1,000 past appointments (79
     missed), how many would 100 calls have reached who then missed, phoning the model's list
     (41), phoning those who missed most before (23) and at random (8, a quieter tile, as the
     baseline). The question sits in bold right above the tiles, and each tile reads as a sentence
@@ -61,7 +61,7 @@ who stay, and last a demo of the real tool's dashboard for those who want to try
   2, and estimates the early cancellations (slots freed for other patients) at the pilot's rate.
   Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
   per 3 calls, as in the pilot.
-- **Bonus: beat the model** tab: a short game to show how a machine learning model learns to
+- **Beat the model** tab: a short game to show how a machine learning model learns to
   beat a person's rule.
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
@@ -263,7 +263,7 @@ python build/train_and_explain.py
 python build/rule_game_data.py
 ```
 
-`build/rule_game_data.py` makes the two files for the bonus game tab (and the first tab's "Why not just phone those who've missed before?" box). It uses the same
+`build/rule_game_data.py` makes the two files for the bonus game tab (and the first tab's "Why bother with machine learning, rather than just phoning those who've missed before?" box). It uses the same
 split as the main build, and checks that its test appointments match `past_predictions.csv`.
 
 - `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a

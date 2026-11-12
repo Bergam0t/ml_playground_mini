@@ -934,7 +934,7 @@ add_mobile_nav()
 # synthetic data, is last for those who want to try it.
 TAB_INTRO = "Why use a model?"
 TAB_CALLS = "How many people should we phone?"
-TAB_GAME = "Bonus: beat the model"
+TAB_GAME = "Beat the model"
 TAB_DASH = "Try a demo dashboard"
 TAB_LABELS = [TAB_INTRO, TAB_CALLS, TAB_GAME, TAB_DASH]
 tab_intro, tab_calls, tab_game, tab_dash = st.tabs(
@@ -1320,7 +1320,7 @@ def forecast_savings(called, risk_min, weeks=None, effect_pct=DEFAULT_CALL_EFFEC
         "of the clinic slots kept, not cash: a Trust may not be paid more when a patient "
         "attends.\n\nThe costs come from **Cost assumptions** in the sidebar.",
         "compare_help": f"In past appointments, the same share of calls would have reached "
-        f"someone who then missed {precision:.0%} of the time with the model's list, "
+        f"someone who would otherwise have missed {precision:.0%} of the time with the model's list, "
         f"{rule_reached / n_calls:.0%} phoning those who missed most before (the simple rule) "
         f"and {random_reached / n_calls:.0%} at random. Each is valued the same way, if "
         f"{effect_pct}% of those reached who would have missed attend instead.",
@@ -1411,7 +1411,7 @@ def choose_way(way):
 
 @st.fragment
 def compare_ways(savings, length):
-    """The first tab's "Why not just phone those who've missed before?" box: the same calls three
+    """The first tab's "Why bother with machine learning, rather than just phoning those who've missed before?" box: the same calls three
     ways, by the model, by the simple rule and at random. It leads with what the rule can't do
     (spot people who'd never missed before), and each tile reads on its own ("41 / of 100 calls /
     reached someone who would have missed"). Clicking a tile shows who its calls would reach,
@@ -1428,7 +1428,7 @@ def compare_ways(savings, length):
             key="reflow_stack_landing_ways"
         ).columns([0.35, 0.65], gap="large", vertical_alignment="center")
         with ways_text:
-            st.markdown("#### Why not just phone those who've missed before?")
+            st.markdown("#### Why bother with machine learning, rather than just phoning those who've missed before?")
             st.markdown(
                 f"**{ways['never_missed_share'] * 10:.0f} in 10 missed appointments are by people "
                 "who'd never missed before.** That simple rule alone can't spot them, but the model can."
@@ -1451,8 +1451,8 @@ def compare_ways(savings, length):
         # sense to someone who reads nothing else
         reached = "reached someone who would have missed"
         ways_numbers.markdown(
-            f"**If the team made {n_calls} calls, how many would reach a patient who then "
-            "missed their appointment?**"
+            f"**If the team made {n_calls} calls, how many would reach a patient who would "
+            "otherwise have missed their appointment?**"
         )
         # The same call to action as above the appointment tables ("Click" in yellow, style.css)
         with ways_numbers.container(key="click_cta_ways"):
@@ -1635,12 +1635,12 @@ with tab_intro:
     with intro_columns("intro", notice=None):  # its notice is in the sidebar
         st.markdown(
             """
-            ### Which appointments are patients most likely to miss?
+            ### Can we reduce missed appointments with Artificial Intelligence (AI)?
 
-            A machine-learning model, trained on past appointments, gives each upcoming one a
-            predicted **risk of not attending** <span class="term">(a DNA, or 'did not attend')</span>, so outpatient
-            teams can phone the patients most likely to miss. The forecasts are
-            <span class="highlight">estimates to support staff judgement, not decisions</span>.
+            A <span class="highlight">machine-learning model</span>, trained on past appointments, predicts
+            each upcoming appointment's **risk of not attending** <span class="term">(a DNA)</span>, so teams
+            can phone the patients most likely to miss. Its forecasts
+            <span class="highlight">support staff judgement; they don't make decisions</span>.
             """,
             unsafe_allow_html=True,
         )
@@ -2447,19 +2447,19 @@ with tab_calls:
             icon=":material/warning:",
         )
 
-    # ---- The way on: one button, to the bonus game
+    # ---- The way on: one button, to the game
     next_step(
         "game",
-        "Bonus: beat the model",
+        TAB_GAME,
         "Make your own rule for who to phone, and see if you can catch more missed appointments "
         "than a machine learning model.",
-        "Play the bonus game",
+        "Play the game",
         go_to_tab,
         (TAB_GAME,),
     )
 
 
-# ---------------------------------------------------------------- tab 3: Bonus: beat the model
+# ---------------------------------------------------------------- tab 3: Beat the model
 # First on the bar but last in the script: the training animation pauses between frames, so
 # the other tabs are drawn before it starts. The visitor builds a rule from the clues the model
 # sees, each with an equal say; then a machine learning model learns its own weighting from more and more
@@ -2759,7 +2759,7 @@ with tab_game:
         say = final["say"]
         top_two = say_order[:2]
         # The best rule the buttons can make, named, so the verdict is honest about how close
-        # it gets (the same comparison as "Why not just phone those who've missed before?" on the first tab)
+        # it gets (the same comparison as "Why bother with machine learning, rather than just phoning those who've missed before?" on the first tab)
         best_rule = max(all_catches, key=lambda rule: all_catches[rule])
         names = [f"*{rule_game.CLUES[c].lower()}*" for c in best_rule]
         best_rule_text = (

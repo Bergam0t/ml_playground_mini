@@ -1,4 +1,4 @@
-"""Bonus: beat the model: the logic behind the game on the third tab, and the
+"""Beat the model: the logic behind the game on the third tab, and the
 three ways to choose who to phone on the first.
 
 A visitor picks clues to phone by; each clue they pick gets an equal say. Their rule is

@@ -149,7 +149,7 @@ section[data-testid="stSidebar"] hr {
 	transform: translateY(2.15rem);
 }
 /* ---- No sidebar on the bonus game ---- */
-/* The filters and cost assumptions don't apply to the bonus game ("Bonus: beat the model",
+/* The filters and cost assumptions don't apply to the bonus game ("Beat the model",
 	the third tab), so while that tab is open, hide the sidebar and (when it's shut) its
 	re-expand button, and give the title its usual padding back. Done in CSS so the sidebar's
 	widgets are still drawn, and keep their settings for the other tabs. */
@@ -298,14 +298,16 @@ h1 { font-family: "HSMA Display", sans-serif; letter-spacing: 0.05em; font-size-
 	flex-wrap: wrap;
 	container-type: inline-size;
 }
-/* The app title, at the left of the bar. */
+/* The app title, at the left of the bar, over two lines (\A, kept by white-space: pre) so
+	it leaves the tabs more room. Tight line height so the bar stays about as tall. */
 [role="tablist"]:not([data-testid="stTabPanel"] *)::before {
-	content: "Outpatient DNA Forecast";
+	content: "Outpatient\A DNA Forecast";
 	font-family: "HSMA Display", sans-serif;
 	font-size: 1.6rem;
+	line-height: 1.05;
 	letter-spacing: 0.05em;
 	margin-right: 1.25rem;
-	white-space: nowrap;
+	white-space: pre;
 	flex-shrink: 0;
 }
 /* ---- Page dropdown in place of the tab pills ---- */
@@ -621,7 +623,7 @@ select.mobile-nav,
 	align-items: start;
 }
 
-/* The first tab's "Why not just phone those who've missed before?" box. Equal shares so all
+/* The first tab's "Why bother with machine learning, rather than just phoning those who've missed before?" box. Equal shares so all
 	three tiles sit on one row on a wide screen, and a minimum width so they stack, one per row,
 	on a phone. */
 .st-key-landing_ways > div { flex: 1 1 0; min-width: 9rem; }
