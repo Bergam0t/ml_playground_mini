@@ -1462,8 +1462,8 @@ def compare_ways(savings, length):
             )
         # One tile per way: the number reached per 100 calls, then the same in £ over the
         # upcoming weeks (the value of the appointments kept by phoning every forecast DNA,
-        # and by the same number of calls made the other two ways). The £ is before the cost
-        # of the calls, which is the same all three ways and is given once under the tiles.
+        # and by the same number of calls made the other two ways). The £ is after the cost
+        # of the calls, which is the same all three ways and is also given once under the tiles.
         tiles = [
             ("model", "The model's list", ways["model"], ":material/smart_toy:", "value",
              (f"Phoning the {n_calls} appointments with the highest predicted risk. The model "
@@ -1502,13 +1502,20 @@ def compare_ways(savings, length):
                         help=help_text,
                     )
                     if savings is not None:
-                        st.markdown(f"**£{savings[pounds]:,.0f}** kept over {length}")
+                        # After the cost of the calls, so the minutes per call count too; a
+                        # minus where the calls cost more than they keep
+                        net = savings[pounds] - savings["call_cost"]
+                        st.markdown(
+                            f"**{'-' if net < 0 else ''}£{abs(net):,.0f}** kept over {length}, "
+                            "after call costs"
+                        )
         if savings is not None:
             ways_numbers.caption(
                 f"**£ in each box:** the value of appointments kept over the next {length} if "
                 f"the team phoned {savings['n_calls']:,} patients chosen that way (as many as "
-                f"the model forecasts as DNAs). The calls cost £{savings['call_cost']:,.0f} "
-                "whichever way you choose; the value is clinic time kept, not cash.",
+                f"the model forecasts as DNAs), less the £{savings['call_cost']:,.0f} the calls "
+                "cost in staff time, the same whichever way you choose. The value is clinic time "
+                "kept, not cash.",
                 help=savings["compare_help"],
             )
 

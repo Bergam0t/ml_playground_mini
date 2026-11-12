@@ -385,10 +385,10 @@ _COLUMNS = [
 # column heading above. The compact set is for the phone tab, where the chart sits beside the
 # cards and above the fold: smaller markers and text, and each explanation on one line.
 _SIZES = {
-    False: dict(unit=16, marker=9, line=2, col_font=22, sym_font=18, title_font=15, why_font=13,
-                col_head=44.8, box_head=80, min_box=256),
-    True: dict(unit=12, marker=7, line=1.5, col_font=18, sym_font=15, title_font=14, why_font=12,
-               col_head=30, box_head=48, min_box=230),
+    False: dict(unit=16, marker=9, line=2, col_font=22, sym_font=20, title_font=19, why_font=13,
+                col_head=44.8, box_head=88, min_box=300),
+    True: dict(unit=12, marker=7, line=1.5, col_font=18, sym_font=17, title_font=17, why_font=12,
+               col_head=30, box_head=54, min_box=264),
 }
 _HEADING_H = 2.0  # the optional line above the column headings, in units
 
