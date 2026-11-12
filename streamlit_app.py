@@ -109,9 +109,10 @@ GUIDE_STEPS = [
         "of not attending, averaged over all appointments."
     ),
     (
-        "<b>Each bar is one fact about this appointment.</b> Red pushes the risk of not "
-        "attending up, blue pushes it down. The number is how far it moves, in percentage "
-        "points. The biggest come first."
+        "<b>Each bar is one fact about this appointment.</b> "
+        f"<b style='color:{charts.UP}'>Red</b> pushes the risk of not attending up, "
+        f"<b style='color:{charts.DOWN}'>blue</b> pushes it down. The number is how far it "
+        "moves, in percentage points. The biggest come first."
     ),
     (
         "<b>The bottom bar is this appointment's predicted risk.</b> The bars add up from the "
