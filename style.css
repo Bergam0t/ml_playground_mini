@@ -707,10 +707,13 @@ select.mobile-nav,
 		animation: none;
 	}
 }
-/* The marker animation's script: it runs, but takes no space (nor its wrapper's flex gap,
-	which would push the caption down for the length of the run) */
+/* The scripts for the marker animation and the explanation chart's (grow_waterfall.py): they
+	run, but take no space (nor their wrappers' flex gap, which would push what follows down
+	for the length of the run) */
 .st-key-landing_move,
-[data-testid="stLayoutWrapper"]:has(> .st-key-landing_move) {
+[data-testid="stLayoutWrapper"]:has(> .st-key-landing_move),
+.st-key-intro_grow,
+[data-testid="stLayoutWrapper"]:has(> .st-key-intro_grow) {
 	display: none;
 }
 

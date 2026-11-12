@@ -14,6 +14,7 @@ import calls
 import charts
 import costs
 import explain
+import grow_waterfall
 import move_markers
 import pilot
 import rule_game
@@ -607,14 +608,18 @@ def how_to_read(key, stacked=False):
     steps_col.markdown(steps, unsafe_allow_html=True)
 
 
-def patient_waterfall(expl, key):
-    """One appointment's waterfall and a sentence naming its two biggest contributions."""
+def patient_waterfall(expl, key, token=None, grow=False):
+    """One appointment's waterfall and a sentence naming its two biggest contributions. `grow`
+    plays the chart from empty (grow_waterfall.py), for a newly picked patient; `token` tells
+    that script this chart from the one before it."""
     st.plotly_chart(
-        charts.waterfall(expl),
+        charts.waterfall(expl, meta=token),
         key=key,
         width="stretch",
         config={"displayModeBar": False},
     )
+    if grow:
+        grow_waterfall.grow_waterfall(expl, token, key)
     top = expl["shown"][:2]
     st.markdown(
         f"The biggest contributions are **{top[0]['label']}** ({top[0]['value']:+.1f} points) and "
@@ -1612,6 +1617,15 @@ def pick_patient(group, seed=None):
     st.session_state.intro_patient = random.Random(seed).choice(others)
 
 
+def choose_patient(group):
+    """A patient button on the first tab was clicked: show a new patient from `group`, and play
+    their chart from empty once (grow_waterfall.py). Counted, so the script can tell the new
+    chart from the old."""
+    pick_patient(group)
+    st.session_state.intro_grow = st.session_state.get("intro_grow", 0) + 1
+    st.session_state.intro_grow_pending = True
+
+
 @st.fragment
 def explain_a_patient():
     """The first tab's explanation chart, always on show: one patient's waterfall, with buttons
@@ -1643,14 +1657,14 @@ def explain_a_patient():
                 f"{label} ({span})",
                 key=f"intro_group_{g}",
                 type="primary" if g == group else "secondary",
-                on_click=pick_patient,
+                on_click=choose_patient,
                 args=(g,),
             )
         st.button(
             "Show a different patient",
             key="intro_shuffle",
             icon=":material/shuffle:",
-            on_click=pick_patient,
+            on_click=choose_patient,
             args=(group,),
             help=f"Another {RISK_GROUPS[group][0].lower()} patient.",
         )
@@ -1665,7 +1679,14 @@ def explain_a_patient():
             f"appointment on {row['Activity_Date']:%d/%m/%Y}. Predicted risk of not attending: "
             f"**{expl['fx']:.0f}%**"
         )
-        patient_waterfall(expl, "intro_waterfall")
+        # After a click, the chart plays from empty, once (popped, so a later rerun doesn't
+        # replay it)
+        patient_waterfall(
+            expl,
+            "intro_waterfall",
+            token=st.session_state.get("intro_grow", 0),
+            grow=st.session_state.pop("intro_grow_pending", False),
+        )
     with guide_col.container(border=True, key="intro_guide"):
         st.markdown("**How to read this chart** (a made-up example)")
         how_to_read("intro_guide_chart", stacked=True)

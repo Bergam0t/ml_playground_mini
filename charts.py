@@ -79,8 +79,10 @@ def _layout(fig, height, **kwargs):
     return fig
 
 
-def waterfall(expl: dict) -> go.Figure:
-    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away."""
+def waterfall(expl: dict, meta=None) -> go.Figure:
+    """SHAP waterfall in percentage points. Red pushes towards not attending, blue away. meta is
+    stored on the layout, so the first tab's animation (grow_waterfall.py) can tell this chart
+    from the one before it."""
     steps = list(expl["shown"])
     if expl["other"]:
         steps.append(expl["other"])
@@ -106,6 +108,7 @@ def waterfall(expl: dict) -> go.Figure:
             zeroline=False,
             range=[min(0, min(running)), x_max],
         ),
+        meta=meta,
     )
 
 
