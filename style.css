@@ -200,40 +200,42 @@ section[data-testid="stSidebar"] hr {
 /* Ported from the geographic mini's next-step boxes: a lightly outlined box, split in two
 	("See upcoming appointments" and "Plan the calls"), divided by a line beside them, or
 	above the second when they stack below 1300px. Both halves are full height with the
-	buttons pinned to the bottom, so the buttons line up if one heading wraps. */
-:is(.st-key-game_next, .st-key-appts_next) {
+	buttons pinned to the bottom, so the buttons line up if one heading wraps.
+	The views of the Upcoming appointments tab end in the same box with a single button
+	(view_next_*), so there is no split to style for them. */
+:is(.st-key-game_next, [class*="st-key-view_next_"]:not([class*="st-key-view_next_btn_"])) {
 	padding: 1.25rem 1.5rem;
 	border: 2px solid rgba(31, 177, 185, 0.55);
 	border-radius: 0.75rem;
 	background-color: rgba(31, 177, 185, 0.06);
 }
-:is(.st-key-game_next, .st-key-appts_next) h3 {
+:is(.st-key-game_next, [class*="st-key-view_next_"]) h3 {
 	padding-top: 0;
 }
-:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] + [data-testid="stColumn"] {
+.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
 	border-left: 1px solid rgba(31, 177, 185, 0.35);
 	padding-left: 2rem;
 }
-:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stHorizontalBlock"] { align-items: stretch; }
-:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] { display: flex; flex-direction: column; }
-:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
-:is(.st-key-to_appts, .st-key-to_call_list),
-:is(.st-key-to_calls, .st-key-to_calls_from_appts) {
+.st-key-reflow_stack_game_next [data-testid="stHorizontalBlock"] { align-items: stretch; }
+.st-key-reflow_stack_game_next [data-testid="stColumn"] { display: flex; flex-direction: column; }
+.st-key-reflow_stack_game_next [data-testid="stColumn"] > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
+:is(.st-key-to_appts, .st-key-to_calls),
+[class*="st-key-view_next_btn_"] {
 	margin: auto 0 0;
 }
-:is(.st-key-to_appts, .st-key-to_call_list) button,
-:is(.st-key-to_calls, .st-key-to_calls_from_appts) button {
+:is(.st-key-to_appts, .st-key-to_calls) button,
+[class*="st-key-view_next_btn_"] button {
 	min-height: 3.5rem;
 	padding: 0 1.5rem;
 }
-:is(.st-key-to_appts, .st-key-to_call_list) button p,
-:is(.st-key-to_calls, .st-key-to_calls_from_appts) button p {
+:is(.st-key-to_appts, .st-key-to_calls) button p,
+[class*="st-key-view_next_btn_"] button p {
 	font-family: "HSMA Display", sans-serif;
 	font-size: 1.1rem;
 	letter-spacing: 0.05em;
 }
 @media (max-width: 1299.98px) {
-	:is(.st-key-reflow_stack_game_next, .st-key-reflow_stack_appts_next) [data-testid="stColumn"] + [data-testid="stColumn"] {
+	.st-key-reflow_stack_game_next [data-testid="stColumn"] + [data-testid="stColumn"] {
 		border-left: none;
 		padding-left: 0;
 		border-top: 1px solid rgba(31, 177, 185, 0.35);
@@ -241,7 +243,7 @@ section[data-testid="stSidebar"] hr {
 	}
 }
 @media (max-width: 767.98px) {
-	:is(.st-key-game_next, .st-key-appts_next) {
+	:is(.st-key-game_next, [class*="st-key-view_next_"]:not([class*="st-key-view_next_btn_"])) {
 		padding: 1rem;
 	}
 }
@@ -422,11 +424,25 @@ select.mobile-nav,
 .stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }
 .stButton button:hover, .stButton button:focus:not(:active) { background-color: #1fb1b9; border-color: #1fb1b9; color: #ffffff; }
 
+/* ---- The call list view's call to action, which holds the "Who goes on the list" control ---- */
+/* An st.info can't contain a widget, so this keyed container is drawn to match one (the
+	default dark-theme info colours). */
+.st-key-threshold_cta {
+	background-color: rgba(61, 157, 243, 0.2);
+	color: rgb(199, 235, 255);
+	border-radius: 0.5rem;
+	padding: 1rem;
+	gap: 0.75rem;
+}
+
 /* ---- The three forecast cards under the intro ---- */
 /* The middle card (confident DNAs) carries a longer takeaway, so it gets more of the row
 	and the cards either side get less. Still wraps onto separate lines when narrow. */
 .st-key-forecast_cards > * { flex: 1 1 10rem; }
 .st-key-forecast_cards > *:nth-child(2) { flex: 1.8 1 14rem; }
+/* The call list's cards: the value card (last) carries a caption and a comparison line */
+.st-key-week_cards > * { flex: 1 1 9rem; }
+.st-key-week_cards > *:nth-child(4) { flex: 2.2 1 16rem; }
 
 /* ---- The demonstration notice's poster and video buttons (demo_notice_full) ---- */
 /* Pulled up under the yellow notice and outlined in its yellow, so they read as the notice's

@@ -666,10 +666,26 @@ def reset_game():
     st.session_state.scroll_to_top = True
 
 
-def go_to_call_list():
-    """From the bottom of the all-appointments view to the admin team's call list view."""
-    st.session_state.appt_view = VIEW_WEEK
+def go_to_view(view):
+    """From the bottom of one Upcoming appointments view to the next (the sidebar's switch)."""
+    st.session_state.appt_view = view
     st.session_state.scroll_to_top = True
+
+
+def next_step(key, heading, text, label, on_click, args=()):
+    """The box at the foot of each Upcoming appointments view: one way on, so a visitor
+    isn't asked to choose. Styled by style.css (view_next_*, view_next_btn_*)."""
+    st.divider()
+    with st.container(key=f"view_next_{key}"):
+        st.markdown(f"### {heading}\n{text}")
+        st.button(
+            label,
+            key=f"view_next_btn_{key}",
+            on_click=on_click,
+            args=args,
+            icon=":material/arrow_forward:",
+            type="primary",
+        )
 
 
 def go_to_forecast_calls(risk_min):
@@ -740,7 +756,7 @@ VIEW_ICONS = {
 }
 DEFAULT_MEASURE = next(iter(weekly.MEASURES))  # the first: the strictest list
 # Start on all appointments, so one button is always shown as chosen. Set through the session
-# state rather than default=, as go_to_call_list sets it; set again on every run, as Streamlit
+# state rather than default=, as go_to_view sets it; set again on every run, as Streamlit
 # forgets a widget's value on a run that doesn't draw it (the other tabs). A value that isn't
 # one of the views (say, a label from before they were renamed) goes back to the first.
 if st.session_state.get("appt_view") not in VIEW_ICONS:
@@ -1044,36 +1060,6 @@ def explore_button(risk_min, key, scope, primary=True):
     )
 
 
-def savings_box(called, risk_min, label, caption, scope, key, none_text, weeks=None):
-    """The value of the appointments kept by phoning every appointment in `called`
-    (forecast_savings), beside the same calls by the simple rule and at random, with a button
-    to the phone tab. `scope` says what the phone tab covers that this doesn't; `none_text` is
-    shown instead when nobody would be phoned; `weeks` adds a weekly figure."""
-    sv = forecast_savings(called, risk_min, weeks)
-    if sv is None:
-        st.caption(none_text)
-        return
-    with st.container(border=True):
-        saving_col, cta_col = st.container(key=f"reflow_stack_{key}").columns(
-            2, gap="large", vertical_alignment="center"
-        )
-        saving_col.metric(
-            label, f"£{sv['value']:,.0f}", icon=":material/savings:", help=sv["help"]
-        )
-        saving_col.caption(f"{caption} Staff time: £{sv['call_cost']:,.0f}.")
-        saving_col.markdown(
-            f"Same calls by the simple rule: **£{sv['rule']:,.0f}** · "
-            f"at random: **£{sv['random']:,.0f}**",
-            help=sv["compare_help"],
-        )
-        cta_col.markdown(
-            f"**{DEFAULT_CALL_EFFECT}% comes from one {pilot.SERVICE.lower()} pilot** with no "
-            "comparison group, so calls may change fewer people here."
-        )
-        with cta_col:
-            explore_button(risk_min, key, scope)
-
-
 # ---------------------------------------------------------------- tab 1: Upcoming appointments (the landing page)
 # One tab, three views picked by the switch at the top of the sidebar
 with tab_appts:
@@ -1258,35 +1244,15 @@ with tab_appts:
                     help=savings["compare_help"],
                 )
 
-        # ---- The way on: a split button, styled like the game tab's (style.css)
-        st.divider()
-        with st.container(key="appts_next"):
-            call_list, plan = st.container(key="reflow_stack_appts_next").columns(
-                2, gap="large"
-            )
-            call_list.markdown(
-                "### See the list for the admin team\n"
-                "What the team would actually work from: next week's appointments, highest risk first, "
-                "ready to phone from the top."
-            )
-            call_list.button(
-                "See next week's call list",
-                key="to_call_list",
-                on_click=go_to_call_list,
-                icon=":material/arrow_forward:",
-                type="primary",
-            )
-            plan.markdown(
-                "### Or plan the calls\n"
-                "How many calls should the team make, and would they be worth the staff time?"
-            )
-            plan.button(
-                "Plan the calls",
-                key="to_calls_from_appts",
-                on_click=go_to_tab,
-                args=(TAB_CALLS,),
-                icon=":material/arrow_forward:",
-            )
+        # ---- The way on: one button, to the next view (style.css)
+        next_step(
+            "all",
+            "See the weekly summary",
+            "Which days have the most appointments the model expects to be missed, week by week.",
+            "See the weekly summary",
+            go_to_view,
+            (VIEW_SUMMARY,),
+        )
 
     elif view == VIEW_SUMMARY:
         # The forecast for every upcoming week, by weekday. Clicking a day lists its appointments
@@ -1379,39 +1345,53 @@ with tab_appts:
                 "in the sidebar and click its row."
             )
 
+        # ---- The way on: one button, to the admin team's call list
+        next_step(
+            "summary",
+            "See the list for the admin team",
+            "What the team would actually work from: next week's appointments, highest risk first, "
+            "ready to phone from the top.",
+            "See next week's call list",
+            go_to_view,
+            (VIEW_WEEK,),
+        )
+
     else:
         with intro_columns("intro_weekly", widths=(0.70, 0.3)):
             st.title("Prioritised call list for admin team")
 
-            st.info(
+            st.markdown(
                 "**Where to draw the line is a human decision.** "
-                "\n\nThe model gives every appointment a risk "
-                "of not attending, not a yes or no. "
-                ""
-                "\n\n- A higher cut-off gives a shorter list that is "
-                "more likely to reach people who really would have missed their appointment"
-                "\n- A lower one catches "
-                "more missed appointments but means more calls, many to people who would have come anyway. "
-                "\n\nThe right balance depends on how many calls the team can make."
-                "Choose a starting point above, then head to the **How many people should we phone?** tab to explore the trade-off.",
-                icon=":material/balance:",
+                "The model gives every appointment a risk of not attending, not a yes or no."
+                "\n\n- :material/arrow_upward: **Higher cut-off: fewer calls, better aimed.** "
+                "Most reach people who would really have missed."
+                "\n- :material/arrow_downward: **Lower cut-off: more misses caught, more calls.** "
+                "Many reach people who would have come anyway."
+                "\n\nThe right balance depends on how many calls the team can make, and how many "
+                "real misses they reach."
             )
-
-        # A choice kept from before "All appointments, ranked by risk" was removed
-        if st.session_state.get("weekly_measure") not in weekly.MEASURES:
-            st.session_state.pop("weekly_measure", None)
-        measure = (
-            st.segmented_control(
-                "Who goes on the list",
-                list(weekly.MEASURES),
-                default=DEFAULT_MEASURE,
-                key="weekly_measure",
-                help="  \n".join(
-                    f"**{name}:** {m.help}" for name, m in weekly.MEASURES.items()
-                ),
-            )
-            or DEFAULT_MEASURE
-        )
+            # A call to action that holds its own control, so it can't be an st.info (which
+            # can't contain widgets): a keyed container that style.css makes look like one
+            # A choice kept from before "All appointments, ranked by risk" was removed
+            if st.session_state.get("weekly_measure") not in weekly.MEASURES:
+                st.session_state.pop("weekly_measure", None)
+            with st.container(key="threshold_cta"):
+                st.markdown(
+                    ":material/touch_app: **Choose one of the two thresholds** to build the call "
+                    "list, then explore it further in the **How many people should we phone?** tab."
+                )
+                measure = (
+                    st.segmented_control(
+                        "Who goes on the list",
+                        list(weekly.MEASURES),
+                        default=DEFAULT_MEASURE,
+                        key="weekly_measure",
+                        help="  \n".join(
+                            f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
+                        ),
+                    )
+                    or DEFAULT_MEASURE
+                )
         m = weekly.MEASURES[measure]
 
         column = m.column
@@ -1433,73 +1413,75 @@ with tab_appts:
         st.markdown(
             f"**{weekly.week_title(first_week)}** (week ending {weekly.week_label(first_week, year=True)})"
         )
-        with st.container(horizontal=True):
-            st.metric(
-                f"Total appointments {when_week}",
-                f"{hw['n']:,}",
-                f"{hw['n'] - h['n'] / h['n_weeks']:+.0f} vs weekly average",
-                delta_color="off",
-                icon=":material/calendar_month:",
-                border=True,
-                help=f"In the week ending {weekly.week_label(first_week, year=True)}, in the sidebar "
-                f"filters. The average over {h['n_weeks']} week{plural} is {h['n'] / h['n_weeks']:.0f}.",
-            )
-            vs_average = round(hw["total"] - h["weekly_average_total"])
-            st.metric(
-                f"On the call list {when_week}",
-                f"{hw['total']:,.0f} ({hw['overall']:.0%})",
-                f"{vs_average:+d} vs weekly average",
-                delta_color="inverse",
-                icon=":material/call:",
-                border=True,
-                help=f"How many appointments {when_week} are on the list chosen above. This is not "
-                "how many will be missed: some of these patients would come anyway, and some "
-                f"lower-risk ones won't. {m.help} The weekly average is "
-                f"{h['weekly_average_total']:.0f} ({h['overall']:.0%}).",
-            )
-            st.metric(
-                "Highest-risk weekday",
-                hw["top_day"],
-                weekly.pts_vs_average(hw["top_day_rate"], hw["overall"])
-                if hw["n_days"] > 1
-                else None,
-                delta_color="inverse",
-                icon=":material/today:",
-                border=True,
-                help=f"{hw['top_day_rate']:.0%} on {hw['top_day']}, against {hw['overall']:.0%} "
-                "for the week.",
-            )
-            expected_cost = costs.expected_dna_cost(filtered_data)
-            week_cost = costs.expected_dna_cost(next_week)
-            st.metric(
-                f"Expected cost of missed appointments {when_week}",
-                f"£{week_cost:,.0f}",
-                f"{week_cost - expected_cost / h['n_weeks']:+,.0f} vs weekly average",
-                delta_color="inverse",
-                icon=":material/payments:",
-                border=True,
-                help=f"The average over {h['n_weeks']} week{plural} is £{expected_cost / h['n_weeks']:,.0f}. "
-                "Each appointment's predicted risk of not attending times the cost of missing it, "
-                "whichever count is chosen above. The costs are assumptions you can change under "
-                "**Cost assumptions** in the sidebar.",
-            )
-
         # The call list covers the first week: the period's counted appointments
         period = next_week
         when = when_week
         listed = period[period[column] == 1]
+        # Predicted value of phoning everyone on the list (None when nobody is on it)
+        sv = forecast_savings(listed, MEASURE_RISK_MIN[column])
 
-        # Predicted savings from phoning everyone on the list
-        savings_box(
-            listed,
-            MEASURE_RISK_MIN[column],
-            f"Value of appointments kept {when} if we phone everyone on this list",
-            f"{len(listed):,} calls in the week ending {weekly.week_label(first_week, year=True)}, "
-            f"if {DEFAULT_CALL_EFFECT}% of those who'd have missed attend instead.",
-            "not just this week or your filters",
-            "week_savings",
-            f"Nobody {when} is on this list, so there are no calls to cost.",
-        )
+        # Each card in a bordered container stretched to the row's height, as on All
+        # appointments, so the value card's extra lines don't leave the others short
+        # Keyed so style.css can make the last (value) card wider than the other three
+        with st.container(horizontal=True, key="week_cards"):
+            with st.container(border=True, height="stretch"):
+                st.metric(
+                    f"Total appointments {when_week}",
+                    f"{hw['n']:,}",
+                    f"{hw['n'] - h['n'] / h['n_weeks']:+.0f} vs weekly average",
+                    delta_color="off",
+                    icon=":material/calendar_month:",
+                    help=f"In the week ending {weekly.week_label(first_week, year=True)}, in the sidebar "
+                    f"filters. The average over {h['n_weeks']} week{plural} is {h['n'] / h['n_weeks']:.0f}.",
+                )
+            vs_average = round(hw["total"] - h["weekly_average_total"])
+            with st.container(border=True, height="stretch"):
+                st.metric(
+                    f"On the call list {when_week}",
+                    f"{hw['total']:,.0f}",
+                    f"{vs_average:+d} vs weekly average",
+                    # No colour for no change (Streamlit would show "+0" in red)
+                    delta_color="inverse" if vs_average else "off",
+                    icon=":material/call:",
+                    help=f"How many appointments {when_week} are on the list chosen above. This is not "
+                    "how many will be missed: some of these patients would come anyway, and some "
+                    f"lower-risk ones won't. {m.help} The weekly average is "
+                    f"{h['weekly_average_total']:.0f} ({h['overall']:.0%} of all appointments).",
+                )
+                st.caption(f"{hw['overall']:.0%} of all appointments {when_week}")
+            with st.container(border=True, height="stretch"):
+                st.metric(
+                    "Highest-risk weekday",
+                    hw["top_day"],
+                    weekly.pts_vs_average(hw["top_day_rate"], hw["overall"])
+                    if hw["n_days"] > 1
+                    else None,
+                    delta_color="inverse",
+                    icon=":material/today:",
+                    help=f"{hw['top_day_rate']:.0%} on {hw['top_day']}, against {hw['overall']:.0%} "
+                    "for the week.",
+                )
+            with st.container(border=True, height="stretch"):
+                if sv is None:
+                    st.metric(
+                        f"Estimated value of appointments kept {when_week}",
+                        "–",
+                        icon=":material/savings:",
+                    )
+                    st.caption(f"Nobody {when_week} is on this list, so there are no calls to cost.")
+                else:
+                    st.metric(
+                        f"Estimated value of appointments kept {when_week}",
+                        f"£{sv['value']:,.0f}",
+                        icon=":material/savings:",
+                        help=sv["help"],
+                    )
+                    st.caption(
+                        f"If we phone everyone on this list: {len(listed):,} calls in the week "
+                        f"ending {weekly.week_label(first_week, year=True)}, if {DEFAULT_CALL_EFFECT}% "
+                        "of those who'd have missed attend instead."
+                    )
+                    st.markdown(f":gray-badge[Staff time: £{sv['call_cost']:,.0f}]")
 
         # The call list itself, highest risk first
         st.subheader("Calls to make")
@@ -1519,9 +1501,14 @@ with tab_appts:
                 hide_index=True,
                 key=f"call_list_{filter_key}",
             )
-        st.caption(
-            "To decide how many calls are worth making, see the **How many people should we phone?** tab. To see why "
-            "the model gave an appointment its risk, choose **All appointments** in the sidebar."
+        # ---- The way on: one button, to the phone tab
+        next_step(
+            "calls",
+            "Plan the calls",
+            "How many calls should the team make, and would they be worth the staff time?",
+            "Plan the calls",
+            go_to_tab,
+            (TAB_CALLS,),
         )
 
 
