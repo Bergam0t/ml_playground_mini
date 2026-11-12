@@ -69,6 +69,8 @@ FEATURES = {
     "Day_Of_Week": "Day of the week",
     "Time_Slot": "Appointment time",
     "Journey_Time_Mins": "Predicted journey time (minutes)",
+    "Weeks_Since_Last": "Weeks since last seen (or referred)",
+    "Treatment_Ended": "Treatment already finished",
 }
 # Categorical model inputs and their categories (fixed, so one-hot columns always line up)
 CATEGORIES = {
@@ -77,6 +79,7 @@ CATEGORIES = {
     "Reporting_Site": list(SITES),
     "Day_Of_Week": DAYS,
     "Time_Slot": list(TIME_EFFECT),
+    "Treatment_Ended": ["No", "Yes"],
 }
 
 
@@ -90,20 +93,44 @@ VISITS_PER_PATIENT, VISITS_P = [1, 2, 3], [0.75, 0.19, 0.06]
 # the last 12 months on average (others average 0.25)
 HABITUAL_SHARE = 0.08
 HABITUAL_MEAN = 5.0
-# Missed appointments before: the strongest clue, adding this much to the log-odds for each
-# one (times 1.5, below). With the habitual missers above and the noise below, this is set so
-# that, as in the real Physiotherapy pilot (pilot.py), about 84% of the appointments the model
-# flags as high risk (70% or more) are missed without a call, while the model's test AUC
-# stays about 0.86 (the "around 86%" the real model is quoted at). The build checks both.
-PREVIOUS_DNA_EFFECT = 0.7
+# The effects below are set so the model reflects the real model's common reasons (long or
+# difficult journeys, long waits between appointments, appointments after treatment had
+# finished) more than missed appointments before, while, as in the real Physiotherapy pilot
+# (pilot.py), about 84% of the appointments it flags as high risk (70% or more) are missed
+# without a call, and its test AUC stays near the "around 86%" the real model is quoted at.
+# The build checks these. Found by searching on the build's fixed seeds: only about 60 past
+# test appointments are flagged, so small changes here move those checks by a lot (about 10
+# points of the 84% and 0.01 of the AUC) as the model refits. Rerun the build after any change.
+
+# Missed appointments before: adds this much to the log-odds (times 1.5, below) for each one.
+# Still a strong clue, but no longer the one that outweighs everything else.
+PREVIOUS_DNA_EFFECT = 0.417
 # Predicted journey time to the appointment: one of the common reasons the real model gave
 # ("long or difficult journeys"). Adds this much to the log-odds (times 1.5) for each step
 # of the log of the journey time away from a typical 25 minutes, so it counts more and more
 # slowly as journeys get longer.
-JOURNEY_EFFECT = 1.0
+JOURNEY_EFFECT = 1.214
 TYPICAL_JOURNEY_MINS = 25
+# Weeks since the patient was last seen in this specialty (a follow-up), or since they were
+# referred (a new appointment): "long waits between appointments", one of the real model's
+# common reasons. Adds this much to the log-odds (times 1.5) for each step of the log of the
+# gap away from a typical gap.
+GAP_EFFECT = 0.947
+TYPICAL_GAP_WEEKS = 10
+# A follow-up booked after the course of treatment had finished ("appointments after treatment
+# had finished", another of the real model's common reasons): this share of follow-ups, adding
+# this much to the log-odds (times 1.5). Rare, but a strong sign: about 4 in 10 are missed.
+TREATMENT_ENDED_SHARE = 0.033
+TREATMENT_ENDED_EFFECT = 2.475
+# Patients who've "moved on" (feel better, or have gone elsewhere): about this share of them.
+# Their follow-ups are much more often after treatment had finished (this share), and their
+# gaps longer (this many times), so these signals pile up in the same few patients. That gives
+# some of the very high risks a call list needs, as habitual missers do.
+MOVED_ON_SHARE = 0.04
+MOVED_ON_ENDED = 0.866
+MOVED_ON_GAP = 1.854
 # What the clues can't see: the spread of each appointment's chance around them
-NOISE_SD = 1.9
+NOISE_SD = 1.432
 
 
 def generate_appointments(n=3200, seed=42, weeks=6):
@@ -116,7 +143,8 @@ def generate_appointments(n=3200, seed=42, weeks=6):
 
     Patient names and appointment times come from a separate random stream, so adding them
     left every other column as it was. A patient keeps their name across appointments.
-    Journey times have a stream of their own too, so adding them changed only the risk.
+    Journey times have a stream of their own too, so adding them changed only the risk, and
+    so do the gap since last seen and whether treatment had already finished.
 
     Each row has a `day_index` (0 = the first Monday) rather than a date, so the
     weekday of a row never changes when the dates roll forward.
@@ -187,6 +215,22 @@ def generate_appointments(n=3200, seed=42, weeks=6):
     extra = np.where(same_site, 0, rng_journey.uniform(20, 40, n))
     df["Journey_Time_Mins"] = np.clip(np.round(usual[patient] + extra), 5, 120).astype(int)
 
+    # Gap since last seen (or referred), and whether treatment had already finished: own random
+    # stream (see above), so adding them changed only the risk. Follow-ups spread more widely
+    # than referral waits. The gap is at least the time since booking: it was booked after.
+    rng_course = np.random.default_rng([seed, 3])
+    moved_on = (rng_course.random(m) < MOVED_ON_SHARE)[patient]
+    follow_up = (df["Appointment Type"] == "Follow Up").to_numpy()
+    gap = np.where(
+        follow_up,
+        rng_course.lognormal(np.log(TYPICAL_GAP_WEEKS), 0.75, n),
+        rng_course.lognormal(np.log(8), 0.5, n),
+    ) * np.where(moved_on, MOVED_ON_GAP, 1.0)
+    gap = np.maximum(gap, np.ceil(df["Lead_Time_Days"].to_numpy() / 7))
+    df["Weeks_Since_Last"] = np.clip(np.round(gap), 1, 104).astype(int)
+    ended = follow_up & (rng_course.random(n) < np.where(moved_on, MOVED_ON_ENDED, TREATMENT_ENDED_SHARE))
+    df["Treatment_Ended"] = np.where(ended, "Yes", "No")
+
     logit = 1.5 * (
         df["Reporting_Site"].map(SITES).to_numpy()
         + df["Specialty"].map(SPECIALTIES).to_numpy()
@@ -199,6 +243,8 @@ def generate_appointments(n=3200, seed=42, weeks=6):
         - 0.025 * (df["Age"].to_numpy() - 52)
         - 0.10 * (df["Deprivation_Decile"].to_numpy() - 5.5)
         + JOURNEY_EFFECT * (np.log(df["Journey_Time_Mins"].to_numpy()) - np.log(TYPICAL_JOURNEY_MINS))
+        + GAP_EFFECT * (np.log(df["Weeks_Since_Last"].to_numpy()) - np.log(TYPICAL_GAP_WEEKS))
+        + TREATMENT_ENDED_EFFECT * ended
     ) + rng.normal(0, NOISE_SD, n)
     # calibrate the intercept so the average true DNA chance is DNA_RATE
     lo, hi = -12.0, 4.0

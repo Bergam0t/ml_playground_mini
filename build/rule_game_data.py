@@ -1,6 +1,6 @@
 """Data for the "Your rule vs the model" tab (offline build step, like train_and_explain.py).
 
-The tab lets a visitor build a rule for who to phone from the ten clues the model sees,
+The tab lets a visitor build a rule for who to phone from the twelve clues the model sees,
 each clue with an equal say. Then it shows a computer learning how much each clue should
 count, from more and more past appointments, and overtaking the visitor's rule.
 
@@ -12,7 +12,7 @@ Writes:
   22,500 past appointments: outcomes per 1,000 at the tab's call budget, and how much say
   each clue ends up with.
 
-The computer is a logistic regression on the same ten clues: the simplest model that
+The computer is a logistic regression on the same twelve clues: the simplest model that
 learns how much each clue counts. It has to learn which way each clue points too (raw
 inputs, categories one-hot), so it starts out worse than a sensible person. On these past
 appointments it reaches the same share of misses as the app's XGBoost model.
@@ -88,6 +88,7 @@ def main():
     X, group = build_matrix(hist)
     X["Lead_Time_Days"] = np.log(X["Lead_Time_Days"])
     X["Journey_Time_Mins"] = np.log(X["Journey_Time_Mins"])
+    X["Weeks_Since_Last"] = np.log(X["Weeks_Since_Last"])
     scaler = StandardScaler().fit(X.loc[idx_train])
     X_tr = scaler.transform(X.loc[idx_train])
     X_te = scaler.transform(X.loc[idx_test])

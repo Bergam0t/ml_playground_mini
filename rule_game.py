@@ -30,6 +30,8 @@ CLUES = {
     "Specialty": "Specialities with the highest miss rate",
     "Reporting_Site": "Sites with the highest miss rate",
     "Journey_Time_Mins": "Longer journeys",
+    "Weeks_Since_Last": "A longer gap since last seen",
+    "Treatment_Ended": "Treatment already finished",
 }
 # Short names for the say chart
 CLUE_SHORT = {
@@ -43,6 +45,8 @@ CLUE_SHORT = {
     "Specialty": "Specialty",
     "Reporting_Site": "Site",
     "Journey_Time_Mins": "Journey time",
+    "Weeks_Since_Last": "Gap since last seen",
+    "Treatment_Ended": "Treatment finished",
 }
 
 
@@ -77,7 +81,8 @@ def results(past: pd.DataFrame, score, share: float = CALL_SHARE) -> dict:
 
 
 # The simple rule a manager would reach for first: phone the people who've missed most before.
-# It is also the best rule the game's buttons can make.
+# In the demo's data, over half of those who go on to miss had never missed before, so it can't
+# tell them apart from everyone else.
 SIMPLE_RULE = ("Previous_DNAs",)
 
 
@@ -87,41 +92,31 @@ def precision_at_share(past: pd.DataFrame, score, share: float) -> float:
     return float(past["Did_Not_Attend"].to_numpy()[called].mean()) if called.any() else 0.0
 
 
-# A bigger call budget, to show the model's lead growing: SIMPLE_RULE runs out of patients
-# who've missed before (only about 3 in 10 have), then it's guessing.
-MORE_CALL_SHARE = 0.40
-
-
 def three_ways(past: pd.DataFrame, model_risk) -> dict:
     """Missed appointments reached per 1,000 past appointments with CALL_SHARE calls: at
     random, by SIMPLE_RULE and by the model. `model_risk` is the live model's predicted risk
-    for the same appointments, in the same order (data/past_predictions.csv). Also the same
-    for SIMPLE_RULE and the model with MORE_CALL_SHARE calls, and the share of missed
-    appointments by patients who had never missed before (SIMPLE_RULE can't rank them)."""
+    for the same appointments, in the same order (data/past_predictions.csv). Also the share of
+    missed appointments by patients who had never missed before (SIMPLE_RULE can't rank them)."""
     y = past["Did_Not_Attend"].to_numpy()
     n_missed = round(y.mean() * 1000)
-    rule = rule_score(past, SIMPLE_RULE)
-    risk = np.asarray(model_risk, dtype=float)
 
-    def caught(score, share=CALL_SHARE):
-        return results(past, score, share)["outcomes"]["called_dna"]
+    def caught(score):
+        return results(past, score)["outcomes"]["called_dna"]
 
     return {
         "n_missed": n_missed,
         "n_calls": round(CALL_SHARE * 1000),
         "random": n_missed * CALL_SHARE,
-        "rule": caught(rule),
-        "model": caught(risk),
+        "rule": caught(rule_score(past, SIMPLE_RULE)),
+        "model": caught(np.asarray(model_risk, dtype=float)),
         "never_missed_share": float(y[past["Previous_DNAs"].to_numpy() == 0].sum() / y.sum()),
-        "more_calls": round(MORE_CALL_SHARE * 1000),
-        "more_rule": caught(rule, MORE_CALL_SHARE),
-        "more_model": caught(risk, MORE_CALL_SHARE),
     }
 
 
 def all_rule_catches(past: pd.DataFrame) -> dict:
     """Missed appointments on the list (per 1,000) for every rule the visitor can make:
-    each combination of one or more clues, keyed by its sorted clues. 1,023 for 10 clues."""
+    each combination of one or more clues, keyed by its sorted clues: 2^n - 1 for n clues
+    (4,095 for 12)."""
     return {
         tuple(sorted(combo)): results(past, rule_score(past, combo))["outcomes"]["called_dna"]
         for k in range(1, len(CLUES) + 1)

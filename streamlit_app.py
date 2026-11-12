@@ -89,7 +89,7 @@ def load_comparison():
     return rule_game.three_ways(game_past, risk), game_past, rule
 
 
-# What every rule the visitor can make would catch, for "Your rule ranks #N of 1,023"
+# What every rule the visitor can make would catch, for "Your rule ranks #N of 4,095"
 @st.cache_data
 def load_rule_catches():
     return rule_game.all_rule_catches(rule_game.load_past())
@@ -1310,8 +1310,9 @@ with tab_appts:
         )
 
         # ---- Why use the model, not just the simple rule: the same calls three ways, under the
-        # table. It leads with what the rule can't do (people who'd never missed before, and the
-        # lead growing with more calls), and each tile reads on its own ("46 of 100").
+        # table. It leads with what the rule can't do (spot people who'd never missed before),
+        # and each tile reads on its own ("41 / of 100 calls / reached someone who would have
+        # missed").
         ways, _, _ = load_comparison()
         n_calls = ways["n_calls"]
         with st.container(border=True, key="landing_compare"):
@@ -1327,6 +1328,14 @@ with tab_appts:
                 st.caption(
                     f"Tested on {1000:,} past appointments the model didn't learn from, of which "
                     f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed."
+                )
+                # Yellow, like the demonstration notice at the top
+                st.warning(
+                    "**These appointments are synthetic.** The factors reflect what the real "
+                    "model found (long journeys, long waits between appointments, appointments "
+                    "after treatment had finished), but not exactly: how much each one counts "
+                    "here is made up.",
+                    icon=":material/science:",
                 )
             # The question the tiles answer, right above them, and the same words under each
             # number ("46 / of 100 calls / reached someone who would have missed"), so a tile makes
@@ -1362,8 +1371,8 @@ with tab_appts:
                     border=True,
                     icon=":material/history:",
                     help=f"Phoning the {n_calls} patients who had missed the most appointments "
-                    "before: the simple rule most people would choose, and the best rule in the "
-                    "bonus game. Patients who've never missed look the same to it.",
+                    "before: the simple rule most people would choose. Patients who've never "
+                    "missed look the same to it.",
                 )
                 with st.container(key="ways_random"):
                     st.metric(
@@ -1377,11 +1386,6 @@ with tab_appts:
                         help=f"Phoning {n_calls} appointments picked at random: the baseline, "
                         "with no way of choosing who to call.",
                     )
-            ways_numbers.markdown(
-                f"**With more calls, the model's lead grows:** {ways['more_calls']} calls would "
-                f"reach {ways['more_model']} with the model's list, {ways['more_rule']} by those "
-                "who missed most before. The rule runs out of people with a history to go on."
-            )
             # The same in £: the value of the appointments kept by phoning every forecast DNA
             # (the third card at the top), and by the same calls made the other two ways, in the
             # tiles' order. Before the cost of the calls, which is the same all three ways.
@@ -2187,8 +2191,9 @@ with tab_game:
         unsafe_allow_html=True,
     )
     st.caption(
-        ":material/science: Demonstration version: all the appointments here are synthetic. "
-        "No real patients or Trust data are displayed."
+        ":material/science: Demonstration version: all the appointments here are synthetic. The "
+        "clues reflect what the real model found, but not exactly: how much each one counts is made "
+        "up. No real patients or Trust data are displayed."
     )
 
     # ---- 1. The visitor's rule
@@ -2444,14 +2449,26 @@ with tab_game:
         # The best rule the buttons can make, named, so the verdict is honest about how close
         # it gets (the same comparison as "Why not just phone those who've missed before?" on the appointments tab)
         best_rule = max(all_catches, key=lambda rule: all_catches[rule])
-        best_rule_text = " and ".join(
-            f"*{rule_game.CLUES[c].lower()}*" for c in best_rule
+        names = [f"*{rule_game.CLUES[c].lower()}*" for c in best_rule]
+        best_rule_text = (
+            names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
         )
         found = (
             "You found the best rule the buttons can make, and the model still won."
             if yours >= best_possible
             else f"No rule from the buttons can match it: the best, {best_rule_text}"
             f"{' on its own' if len(best_rule) == 1 else ''}, reaches {best_possible} of {n_missed}."
+        )
+        # How far ahead the model is, in words that stay true if the data changes: a simple
+        # rule can do most of the work when the model is only a few ahead of the best one
+        lead = theirs - best_possible
+        verdict = (
+            "**So a simple rule does most of the work.** The model adds the last few, plus a risk "
+            "for every patient (to size the call list) and the reasons behind it."
+            if lead <= 3
+            else f"**The model reaches {lead} more than any rule from the buttons**, by learning "
+            "how much each clue should count. It also gives a risk for every patient (to size the "
+            "call list) and the reasons behind it."
         )
         equal_say = (
             "Your rule gives every clue an equal say: tuning the weights by hand is hard."
@@ -2470,8 +2487,7 @@ with tab_game:
                 f"{equal_say} The model gives "
                 f"*{rule_game.CLUE_SHORT[top_two[0]].lower()}* {say[top_two[0]]:.0%} and "
                 f"*{rule_game.CLUE_SHORT[top_two[1]].lower()}* {say[top_two[1]]:.0%}, and the rest less."
-                f"\n\n{found} **So a simple rule does most of the work.** The model adds the last "
-                "few, plus a risk for every patient (to size the call list) and the reasons behind it."
+                f"\n\n{found} {verdict}"
             )
         with c2.container(border=True, key="title_card_game_limit", height="stretch"):
             st.markdown(":material/visibility_off: **Nobody gets them all.**")

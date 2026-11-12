@@ -35,18 +35,19 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     filters sit above it, on one row with a "What does confidence mean?" popover, and narrow
     only the table: in the sidebar they would fight the forecast cards and call list, and the
     chart below would go round in circles (they select by the forecast it explains).
-  - **Why not just phone those who've missed before?**: of 1,000 past appointments (80
+  - **Why not just phone those who've missed before?**: of 1,000 past appointments (79
     missed), how many would 100 calls have reached who then missed, phoning the model's list
-    (46), phoning those who missed most before (43, the best rule in the game) and at random (8,
-    a quieter tile, as the baseline). The question sits in bold right above the tiles, and each
-    tile reads as a sentence ("46 / of 100 calls / reached someone who would have missed") so it
-    makes sense on its own.
-    It leads with what the simple rule can't do: 3 in 10 missed appointments are by people who'd
-    never missed before, and with more calls the model's lead grows (400 calls: 70 against 58)
-    because the rule runs out of people with a history. The model tile's help adds that the
+    (41), phoning those who missed most before (23) and at random (8, a quieter tile, as the
+    baseline). The question sits in bold right above the tiles, and each tile reads as a sentence
+    ("41 / of 100 calls / reached someone who would have missed") so it makes sense on its own.
+    It leads with what the simple rule can't do: 6 in 10 missed appointments are by people who'd
+    never missed before. A yellow box (like the demonstration
+    notice) says the appointments are synthetic: the factors reflect what the real model found
+    (its common reasons), but not exactly, as how much each one counts is made up (the bonus
+    game's demonstration caption says the same about its clues). The model tile's help adds that the
     model gives every patient a risk and the reasons behind it. Worked out by
     `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv` (the same
-    rows; the bigger budget is `rule_game.MORE_CALL_SHARE`). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
+    rows). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
     kept by phoning every forecast DNA, against the same number of calls made by the simple rule and
     at random (valued the same way, before the cost of the calls, which the line gives once as
     it's the same all three ways; clinic time kept, not cash). Buttons lead to the phone tab ("Explore these
@@ -69,26 +70,29 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
   Phoning everyone at 70% or more (the high-risk flag) with the 80% effect gives about 2 saved
   per 3 calls, as in the pilot.
 - **Bonus: beat the model** tab (last): a short game to show how a machine learning model learns to
-  beat a person's rule, and by how little the obvious rule loses.
+  beat a person's rule.
   - Built for a 2-5 minute visit to a stand: the setup is three numbers and a question, so the
     clue buttons are on screen without scrolling at 1920x1080 (100% and 125% scaling).
-  - Using 1,000 past appointments (80 missed) and 100 calls, the visitor builds a rule for who
-    to phone from the ten clues the model sees (including *riskiest times of day* and *longer
-    journeys*), with each chosen clue getting an equal say.
+  - Using 1,000 past appointments (79 missed) and 100 calls, the visitor builds a rule for who
+    to phone from the twelve clues the model sees (including *riskiest times of day*, *longer
+    journeys*, *a longer gap since last seen* and *treatment already finished*), with each
+    chosen clue getting an equal say.
     After each change, a callout says whether the last clue added or taken away made the list
-    better or worse, and the rule is ranked against all 1,023 rules the buttons can make (the
-    best is *most missed appointments before* on its own: 43 of 80).
+    better or worse, and the rule is ranked against all 4,095 rules the buttons can make (the
+    best combine six or more clues and reach 34 of 79; *most missed appointments before* on its
+    own reaches 23).
   - They then watch a model learn its own weighting from 0 to 22,500 past appointments: the
     race against their best rule beside how much say each clue gets. A toast and an
     "Overtook you" marker show where the model passes them (800 for the best rule).
   - The verdict follows at once: a banner saying where the model overtook them, then two short
     cards: same clues but the model learnt which matter most (no rule from the buttons can match
-    its 46), and even the best possible list (knowing each patient's true chance) reaches only
-    56 of 80. A short "Why a computer?" section comes last.
+    its 42), and even the best possible list (knowing each patient's true chance) reaches only
+    55 of 79. A short "Why a computer?" section comes last.
   - **Start again** (at the top once a game has begun, and after the verdict) clears the game
     for the next visitor.
-  - The verdict names the best rule the buttons can make and says the simple rule does most of
-    the work, matching the landing page.
+  - The verdict names the best rule the buttons can make and how far the model is ahead of it.
+    It says a simple rule does most of the work only when the model is 3 or fewer ahead, so it
+    stays true if the data changes.
   - Two buttons lead back to the Upcoming appointments and How many people should we phone? tabs, as in the
     geographic mini. The tabs are keyed (`key="page"`) so a button can switch them.
 
@@ -161,12 +165,19 @@ lambda_ml_streamlit_exercise:
 
 1. `demo_data.generate_appointments()` makes up past appointments with a hidden "true" chance of not attending,
    and draws whether each patient attended. The chances average `DNA_RATE` (8%: recent NHS
-   outpatient figures are about 6.4%, so the demo Trust is a little worse than average). A small
-   group of patients miss again and again (`HABITUAL_SHARE`, `HABITUAL_MEAN`), and each missed
-   appointment before counts strongly (`PREVIOUS_DNA_EFFECT`), against a lot that no clue can
-   see (`NOISE_SD`). These are set so the model matches the real pilot: a test AUC of about 0.86,
-   and about 84% of the appointments it flags as high risk missed without a call.
-2. An XGBoost model is trained on those past appointments.
+   outpatient figures are about 6.4%, so the demo Trust is a little worse than average). The
+   strongest clues are the real model's common reasons (see **The real pilot**): long journeys,
+   long gaps since last seen and appointments after treatment had finished (below), alongside
+   missed appointments before (`PREVIOUS_DNA_EFFECT`; a small group of patients miss again and
+   again, `HABITUAL_SHARE`, `HABITUAL_MEAN`), against a lot that no clue can see (`NOISE_SD`).
+   These are set so the model matches the real pilot: a test AUC near 0.86, and about 84% of the
+   appointments it flags as high risk missed without a call. They were found by searching on the
+   build's fixed seeds, and are sensitive: only about 60 past appointments are flagged, so a
+   small change moves the 84% by up to 10 points and the AUC by about 0.01. Rerun the build
+   after any change.
+2. An XGBoost model is trained on those past appointments. Its trees are two deep, not three as
+   in lambda_ml_streamlit_exercise: the demo's risks mostly add up clue by clue, and deeper trees
+   fitted them less well than the bonus game's simpler model.
 3. The model scores 3,200 future appointments. Their confidence score is worked out as in the
    live pipeline (WX-BIU/Outpatient-DNAs, `src/forecast/Outpatient_Forecast.py`): the top class
    probability minus the second, which for a yes/no model is |2q − 1|. The live model's q is
@@ -191,9 +202,26 @@ has a usual journey to their usual site (about 25 minutes typically, a little lo
 deprived areas), and an appointment at another site takes 20 to 40 minutes more. Longer journeys
 push the risk up (`JOURNEY_EFFECT`), more slowly the longer they get. It has its own random stream,
 so adding it changed only the risk. The build checks that journeys of 45 minutes or more miss more
-often (about 13%, against 7%) and that journey time is one of the model's four main reasons (it is
+often (about 15%, against 6%) and that journey time is one of the model's four main reasons (it is
 second, after missed appointments before). It shows in the explanations and as a clue in Your rule
 vs the model, not as a column in the appointment tables.
+
+**Gap since last seen, and treatment already finished.** The real model's other common reasons
+were long waits between appointments and appointments after treatment had finished. Each
+appointment has the weeks since the patient was last seen in that specialty, or, for a new
+appointment, since they were referred (`Weeks_Since_Last`, "Weeks since last seen (or
+referred)"); longer gaps push the risk up (`GAP_EFFECT`). About 3% of follow-ups come after the
+course of treatment had finished (`Treatment_Ended`, `TREATMENT_ENDED_SHARE`), a strong push
+(`TREATMENT_ENDED_EFFECT`). A small group of patients have "moved on" (`MOVED_ON_SHARE`): their
+follow-ups are much more often after treatment had finished and their gaps longer, so these
+signals pile up in the same patients and give some of the very high risks a call list needs.
+Both have their own random stream, so adding them changed only the risk. The build checks that
+the longest fifth of gaps miss more (about 16%, against 6%), that appointments after treatment
+had finished miss much more (about 39%, against 6%), that both are among the model's five main
+reasons (third and fourth), and that no one reason outweighs the others (missed appointments
+before is now about 1.4 times the next, journey time; it was over three times before these were
+added). Like journey time, they show in the explanations and as clues in the bonus game, not as
+columns in the appointment tables.
 
 Dates are not stored. `demo_data.load_forecast()` dates the appointments from next Monday onwards,
 so they always roll forward from today while each appointment keeps its weekday.
@@ -218,15 +246,16 @@ split as the main build, and checks that its test appointments match `past_predi
 
 The model on this tab is a logistic regression on raw inputs, so it has to learn which way each clue
 points as well as how much it counts. That's why it starts out worse than a person. With all the
-data it reaches the same share of misses as the XGBoost model (the build checks this). The demo
-data has only one interaction between clues, Monday mornings (below), which the simpler model can't
-learn, but it is a small part of the risk, so the simpler model loses almost nothing.
+data it reaches the same share of misses as the XGBoost model, within 3 points (the build checks
+this; 54% against 52%). The demo data has only one interaction between clues, Monday mornings
+(below), which the simpler model can't learn, but it is a small part of the risk, so the simpler
+model loses almost nothing.
 
 The build checks that the SHAP values add up to each prediction, that the past DNA rate is
 within a point of `DNA_RATE` and that every risk band has some appointments. It also checks the
-match with the real pilot: a test AUC from 0.85 to 0.87 (the "around 86%" the real model is
-quoted at), 80% to 88% of high-risk past appointments missed (the pilot's 84%), and at least 1.5%
-of upcoming appointments flagged. It prints how the
+match with the real pilot: a test AUC from 0.85 to 0.88 (near the "around 86%" the real model is
+quoted at; it is 0.875), 80% to 88% of high-risk past appointments missed (the pilot's 84%), and
+at least 1.2% of upcoming appointments flagged. It prints how the
 forecasts fall into the risk bands and the high-risk flag.
 
 It also checks **calibration** on the past appointments the model didn't train on: in each risk
@@ -242,13 +271,15 @@ sit higher than the demo's.
   70%, Very High 70% or more.
 - **Yes/no forecast** ("Expected DNA", `FORECAST_MIN` in the build and the app): a predicted risk
   of 20% or more, about two and a half times the average. The live model says yes at 50%, which
-  with its `scale_pos_weight=4` is about a 20% true risk. That's about 8% of appointments; about
-  half of those past patients missed, and they include about half of everyone who missed.
+  with its `scale_pos_weight=4` is about a 20% true risk. That's about 10% of appointments; about
+  4 in 10 of those past patients missed, and they include about half of everyone who missed.
 - **High-risk flag** (`HIGH_RISK_MIN`): the Very High band, 70% or more, the live app's flag. About
-  3% of upcoming appointments (2% of past ones); about 87% of those past patients missed (the real
-  pilot's high-risk patients: 84%), and they include about a quarter of everyone who missed.
-- **Weekly summary colours** (`weekly.MEASURES`): green below and red above 2% and 6% for the
-  flag, and 5% and 15% for the yes/no forecast.
+  1.4% of upcoming and past appointments; about 84% of those past patients missed (the real
+  pilot's high-risk patients: 84%), and they include about 15% of everyone who missed.
+- **Weekly summary colours** (`weekly.MEASURES`): green up to 1% and red from 4% for the flag,
+  and green up to 7% and red from 20% for the yes/no forecast. Set so that, over all the upcoming
+  days, about 7% are red for either list and most of the rest amber or green, as before the
+  data's factors were rebalanced (it was 2% and 6%, and 5% and 15%).
 
 ## The real pilot
 
@@ -263,10 +294,11 @@ confirm attendance, rearrange if needed and reassure.
 - So of about 229 patients who would have missed, 182 attended: an effect of about 80%, the phone
   tab's starting value (`DEFAULT_CALL_EFFECT`, worked out from `pilot.EFFECT`).
 
-The demo is set to match: the model's test AUC is about 0.86 (the real model is quoted as
+The demo is set to match: the model's test AUC is about 0.87 (the real model is quoted as
 "accurately predicting in around 86% of cases"), the high-risk flag catches patients who miss about
-84% of the time, Physiotherapy is one of the specialties, and long journeys (one of the real
-model's common reasons) are one of the model's main reasons. The pilot had no comparison group
+84% of the time, Physiotherapy is one of the specialties, and the real model's common reasons
+(long or difficult journeys, long waits between appointments, appointments after treatment had
+finished) are among the model's main reasons. The pilot had no comparison group
 (it compared these patients with how often they usually missed), so the tab says the true effect
 may be lower, especially lower down the list or in other services.
 

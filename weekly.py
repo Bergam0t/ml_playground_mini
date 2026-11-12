@@ -29,7 +29,7 @@ MEASURES = {
         cell_label="at very high risk",
         day_phrase="at very high risk of being missed (70% risk or more)",
         rate_phrase="{rate} of appointments are at very high risk of being missed (70% or more)",
-        thresholds=(0.02, 0.06),
+        thresholds=(0.01, 0.04),
         help="Only appointments with a predicted risk of not attending of 70% or more (the Very High risk band), "
         "the patients phoned in the real Physiotherapy pilot. A short, strict list: it catches the fewest "
         "missed appointments but wastes the fewest calls.",
@@ -40,7 +40,7 @@ MEASURES = {
         cell_label="at 20% risk or more",
         day_phrase="at 20% risk or more of being missed",
         rate_phrase="{rate} of appointments have a predicted risk of being missed of 20% or more",
-        thresholds=(0.05, 0.15),
+        thresholds=(0.07, 0.20),
         help="Every appointment with a predicted risk of not attending of 20% or more (about two and a half "
         "times the average): the model's yes/no forecast, as in the 'Expected DNA' column in the "
         "appointment list. A longer list that catches more missed appointments but takes more calls, "
