@@ -520,8 +520,7 @@ select.mobile-nav,
 /* ---- The demonstration notice's poster and video buttons (demo_notice_full) ---- */
 /* Pulled up under the yellow notice and outlined in its yellow, so they read as the notice's
 	own links rather than the page's teal actions. They open pop-ups, not new pages. */
-[class*="st-key-demo_notice_"] [data-testid="stAlert"] p,
-.st-key-synthetic_note [data-testid="stAlert"] p {
+[class*="st-key-demo_notice_"] [data-testid="stAlert"] p {
 	font-size: 0.875rem;
 }
 [class*="st-key-demo_links_"] {

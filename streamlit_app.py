@@ -1436,18 +1436,19 @@ def compare_ways(savings, length):
                 f"**{ways['never_missed_share'] * 10:.0f} in 10 missed appointments are by people "
                 "who'd never missed before.** That simple rule alone can't spot them, but the model can."
             )
-            st.caption(
-                f"Tested on {1000:,} past appointments the model didn't learn from, of which "
-                f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed."
-            )
-            # Yellow, like the demonstration notice; keyed so style.css can make its text smaller
-            with st.container(key="synthetic_note"):
-                st.warning(
-                    "**These appointments are synthetic.** The factors reflect what the real "
-                    "model found (long journeys, long waits between appointments, appointments "
-                    "after treatment had finished), but not exactly: how much each one counts "
-                    "here is made up.",
-                    icon=":material/science:",
+            # What the figures were tested on, and that the data is synthetic: the gist in the
+            # label, the details folded away (the sidebar notice also says it's synthetic)
+            with st.expander(
+                f"Tested on {1000:,} past appointments (synthetic)",
+                icon=":material/science:",
+            ):
+                st.caption(
+                    f"The model didn't learn from these {1000:,} past appointments, of which "
+                    f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed.\n\n"
+                    "**They are synthetic.** The factors reflect what the real model found "
+                    "(long journeys, long waits between appointments, appointments after "
+                    "treatment had finished), but not exactly: how much each one counts here "
+                    "is made up."
                 )
         # The question the tiles answer, right above them, and the same words under each
         # number ("46 / of 100 calls / reached someone who would have missed"), so a tile makes
