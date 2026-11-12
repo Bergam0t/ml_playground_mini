@@ -21,7 +21,12 @@ MUTED = "#898781"
 FONT = dict(family="Space Grotesk, sans-serif", color=TEXT, size=15)
 
 
-def _waterfall_trace(labels, values, measure, texts):
+def _waterfall_trace(labels, values, measure, texts, size, big):
+    """`big` is the text size for the average and total rows, whose figures also take VALUE
+    colour; `size` is for the factor rows."""
+    is_end = [m != "relative" for m in measure]
+    # Only the patient's own total takes VALUE colour; the average stays in plain text colour
+    colours = [VALUE if m == "total" else TEXT for m in measure]
     return go.Waterfall(
         orientation="h",
         y=labels,
@@ -29,7 +34,10 @@ def _waterfall_trace(labels, values, measure, texts):
         measure=measure,
         text=texts,
         textposition="outside",
-        textfont=dict(color=TEXT),
+        textfont=dict(
+            color=colours,
+            size=[big if e else size for e in is_end],
+        ),
         increasing=dict(marker=dict(color=UP)),
         decreasing=dict(marker=dict(color=DOWN)),
         totals=dict(marker=dict(color=TOTAL)),
@@ -41,15 +49,19 @@ def _waterfall_trace(labels, values, measure, texts):
 VALUE = "#f2c14e"  # a patient's own figure in a row label: warm, so not mistaken for red or blue
 
 
-def _highlight_values(fig, labels, size):
-    """Show the figure after " = " in each row label bigger and in VALUE colour. Only the axis
-    text changes: the labels the hover uses stay plain."""
+def _highlight_values(fig, labels, measure, size, big):
+    """Show the figure after " = " in each row label bigger and in VALUE colour, and the
+    average and total rows' labels bigger (size `big`). Only the axis text changes: the labels
+    the hover uses stay plain."""
     styled = []
-    for label in labels:
+    for label, m in zip(labels, measure):
         name, sep, value = label.partition(" = ")
-        styled.append(
-            f'{name} = <span style="color:{VALUE};font-size:{size}px">{value}</span>' if sep else label
-        )
+        if sep:
+            styled.append(f'{name} = <span style="color:{VALUE};font-size:{size}px">{value}</span>')
+        elif m != "relative":
+            styled.append(f'<span style="font-size:{big}px">{label}</span>')
+        else:
+            styled.append(label)
     fig.update_yaxes(tickmode="array", tickvals=labels, ticktext=styled)
 
 
@@ -75,13 +87,13 @@ def waterfall(expl: dict) -> go.Figure:
     values = [expl["base"]] + [s["value"] for s in steps] + [expl["fx"]]
     measure = ["absolute"] + ["relative"] * len(steps) + ["total"]
     texts = [f"{expl['base']:.1f}%"] + [f"{s['value']:+.1f}%" for s in steps] + [f"{expl['fx']:.1f}%"]
-    fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
+    fig = go.Figure(_waterfall_trace(labels, values, measure, texts, 15, 20))
     # Room past the furthest bar end for its outside label
     running = [expl["base"]]
     for s in steps:
         running.append(running[-1] + s["value"])
     x_max = max(running) * 1.15 + 3
-    _highlight_values(fig, labels, 18)
+    _highlight_values(fig, labels, measure, 18, 20)
     return _layout(
         fig,
         120 + 40 * len(labels),
@@ -129,7 +141,8 @@ def importance_bars(overall: list, overall_title: str, filtered: list | None = N
         )
     x_max = max(i["value"] for items, _, _ in panels for i in items) * 1.05
     fig.update_xaxes(range=[0, x_max], showticklabels=False, showgrid=False, zeroline=False, fixedrange=True)
-    fig.update_yaxes(fixedrange=True)
+    # Bigger factor names; the plot area shrinks to make room, so the bars get shorter
+    fig.update_yaxes(fixedrange=True, tickfont=dict(size=18))
     _layout(fig, 100 + 40 * len(labels), margin=dict(l=0, r=10, t=40, b=10))
     # Panel titles left-aligned over their own panel
     for ann, axis in zip(fig.layout.annotations, ["xaxis", "xaxis2"]):
@@ -152,7 +165,7 @@ GUIDE_BADGES = {1: "Average appointment", 2: "Missed appointments = 3", 3: "This
 def guide_waterfall() -> go.Figure:
     """Small annotated example waterfall with numbered badges in a column on the right."""
     labels, values, measure, texts = (list(t) for t in zip(*GUIDE_STEPS))
-    fig = go.Figure(_waterfall_trace(labels, values, measure, texts))
+    fig = go.Figure(_waterfall_trace(labels, values, measure, texts, 12, 16))
     badge_x = 38
     fig.add_trace(
         go.Scatter(
@@ -173,7 +186,7 @@ def guide_waterfall() -> go.Figure:
         xaxis=dict(visible=False, range=[0, badge_x + 4], fixedrange=True),
     )
     fig.update_layout(font_size=12)  # smaller than the real chart: it is only a guide
-    _highlight_values(fig, labels, 15)
+    _highlight_values(fig, labels, measure, 15, 16)
     return fig
 
 

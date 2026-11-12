@@ -349,9 +349,12 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
     show_filtered = is_filtered and n >= MIN_GROUP_FOR_CHART
 
     st.markdown(
-        "Each bar shows how much a factor moves an appointment's predicted risk of not "
-        "attending, on average, **whether it pushes the risk up or down**. A longer bar means "
-        "the model relies on that factor more. Hover over a bar for the figure."
+        "These bars show what the model relies on **on average, across many appointments**. "
+        "Each bar is how much a factor moves the predicted risk of not attending, "
+        "**whether it pushes the risk up or down**, so a longer bar means the model relies on "
+        "that factor more.\n\nThis is different from the chart for one appointment, which shows "
+        "how **that patient's own values moved** their risk, and in **which direction**. "
+        "Hover over a bar for the figure."
     )
     st.plotly_chart(
         charts.importance_bars(
@@ -453,11 +456,6 @@ def explanation_body(row, expl, meta, overall):
 
 def this_appointment(row, expl, meta):
     """The "This appointment" tab: the waterfall for one appointment."""
-    st.markdown(
-        f"**The model predicts a {expl['fx']:.0f}% risk that this patient won't attend**, "
-        f"compared with about **{expl['base']:.0f}%** for the average appointment."
-    )
-
     # Starts open; collapse it once you have the idea (it stays collapsed between patients)
     with st.expander(
         "How to read this chart (a made-up example)",
