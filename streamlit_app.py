@@ -1755,6 +1755,17 @@ def explain_a_patient():
             args=(group,),
             help=f"Another {RISK_GROUPS[group][0].lower()} patient.",
         )
+    # The first time a visitor scrolls down to these buttons, a pointer shows them clicking
+    # one that isn't chosen ("Medium risk" at first), so the click visibly would change the
+    # chart. Only once the tab is open (see show_click_hint)
+    if page == TAB_INTRO:
+        click_hint.show_click_hint(
+            "patients",
+            f"intro_group_{next(g for g in RISK_GROUPS if g != group)}",
+            inner="button",
+            delay=600,
+            bottom_margin=0.25,
+        )
 
     # Keyed so style.css stacks the guide under the chart on narrower screens
     chart_col, guide_col = st.container(key="reflow_stack_intro_shap").columns(
@@ -1937,7 +1948,12 @@ with tab_dash:
         # The first time a visitor opens this view, a pointer shows them clicking a row. Only
         # once the tab is open (see show_click_hint)
         if page == TAB_DASH:
-            click_hint.show_click_hint("appointments", "appointments_grid", TABLE_ROW_HEIGHT)
+            click_hint.show_click_hint(
+                "appointments",
+                "appointments_grid",
+                TABLE_ROW_HEIGHT,
+                inner='[data-testid="stDataFrame"]',
+            )
 
         # ---- The way on: one button, to the next view (style.css)
         next_step(

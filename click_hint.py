@@ -1,7 +1,8 @@
 """A pointer that shows a visitor what to click: the first time they see something clickable,
 a pointer glides onto it and clicks it, twice, with a ripple and a yellow flash of what it
 clicked, then fades away. Used on the first tab's three boxes (it clicks "Missed most before")
-and on the demo dashboard's All appointments table (it clicks the first row).
+and its patient buttons further down (it clicks "Medium risk", once they're scrolled into
+view), and on the demo dashboard's All appointments table (it clicks the first row).
 
 The pointer is drawn over the page, not in it, and lets every click through, so the page works
 as normal throughout; any press removes the pointer at once. It waits until most of its target
@@ -20,24 +21,31 @@ CLICK_SCRIPT = """
 <script>
 (function () {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    // TARGET: the keyed container to click (a table inside it, if any, is the target).
-    // ROW: a table's row height, to click its first row; null to click the whole box.
+    // NAME: which pointer this is (several can be on one page).
+    // TARGET: the keyed container to click; INNER: a selector for the element inside it to
+    // click (a table, a button), or null for the container itself.
+    // ROW: a table's row height, to click its first row; null to click the whole target.
     // DELAY: ms to wait once the target is on screen, so the page has settled.
-    var TARGET = __TARGET__, ROW = __ROW__, DELAY = __DELAY__;
+    // BOTTOM: the fraction of the screen at the bottom that doesn't count as on screen, so a
+    // target low on the page waits until the visitor has scrolled it well into view.
+    var NAME = __NAME__, TARGET = __TARGET__, INNER = __INNER__, ROW = __ROW__;
+    var DELAY = __DELAY__, BOTTOM = __BOTTOM__;
     var CYCLE = 1800;      // ms for one glide and click
     var CYCLES = 2;
-    var WAIT = 60000;      // give up if the target is never seen
+    var WAIT = 60000;      // give up if the target is never drawn
     var YELLOW = '#ffe600';
-    // A newer run (say, a reloaded page) takes over from an older one
-    var run = (window.__clickHintRun || 0) + 1;
-    window.__clickHintRun = run;
+    // A newer copy of this pointer (say, on a reloaded page) takes over from an older one
+    var runs = window.__clickHintRuns = window.__clickHintRuns || {};
+    var run = (runs[NAME] || 0) + 1;
+    runs[NAME] = run;
+    function current() { return window.__clickHintRuns[NAME] === run; }
     var started = performance.now();
     var overlay = null, grid = null, frame = null, watcher = null, observer = null, timer = null;
 
     function findGrid() {
         var box = document.querySelector('.st-key-' + TARGET);
         if (!box) return null;
-        return box.querySelector('[data-testid="stDataFrame"]') || box;
+        return INNER ? box.querySelector(INNER) : box;
     }
 
     function stop() {
@@ -48,6 +56,8 @@ CLICK_SCRIPT = """
         if (observer) observer.disconnect();
         if (timer) clearTimeout(timer);
         document.removeEventListener('pointerdown', stop, true);
+        // Let another pointer waiting its turn play
+        if (window.__clickHintPlaying === NAME + run) window.__clickHintPlaying = null;
     }
 
     function el(css) {
@@ -57,14 +67,16 @@ CLICK_SCRIPT = """
     }
 
     function play() {
+        window.__clickHintPlaying = NAME + run;
         // The overlay sits over the target, on the page body so Streamlit's redraws leave it
         // alone, and follows the target each frame as the page scrolls
         overlay = el('position:fixed;z-index:999;overflow:visible;transition:opacity 300ms;');
         // What lights up on the click: a table's first row, under its header row, or the
-        // whole box, with its rounded corners
+        // whole target, with its own rounded corners
         var bar = el((ROW
             ? 'left:0;right:0;top:' + ROW + 'px;height:' + ROW + 'px;background:rgba(255,230,0,0.28);'
-            : 'inset:0;border-radius:0.5rem;background:rgba(255,230,0,0.1);') +
+            : 'inset:0;border-radius:' + (getComputedStyle(grid).borderRadius || '0.5rem') +
+              ';background:rgba(255,230,0,0.1);') +
             'box-shadow:inset 0 0 0 2px ' + YELLOW + ';opacity:0;');
         var ring = el('width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;' +
             'border:3px solid ' + YELLOW + ';opacity:0;');
@@ -91,10 +103,12 @@ CLICK_SCRIPT = """
         document.body.appendChild(overlay);
 
         function place() {
-            if (window.__clickHintRun !== run || !overlay) return stop();
+            if (!current() || !overlay) return stop();
             var r = grid.getBoundingClientRect();
-            // Gone (the tab or view changed, or a table was redrawn empty): stop
-            if (!grid.isConnected || r.width === 0 || r.height === 0) return stop();
+            // Gone (the tab or view changed, or a table was redrawn empty), or scrolled right
+            // off screen (so a pointer waiting its turn further down needn't wait): stop
+            if (!grid.isConnected || r.width === 0 || r.height === 0 ||
+                r.bottom <= 0 || r.top >= window.innerHeight) return stop();
             overlay.style.left = r.left + 'px';
             overlay.style.top = r.top + 'px';
             overlay.style.width = r.width + 'px';
@@ -139,22 +153,37 @@ CLICK_SCRIPT = """
         timer = setTimeout(stop, CYCLE * CYCLES + 100);
     }
 
+    // Whether most of the target is on screen, above the bottom BOTTOM of it
+    function inView() {
+        var r = grid.getBoundingClientRect();
+        var bottom = window.innerHeight * (1 - BOTTOM);
+        var shown = Math.min(r.bottom, bottom) - Math.max(r.top, 0);
+        return r.height > 0 && shown >= r.height * 0.6;
+    }
+
+    // After the pause: play, unless another pointer is playing (wait for it to finish, so two
+    // never play at once) or the visitor has scrolled away meanwhile (wait for it again)
+    function turn() {
+        if (!current() || !grid.isConnected) return;
+        if (window.__clickHintPlaying) { timer = setTimeout(turn, 400); return; }
+        if (!inView()) { watch(); return; }
+        play();
+    }
+
     // Once most of the target is on screen, after a pause so the page has settled
     function watch() {
         observer = new IntersectionObserver(function (entries) {
             if (entries.some(function (e) { return e.intersectionRatio >= 0.6; })) {
                 observer.disconnect();
                 observer = null;
-                timer = setTimeout(function () {
-                    if (window.__clickHintRun === run && grid.isConnected) play();
-                }, DELAY);
+                timer = setTimeout(turn, DELAY);
             }
-        }, { threshold: [0, 0.6, 1] });
+        }, { threshold: [0, 0.6, 1], rootMargin: '0px 0px -' + BOTTOM * 100 + '% 0px' });
         observer.observe(grid);
     }
 
     function tryStart() {
-        if (window.__clickHintRun !== run) return true;
+        if (!current()) return true;
         grid = findGrid();
         if (!grid || grid.getBoundingClientRect().height === 0) return false;
         watch();
@@ -177,11 +206,15 @@ CLICK_SCRIPT = """
 """
 
 
-def show_click_hint(name, target_key, row_height=None, delay=500):
+def show_click_hint(
+    name, target_key, row_height=None, delay=500, inner=None, bottom_margin=0
+):
     """Play the pointer once per visit for `name`: later calls with the same name do nothing.
-    It clicks the container keyed `target_key`: the first row of the table inside it, whose rows
-    (and header) are `row_height` px tall, or, with no row height, the whole container. It plays
-    `delay` ms after most of the target is on screen.
+    It clicks the container keyed `target_key`, or the element inside it matching the CSS
+    selector `inner` (a table, a button): the first row of a table whose rows (and header) are
+    `row_height` px tall, or, with no row height, the whole target. It plays `delay` ms after
+    most of the target is on screen, not counting the bottom `bottom_margin` of the screen
+    (0.25: the target must be in the top three-quarters). Pointers on one page take turns.
 
     Call it only on a run where the target's tab is open: a tab's contents are drawn on every
     run, even behind another tab, and a pointer sent to a hidden tab is never seen but still
@@ -190,10 +223,15 @@ def show_click_hint(name, target_key, row_height=None, delay=500):
     if st.session_state.get(seen):
         return
     st.session_state[seen] = True
-    script = (
-        CLICK_SCRIPT.replace("__TARGET__", json.dumps(target_key))
-        .replace("__ROW__", json.dumps(row_height))
-        .replace("__DELAY__", json.dumps(delay))
-    )
+    script = CLICK_SCRIPT
+    for placeholder, value in {
+        "__NAME__": name,
+        "__TARGET__": target_key,
+        "__INNER__": inner,
+        "__ROW__": row_height,
+        "__DELAY__": delay,
+        "__BOTTOM__": bottom_margin,
+    }.items():
+        script = script.replace(placeholder, json.dumps(value))
     with st.container(key=f"click_hint_{name}"):
         st.html(script, unsafe_allow_javascript=True)
