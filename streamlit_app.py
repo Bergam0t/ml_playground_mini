@@ -64,6 +64,15 @@ def load_past():
     return pd.read_csv(DATA_DIR / "past_predictions.csv")
 
 
+def catch_rates(threshold):
+    """On the past appointments the model didn't train on: the share of the missed appointments
+    at or above this risk, and the share of those at or above it that were missed."""
+    past = load_past()
+    picked = past["DNA_Prob_Forecast"] >= threshold
+    missed = past["Did_Not_Attend"] == 1
+    return (picked & missed).sum() / missed.sum(), missed[picked].mean()
+
+
 @st.cache_data
 def load_model_meta():
     return json.loads((DATA_DIR / "model_meta.json").read_text(encoding="utf-8"))
@@ -132,6 +141,28 @@ HIGH_RISK_MIN = 0.70
 # the starting value on the phone tab and in the savings on the appointments tab. The real
 # pilot's, about 80% (pilot.EFFECT), to the nearest 5 so it sits on the phone tab's slider.
 DEFAULT_CALL_EFFECT = round(pilot.EFFECT * 20) * 5
+
+
+def in_words(share):
+    """A share as "N in 10", or "1 in N" when it's small (0.15 is "1 in 7", not "1 in 10")."""
+    if share < 0.3:
+        return f"1 in {round(1 / share)}"
+    return f"{round(share * 10)} in 10"
+
+
+def model_caveat():
+    """The explanation overlay's note on what the bars mean and how good the model is, for a
+    non-technical reader: how often a Very High flag was right, and how many missed
+    appointments it caught, on past appointments the model hadn't seen."""
+    recall, precision = catch_rates(HIGH_RISK_MIN)
+    return (
+        "These bars show patterns the model spotted, not causes: changing one of these facts "
+        "wouldn't necessarily make a patient more likely to attend. How good is the model? We "
+        "checked it on past appointments it hadn't seen. Of the patients it rated Very High "
+        f"risk ({HIGH_RISK_MIN:.0%} or more), about {in_words(precision)} did miss. "
+        f"But it can't spot everyone: only about {in_words(recall)} missed "
+        "appointments had a risk that high."
+    )
 
 
 def DNA_Risk(prob):
@@ -400,7 +431,6 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
     # filtered_data leaves out the table's forecast filters: they pick appointments by the
     # very pushes being charted (Very High risk = big pushes up), so the comparison would be
     # circular
-    meta = load_model_meta()
     shap_all = load_shap()
     n = len(filtered_data)
     is_filtered = n < len(data)
@@ -450,13 +480,7 @@ def overall_importance(filtered_data, filter_key, sidebar_choices):
             f"Only {n:,} appointment{'s' if n != 1 else ''} match your filters: too few for a "
             f"reliable chart of their own (it needs at least {MIN_GROUP_FOR_CHART})."
         )
-    st.info(
-        "These bars show what the model relied on, not what causes missed appointments: "
-        "changing one of these facts would not necessarily change whether a patient attends. "
-        "The model is reasonably but not perfectly accurate: tested on past appointments it "
-        "hadn't seen, it gave a missed appointment a higher risk than an attended one about "
-        f"{meta['auc_test'] * 100:.0f} times in 100."
-    )
+    st.info(model_caveat())
     st.warning(
         "This is a synthetic dataset, so these results should not be used for service planning.",
         icon=":material/science:",
@@ -489,11 +513,11 @@ def explain_appointment(row, overall):
         f"{expl['fx']:.0f}% risk of not attending: why?"
     )
     st.dialog(title, width="large", on_dismiss=close_explanation)(explanation_body)(
-        row, expl, meta, overall
+        row, expl, overall
     )
 
 
-def explanation_body(row, expl, meta, overall):
+def explanation_body(row, expl, overall):
     """What the explain_appointment overlay shows: this appointment, and, on a second tab, what
     the model relies on overall."""
     # A segmented control, not st.tabs: style.css turns every top-level tab bar into the page
@@ -507,12 +531,12 @@ def explanation_body(row, expl, meta, overall):
         label_visibility="collapsed",
     )
     if show == "This appointment":
-        this_appointment(row, expl, meta)
+        this_appointment(row, expl)
     else:
         overall_importance(*overall)
 
 
-def this_appointment(row, expl, meta):
+def this_appointment(row, expl):
     """The "This appointment" tab: the waterfall for one appointment."""
     # Starts open; collapse it once you have the idea (it stays collapsed between patients)
     with st.expander(
@@ -553,12 +577,7 @@ def this_appointment(row, expl, meta):
     )
     st.info(
         "A predicted risk is an estimate based on similar appointments in past data, not a "
-        "forecast of what this one person will do. The bars show what the model relied on, "
-        "not what causes missed appointments: changing one of these facts would not "
-        f"necessarily change whether the patient attends. The model is reasonably but not "
-        f"perfectly accurate: tested on past appointments it hadn't seen, it gave a missed "
-        f"appointment a higher risk than an attended one about {meta['auc_test'] * 100:.0f} "
-        f"times in 100."
+        f"forecast of what this one person will do. {model_caveat()}"
     )
     st.warning(
         "This is not a real patient, and the factors shown here should not be used for "
@@ -1198,13 +1217,6 @@ with tab_appts:
         # What really happened to past appointments the model did not train on
         past = load_past()
         past_dna_rate = past["Did_Not_Attend"].mean()
-
-        def catch_rates(threshold):
-            """Share of the missed appointments at or above this risk, and share of those that were missed."""
-            picked = past["DNA_Prob_Forecast"] >= threshold
-            missed = past["Did_Not_Attend"] == 1
-            return (picked & missed).sum() / missed.sum(), missed[picked].mean()
-
         forecast_recall, forecast_precision = catch_rates(FORECAST_MIN)
         high_recall, high_precision = catch_rates(HIGH_RISK_MIN)
 
