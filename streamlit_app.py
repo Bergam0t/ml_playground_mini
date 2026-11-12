@@ -1387,14 +1387,23 @@ def section_title(question, note, **kwargs):
     )
 
 
+def outcome_cols(n_calls):
+    """How many markers wide the compact outcome chart's two columns are, for `n_calls` calls
+    in 1,000. 84 in all, shared in line with the columns' sizes: the chart is then wide and
+    short enough to fill its column and sit beside the cards. The limits keep each column at
+    least as wide as its box (23 markers), so the markers fill it."""
+    left_cols = min(61, max(23, round(84 * n_calls / 1000)))
+    return left_cols, 84 - left_cols
+
+
 def calling_right_people(out, list_name, note, key, previous=None, token=None):
     """"Are we calling the right people?": the past appointments as four boxes (on the call list
     or not, missed or not) beside the two rate cards, for the calls in `out`
     (calls.call_outcomes). `list_name` says how the call list was made, for the caption; `key`
     keeps the phone tab's copy and the first tab's apart (and keys them for style.css).
-    `previous`, the outcomes shown before, with the same number of calls, makes the markers
-    that change box fly there from where they were (move_markers.py); `token` tells that
-    script this chart from the one before it."""
+    `previous`, the outcomes shown before, makes the markers that change box fly there from
+    where they were (move_markers.py); `token` tells that script this chart from the one
+    before it."""
     meta = load_model_meta()
     section_title("Are we calling the right people?", note)
     # Keyed so style.css puts the cards under the chart on narrower screens
@@ -1402,20 +1411,16 @@ def calling_right_people(out, list_name, note, key, previous=None, token=None):
         [0.68, 0.32], gap="large"
     )
     with left:
-        # Share 84 small markers of width between the columns in line with their sizes: the
-        # compact chart is then wide and short enough to fill its column and sit beside the
-        # cards. The limits keep each column at least as wide as its box (23 markers), so the
-        # markers fill it.
-        left_cols = min(61, max(23, round(84 * out["calls"] / 1000)))
+        cols = outcome_cols(out["calls"])
         st.plotly_chart(
-            charts.outcome_blocks(out, left_cols, 84 - left_cols, compact=True, meta=token),
+            charts.outcome_blocks(out, *cols, compact=True, meta=token),
             width="stretch",
             config={"displayModeBar": False},
             key=f"outcome_blocks_{key}",
         )
         if previous is not None:
             move_markers.animate_moves(
-                move_markers.outcome_moves(previous, out, left_cols, 84 - left_cols),
+                move_markers.outcome_moves(previous, out, outcome_cols(previous["calls"]), cols),
                 token,
                 f"outcome_blocks_{key}",
             )
@@ -2467,13 +2472,26 @@ with tab_calls:
         st.info(
             "With this setting nobody would get a call. Raise the number of calls or lower the bar."
         )
+        # No chart now, so the next one has nothing to move from
+        st.session_state.phone_shown = None
     else:
+        # When the setting changes, the markers that change box fly there (move_markers.py).
+        # Against the outcomes the chart last showed, so it plays once per change; counted, so
+        # the script can tell the new chart from the old.
+        shown = st.session_state.get("phone_shown")
+        counts = {k: out[k] for k, _ in calls.GROUPS} | {"calls": out["calls"]}
+        moved = shown is not None and shown != counts
+        if moved:
+            st.session_state.phone_move = st.session_state.get("phone_move", 0) + 1
+        st.session_state.phone_shown = counts
         calling_right_people(
             out,
             "the model's list",
             # The bridge from the per-week figures above to the past appointments below
             f"the same setting replayed on 1,000 past appointments: {out['calls']:,} calls",
             "phone",
+            previous=shown if moved else None,
+            token=st.session_state.get("phone_move", 0),
         )
 
     # What happened when the real tool was piloted (pilot.py): the evidence behind the effect
@@ -2639,6 +2657,8 @@ with tab_game:
             "Pick at least one clue to see who your rule would put on the call list.",
             icon=":material/touch_app:",
         )
+        # No chart now, so the next one has nothing to move from
+        st.session_state.game_shown = None
     else:
         mine = rule_game.results(game_past, rule_game.rule_score(game_past, clues))
         caught = mine["outcomes"]["called_dna"]
@@ -2656,16 +2676,35 @@ with tab_game:
         left, right = st.container(key="reflow_stack_game_rule").columns(
             [0.62, 0.38], gap="large"
         )
+        # When the rule changes, the markers that change box fly there (move_markers.py).
+        # Against the outcomes the chart last showed, so it plays once per change; counted, so
+        # the script can tell the new chart from the old.
+        shown = st.session_state.get("game_shown")
+        moved = shown is not None and shown != mine["outcomes"]
+        if moved:
+            st.session_state.game_move = st.session_state.get("game_move", 0) + 1
+        st.session_state.game_shown = mine["outcomes"]
+        game_token = st.session_state.get("game_move", 0)
+        # 50 wide on the right so the chart is wide and short enough to fill its column
+        game_cols, game_heading = (10, 50), "Using your rule to rank the list"
         with left:
             st.plotly_chart(
-                # 50 wide on the right so the chart is wide and short enough to fill its column
                 charts.outcome_blocks(
-                    mine["outcomes"], 10, 50, heading="Using your rule to rank the list"
+                    mine["outcomes"], *game_cols, heading=game_heading, meta=game_token
                 ),
                 width="stretch",
                 config={"displayModeBar": False},
                 key="game_rule_icons",
             )
+            if moved:
+                move_markers.animate_moves(
+                    move_markers.outcome_moves(
+                        shown, mine["outcomes"], game_cols, game_cols, game_heading, compact=False
+                    ),
+                    game_token,
+                    "game_rule_icons",
+                    compact=False,
+                )
             st.caption(
                 "Each marker is one of the 1,000 past appointments. Nobody was phoned: your rule would "
                 f"have put the left-hand ones in the first {n_calls}. Missed or attended is what really happened."

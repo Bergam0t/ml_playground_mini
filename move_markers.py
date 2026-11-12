@@ -1,11 +1,14 @@
-"""Markers that move between the boxes of the first tab's "Are we calling the right people?"
-chart when a different tile is clicked.
+"""Markers that move between the boxes of an outcome chart (charts.outcome_blocks) when its
+call list changes: on the first tab when a different tile is clicked, on the phone tab when
+the number of calls or the risk bar changes, and on the game tab when the rule changes.
 
-All three ways make the same number of calls, so the column totals never change: only the
-split inside each column does. If the new way's calls reach d more people who would have
-missed, d of them move from "Missed, and got no call" to "Useful call" (a red cross becomes a
-green dot), and d people who came move the other way, from "Unnecessary call" to "Came, and got
-no call". These are the net moves, not every patient who changes list.
+Who missed and who came never changes, only who is on the call list. So people who missed
+only move between "Useful call" and "Missed, and got no call" (a green dot becomes a red cross
+on the way, or back), and people who came only between "Unnecessary call" and "Came, and got no
+call" (an amber square and a grey ring). How many move each way follows from the counts in
+the left-hand boxes. These are the net moves, not every patient who changes list. With the
+same number of calls (the first tab and the game), as many people who came move one way as
+people who missed move the other; with more calls (the phone tab), both flow onto the list.
 
 The chart is redrawn in its new state by Streamlit; the script below then hides the arriving
 markers, flies a copy of each in from where it was on the old chart, changing shape on the way,
@@ -33,15 +36,21 @@ MOVE_SCRIPT = """
     var SIZE = __SIZE__, LINE = __LINE__, TRACES = __TRACES__;
     var NS = 'http://www.w3.org/2000/svg';
     var FLIGHT = 900;                                   // ms per marker
-    var STAGGER = Math.min(30, 700 / Math.max(1, MOVERS.length / 2));
-    // A newer click takes over: an older run stops waiting and leaves the points alone
-    var run = (window.__markerMoveRun || 0) + 1;
-    window.__markerMoveRun = run;
+    // The whole move takes about the same time however many markers set off in a row
+    var turns = 1;
+    MOVERS.forEach(function (m) { turns = Math.max(turns, m.k + 1); });
+    var STAGGER = Math.min(30, 700 / turns);
+    // Each chart has its own runs. A newer change takes over: an older run stops waiting and
+    // leaves the points alone
+    var runs = window.__markerMoveRuns = window.__markerMoveRuns || {};
+    var run = runs[CHART] = (runs[CHART] || 0) + 1;
+    function current() { return window.__markerMoveRuns[CHART] === run; }
     var started = performance.now();
     // and shows anything the older run had hidden, in case this one never finds its chart
-    var leftover = document.getElementById('marker-move-style');
+    var sheetId = 'marker-move-style-' + CHART;
+    var leftover = document.getElementById(sheetId);
     if (leftover) leftover.textContent = '';
-    document.querySelectorAll('svg.marker-move').forEach(function (old) { old.remove(); });
+    document.querySelectorAll('.st-key-' + CHART + ' svg.marker-move').forEach(function (old) { old.remove(); });
 
     // The new chart: Streamlit may draw it before or after this script runs
     function findChart() {
@@ -52,7 +61,7 @@ MOVE_SCRIPT = """
     }
 
     function wait() {
-        if (window.__markerMoveRun !== run) return;
+        if (!current()) return;
         var gd = findChart();
         if (gd) return animate(gd);
         if (performance.now() - started < 4000) requestAnimationFrame(wait);
@@ -91,10 +100,10 @@ MOVE_SCRIPT = """
         MOVERS.forEach(function (m) {
             nextToLand[m.d] = Math.min(m.i, nextToLand[m.d] === undefined ? m.i : nextToLand[m.d]);
         });
-        var sheet = document.getElementById('marker-move-style');
+        var sheet = document.getElementById(sheetId);
         if (!sheet) {
             sheet = document.createElement('style');
-            sheet.id = 'marker-move-style';
+            sheet.id = sheetId;
             document.head.appendChild(sheet);
         }
         function hide() {
@@ -141,7 +150,7 @@ MOVE_SCRIPT = """
             from.animate([{ opacity: 1 }, { opacity: 1, offset: 0.3 }, { opacity: 0, offset: 0.7 }, { opacity: 0 }], timing);
             var landing = to.animate([{ opacity: 0 }, { opacity: 0, offset: 0.3 }, { opacity: 1, offset: 0.7 }, { opacity: 1 }], timing);
             landing.onfinish = function () {
-                if (window.__markerMoveRun !== run) return;
+                if (!current()) return;
                 // Each box's copies land in order, so show its markers up to this one
                 nextToLand[m.d] = Math.max(nextToLand[m.d], m.i + 1);
                 hide();
@@ -160,44 +169,52 @@ MOVE_SCRIPT = """
 """
 
 
-def outcome_moves(old, new, left_cols, right_cols):
-    """The markers that move from the `old` outcomes (calls.call_outcomes) to the `new`, laid out
-    as outcome_blocks(..., left_cols, right_cols, compact=True) draws them. Each is a dict:
+# At most this many markers fly in each row of boxes; any more just appear in their new box.
+# Moving from 50 to 300 calls on the phone tab moves about 200 people who came, more than the
+# eye can follow and more than the browser animates smoothly.
+MAX_FLYING = 150
+
+# Each row of boxes: those on the call list, and those not, with the same outcome
+_ROWS = [("called_dna", "not_called_dna"), ("called_attended", "not_called_attended")]
+
+
+def outcome_moves(old, new, old_cols, new_cols, heading="", compact=True):
+    """The markers that move from the `old` outcomes (calls.call_outcomes, or just its four
+    counts) to the `new`, each laid out as outcome_blocks(outcomes, *cols, heading, compact)
+    draws it, where `old_cols` and `new_cols` are (left_cols, right_cols). Each is a dict:
     f and t, where it starts and lands in data units; s and d, the boxes it leaves and joins;
-    i, its index among the markers of box d; k, its turn to set off. Both calls must make the
-    same number of calls, so that the column totals stay the same."""
-    gained = new["called_dna"] - old["called_dna"]
-    n = abs(gained)
-    if not n or old["calls"] != new["calls"]:
-        return []
-    before = charts.outcome_positions(old, left_cols, right_cols, compact=True)
-    after = charts.outcome_positions(new, left_cols, right_cols, compact=True)
-    if gained > 0:
-        pairs = [("not_called_dna", "called_dna"), ("called_attended", "not_called_attended")]
-    else:
-        pairs = [("called_dna", "not_called_dna"), ("not_called_attended", "called_attended")]
+    i, its index among the markers of box d; k, its turn to set off in its row."""
+    if any(old[a] + old[b] != new[a] + new[b] for a, b in _ROWS):
+        return []  # not the same appointments
+    before = charts.outcome_positions(old, *old_cols, heading, compact)
+    after = charts.outcome_positions(new, *new_cols, heading, compact)
     moves = []
-    for src, dst in pairs:
+    for on_list, off_list in _ROWS:
+        gained = new[on_list] - old[on_list]
+        src, dst = (off_list, on_list) if gained > 0 else (on_list, off_list)
+        n = abs(gained)
         # The last marker leaves first, and the first new place fills first, so they pour
-        # from the end of one grid onto the end of the other
-        for k in range(n):
-            start = before[src][old[src] - 1 - k]
-            end_i = new[dst] - n + k
+        # from the end of one grid onto the end of the other. Past MAX_FLYING, the first to
+        # move just appear: the flying ones are the last to land.
+        for j in range(n - min(n, MAX_FLYING), n):
+            start = before[src][old[src] - 1 - j]
+            end_i = new[dst] - n + j
             end = after[dst][end_i]
             moves.append(dict(
                 f=[round(start[0], 2), round(start[1], 2)],
                 t=[round(end[0], 2), round(end[1], 2)],
-                s=src, d=dst, i=end_i, k=k,
+                s=src, d=dst, i=end_i, k=j - (n - min(n, MAX_FLYING)),
             ))
     return moves
 
 
-def animate_moves(moves, token, chart_key):
+def animate_moves(moves, token, chart_key, compact=True):
     """Fly `moves` (outcome_moves()) on the plotly chart keyed `chart_key`, once its layout's
-    meta is `token`. The script's container (landing_move) is hidden by style.css."""
+    meta is `token`; `compact` as the chart was drawn, for the markers' size. The script's
+    container (marker_move_*) is hidden by style.css."""
     if not moves:
         return
-    size = charts._SIZES[True]
+    size = charts._SIZES[compact]
     styles = {
         key: {"colour": colour, "shape": _SHAPES[symbol]}
         for key, (colour, symbol) in charts._ICON_STYLE.items()
@@ -211,5 +228,5 @@ def animate_moves(moves, token, chart_key):
         .replace("__LINE__", json.dumps(size["line"]))
         .replace("__TRACES__", json.dumps(TRACE_ORDER))
     )
-    with st.container(key="landing_move"):
+    with st.container(key=f"marker_move_{chart_key}"):
         st.html(script, unsafe_allow_javascript=True)

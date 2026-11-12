@@ -710,8 +710,8 @@ select.mobile-nav,
 /* The scripts for the marker animation and the explanation chart's (grow_waterfall.py): they
 	run, but take no space (nor their wrappers' flex gap, which would push what follows down
 	for the length of the run) */
-.st-key-landing_move,
-[data-testid="stLayoutWrapper"]:has(> .st-key-landing_move),
+[class*="st-key-marker_move_"],
+[data-testid="stLayoutWrapper"]:has(> [class*="st-key-marker_move_"]),
 .st-key-intro_grow,
 [data-testid="stLayoutWrapper"]:has(> .st-key-intro_grow) {
 	display: none;
