@@ -1081,6 +1081,9 @@ if page == TAB_DASH:
         required=True,  # clicking the chosen view again doesn't clear it
     )
 view = st.session_state.get("appt_view") or VIEW_ALL
+# The pointers that show what to click play again each time the visitor comes back to a tab,
+# or to a view of the demo dashboard, not just once per page load
+click_hint.replay_on_change(f"{page}|{view if page == TAB_DASH else ''}")
 
 # Filters, only on the demo dashboard. The other tabs use all the upcoming appointments (the
 # phone tab shows its own controls instead; all of them keep the cost assumptions). The choices

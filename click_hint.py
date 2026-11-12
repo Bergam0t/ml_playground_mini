@@ -1,5 +1,5 @@
-"""A pointer that shows a visitor what to click: the first time they see something clickable,
-a pointer glides onto it and clicks it, twice, with a ripple and a yellow flash of what it
+"""A pointer that shows a visitor what to click: each time they come to a tab (or a view of the
+demo dashboard) with something clickable, a pointer glides onto it and clicks it, twice, with a ripple and a yellow flash of what it
 clicked, then fades away. Used on the first tab's three boxes (it clicks "Missed most before")
 and its patient buttons further down (it clicks "Medium risk", once they're scrolled into
 view), and on the demo dashboard's All appointments table (it clicks the first row).
@@ -206,10 +206,22 @@ CLICK_SCRIPT = """
 """
 
 
+def replay_on_change(place):
+    """Let every pointer play again once the visitor moves somewhere else: forget which have
+    been shown when `place` (the open tab, and the demo dashboard's view) differs from the last
+    run's. Reruns in the same place leave them shown. Call it once per run, before any
+    show_click_hint."""
+    if st.session_state.get("click_hint_place") != place:
+        for key in [k for k in st.session_state if k.startswith("click_hint_seen_")]:
+            del st.session_state[key]
+        st.session_state["click_hint_place"] = place
+
+
 def show_click_hint(
     name, target_key, row_height=None, delay=500, inner=None, bottom_margin=0
 ):
-    """Play the pointer once per visit for `name`: later calls with the same name do nothing.
+    """Play the pointer for `name` once each time the visitor comes to its tab or view (see
+    replay_on_change): later calls with the same name there do nothing.
     It clicks the container keyed `target_key`, or the element inside it matching the CSS
     selector `inner` (a table, a button): the first row of a table whose rows (and header) are
     `row_height` px tall, or, with no row height, the whole target. It plays `delay` ms after
