@@ -13,6 +13,7 @@ import calls
 import charts
 import costs
 import explain
+import move_markers
 import pilot
 import rule_game
 import weekly
@@ -1348,11 +1349,14 @@ def section_title(question, note, **kwargs):
     )
 
 
-def calling_right_people(out, list_name, note, key):
+def calling_right_people(out, list_name, note, key, previous=None, token=None):
     """"Are we calling the right people?": the past appointments as four boxes (on the call list
     or not, missed or not) beside the two rate cards, for the calls in `out`
     (calls.call_outcomes). `list_name` says how the call list was made, for the caption; `key`
-    keeps the phone tab's copy and the first tab's apart (and keys them for style.css)."""
+    keeps the phone tab's copy and the first tab's apart (and keys them for style.css).
+    `previous`, the outcomes shown before, with the same number of calls, makes the markers
+    that change box fly there from where they were (move_markers.py); `token` tells that
+    script this chart from the one before it."""
     meta = load_model_meta()
     section_title("Are we calling the right people?", note)
     # Keyed so style.css puts the cards under the chart on narrower screens
@@ -1366,11 +1370,17 @@ def calling_right_people(out, list_name, note, key):
         # markers fill it.
         left_cols = min(61, max(23, round(84 * out["calls"] / 1000)))
         st.plotly_chart(
-            charts.outcome_blocks(out, left_cols, 84 - left_cols, compact=True),
+            charts.outcome_blocks(out, left_cols, 84 - left_cols, compact=True, meta=token),
             width="stretch",
             config={"displayModeBar": False},
             key=f"outcome_blocks_{key}",
         )
+        if previous is not None:
+            move_markers.animate_moves(
+                move_markers.outcome_moves(previous, out, left_cols, 84 - left_cols),
+                token,
+                f"outcome_blocks_{key}",
+            )
         st.caption(
             f'Each marker is one of 1,000 past appointments. "On the call list" is {list_name} (no '
             "calls were made); the boxes show what really happened. Counts are scaled from "
@@ -1406,9 +1416,12 @@ def calling_right_people(out, list_name, note, key):
 
 def choose_way(way):
     """A tile in the comparison box on the first tab was clicked: show its calls under the tiles.
-    A different tile also counts a change, so the numbers under the tiles flash (style.css)."""
-    if way != st.session_state.get("landing_way", "model"):
+    A different tile also counts a change, so the rate cards under the tiles flash (style.css)
+    and the chart's markers move to their new boxes (move_markers.py), once."""
+    before = st.session_state.get("landing_way", "model")
+    if way != before:
         st.session_state.landing_flash = st.session_state.get("landing_flash", 0) + 1
+        st.session_state.landing_move = before
     st.session_state.landing_way = way
 
 
@@ -1532,16 +1545,22 @@ def compare_ways(savings, length):
             "random": "a random pick (the counts expected on average)",
         }
         tile_label = next(label for key, label, *_ in tiles if key == chosen)
-        # After a click on a different tile, the numbers that changed flash yellow (style.css).
+        # After a click on a different tile, the rate cards' numbers flash yellow (style.css).
         # The key swaps between two names on each change, each with its own copy of the
-        # animation, so it plays again every time; before any change, no flash.
+        # animation, so it plays again every time; before any change, no flash. The chart's
+        # markers that change box fly there instead, just after the click (popped, so a later
+        # rerun doesn't replay it).
         flash = st.session_state.get("landing_flash", 0)
+        moved_from = st.session_state.pop("landing_move", None)
+        outcomes = load_way_outcomes()
         with st.container(key=f"landing_who_flash{flash % 2}" if flash else "landing_who"):
             calling_right_people(
-                load_way_outcomes()[chosen],
+                outcomes[chosen],
                 list_names[chosen],
                 f"{tile_label.lower()}: {n_calls} calls in 1,000 past appointments",
                 "landing",
+                previous=outcomes.get(moved_from),
+                token=flash,
             )
 
 

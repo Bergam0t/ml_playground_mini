@@ -399,12 +399,56 @@ def _tint(hex_colour: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
+def _outcome_layout(outcomes: dict, left_cols: int, right_cols: int, heading: str, compact: bool):
+    """Where outcome_blocks() puts everything, in data units (one unit per marker row and
+    column, y downwards from 0). Yields ("column", x0, top, title, n) for each column heading
+    and ("box", key, x0, y, box_w, box_h, cols) for each box, in drawing order."""
+    size = _SIZES[compact]
+    unit = size["unit"]
+    min_box_w, box_head, col_head = (size[k] / unit for k in ("min_box", "box_head", "col_head"))
+    x0 = 0.0
+    top = _HEADING_H if heading else 0.0
+    for (title, keys), cols in zip(_COLUMNS, (left_cols, right_cols)):
+        cols = max(1, cols)
+        box_w = max(cols, min_box_w)
+        yield ("column", x0, top, title, sum(outcomes[k] for k in keys))
+        y = -top - col_head
+        for key in keys:
+            rows = -(-outcomes[key] // cols) if outcomes[key] else 0
+            box_h = box_head + rows + 0.6
+            yield ("box", key, x0, y, box_w, box_h, cols)
+            y -= box_h + 0.8
+        x0 += box_w + 1.2
+
+
+def outcome_positions(
+    outcomes: dict,
+    left_cols: int,
+    right_cols: int,
+    heading: str = "",
+    compact: bool = False,
+) -> dict:
+    """The markers' positions on outcome_blocks() with the same arguments, in data units:
+    {key: [(x, y), ...]} in the order they are drawn, so the last ones are at the end of
+    each box's grid. For the first tab's animation (move_markers.py)."""
+    box_head = _SIZES[compact]["box_head"] / _SIZES[compact]["unit"]
+    out = {}
+    for item in _outcome_layout(outcomes, left_cols, right_cols, heading, compact):
+        if item[0] == "box":
+            _, key, x0, y, _, _, cols = item
+            out[key] = [
+                (x0 + i % cols, y - box_head - (i // cols) - 0.3) for i in range(outcomes[key])
+            ]
+    return out
+
+
 def outcome_blocks(
     outcomes: dict,
     left_cols: int,
     right_cols: int,
     heading: str = "",
     compact: bool = False,
+    meta=None,
 ) -> go.Figure:
     """The 1,000 past appointments as four boxes, two per column: those on the call list (left)
     and those not (right), each split into who would have missed and who would have attended.
@@ -412,65 +456,60 @@ def outcome_blocks(
     laid out left_cols / right_cols wide, so the Your rule tab can keep its 100 calls in a 10 x 10
     square and the phone tab can widen the columns with the number of calls. heading, if given,
     runs across the top of both columns to say how the list was made. compact draws it smaller
-    and shorter (see _SIZES); give it about 85 columns in all to fill a 1,030px-wide column."""
+    and shorter (see _SIZES); give it about 85 columns in all to fill a 1,030px-wide column.
+    meta is stored on the layout, so the first tab's animation can tell this chart from the
+    one before it."""
     size = _SIZES[compact]
     unit = size["unit"]
-    min_box_w, box_head, col_head = (size[k] / unit for k in ("min_box", "box_head", "col_head"))
     labels = dict(GROUPS)
+    positions = outcome_positions(outcomes, left_cols, right_cols, heading, compact)
     fig = go.Figure()
-    x0 = 0.0
+    x_end = 0.0
     total_h = 0.0
-    top = _HEADING_H if heading else 0.0
     if heading:
         fig.add_annotation(
             x=-0.4, y=0, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
             text=f"<b>{heading}</b>", showarrow=False, font=dict(size=16, color=MUTED),
         )
-    for (title, keys), cols in zip(_COLUMNS, (left_cols, right_cols)):
-        cols = max(1, cols)
-        box_w = max(cols, min_box_w)
-        n_col = sum(outcomes[k] for k in keys)
-        fig.add_annotation(
-            x=x0 - 0.4, y=-top, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
-            text=f"<b>{title}: {n_col}</b>", showarrow=False, font=dict(size=size["col_font"], color=TEXT),
-        )
-        y = -top - col_head
-        for key in keys:
-            colour, symbol = _ICON_STYLE[key]
-            sym, name, why = _OUTCOME_TEXT[key]
-            if compact:
-                why = why.replace("<br>", " ")
-            count = outcomes[key]
-            rows = -(-count // cols) if count else 0
-            box_h = box_head + rows + 0.6
-            fig.add_shape(
-                type="rect", x0=x0 - 0.5, x1=x0 - 0.5 + box_w + 0.4, y0=y, y1=y - box_h,
-                fillcolor=_tint(colour, 0.10), line=dict(color=_tint(colour, 0.6), width=1),
-                layer="below",
-            )
+    for item in _outcome_layout(outcomes, left_cols, right_cols, heading, compact):
+        if item[0] == "column":
+            _, x0, top, title, n_col = item
             fig.add_annotation(
-                x=x0 - 0.2, y=y - 0.3, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
-                text=(
-                    f"<span style='color:{colour};font-size:{size['sym_font']}px'>{sym}</span> "
-                    f"<b>{count} · {name}</b><br>"
-                    f"<span style='font-size:{size['why_font']}px;color:{TEXT}'>{why}</span>"
-                ),
-                showarrow=False, font=dict(size=size["title_font"], color=TEXT),
+                x=x0 - 0.4, y=-top, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
+                text=f"<b>{title}: {n_col}</b>", showarrow=False, font=dict(size=size["col_font"], color=TEXT),
             )
-            idx = range(count)
-            fig.add_trace(
-                go.Scatter(
-                    x=[x0 + i % cols for i in idx],
-                    y=[y - box_head - (i // cols) - 0.3 for i in idx],
-                    mode="markers",
-                    marker=dict(color=colour, symbol=symbol, size=size["marker"],
-                                line=dict(width=size["line"], color=colour)),
-                    hovertemplate=f"{labels[key]}<extra></extra>",
-                )
+            continue
+        _, key, x0, y, box_w, box_h, _ = item
+        colour, symbol = _ICON_STYLE[key]
+        sym, name, why = _OUTCOME_TEXT[key]
+        if compact:
+            why = why.replace("<br>", " ")
+        fig.add_shape(
+            type="rect", x0=x0 - 0.5, x1=x0 - 0.5 + box_w + 0.4, y0=y, y1=y - box_h,
+            fillcolor=_tint(colour, 0.10), line=dict(color=_tint(colour, 0.6), width=1),
+            layer="below",
+        )
+        fig.add_annotation(
+            x=x0 - 0.2, y=y - 0.3, xref="x", yref="y", xanchor="left", yanchor="top", align="left",
+            text=(
+                f"<span style='color:{colour};font-size:{size['sym_font']}px'>{sym}</span> "
+                f"<b>{outcomes[key]} · {name}</b><br>"
+                f"<span style='font-size:{size['why_font']}px;color:{TEXT}'>{why}</span>"
+            ),
+            showarrow=False, font=dict(size=size["title_font"], color=TEXT),
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[px for px, _ in positions[key]],
+                y=[py for _, py in positions[key]],
+                mode="markers",
+                marker=dict(color=colour, symbol=symbol, size=size["marker"],
+                            line=dict(width=size["line"], color=colour)),
+                hovertemplate=f"{labels[key]}<extra></extra>",
             )
-            y -= box_h + 0.8
-        total_h = max(total_h, -y)
-        x0 += box_w + 1.2
+        )
+        total_h = max(total_h, box_h + 0.8 - y)
+        x_end = max(x_end, x0 + (box_w + 1.2))
     # Full size: rows and columns locked to the same scale, so the game's 10 x 10 square stays
     # square. Compact: not locked, so in a column narrower than it was laid out for, only the
     # columns close up; each row stays `unit` pixels tall, so the text never runs into the markers
@@ -480,11 +519,12 @@ def outcome_blocks(
         height=round((total_h + 0.5) * unit),
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
-        xaxis=dict(visible=False, range=[-0.6, x0 - 0.8], fixedrange=True,
+        xaxis=dict(visible=False, range=[-0.6, x_end - 0.8], fixedrange=True,
                    constrain="domain", constraintoward="left"),
         yaxis=dict(visible=False, range=[-total_h - 0.3, 0.4], fixedrange=True, **lock),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=FONT,
+        meta=meta,
     )
     return fig
