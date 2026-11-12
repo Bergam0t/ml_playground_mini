@@ -590,6 +590,29 @@ select.mobile-nav,
 	align-items: start;
 }
 
+/* The landing page's "Why not just phone those who've missed before?" box: the model's tile
+	picked out in the primary colour, and the random tile quieter, as the baseline rather than
+	the eye-catcher. Equal shares so all three sit on one row on a wide screen, and a minimum
+	width so they stack, one per row, on a phone. */
+.st-key-landing_ways > div { flex: 1 1 0; min-width: 9rem; }
+/* "reached someone who would have missed" on its own line under the "of 100 calls" pill, in full */
+.st-key-landing_ways div:has(> [data-testid="stMetricDeltaDescription"]) {
+	flex-wrap: wrap;
+	row-gap: 0.25rem;
+}
+.st-key-landing_ways [data-testid="stMetricDeltaDescription"] {
+	flex-basis: 100%;
+	margin-left: 0;
+}
+.st-key-landing_ways [data-testid="stMetricDeltaDescription"],
+.st-key-landing_ways [data-testid="stMetricDeltaDescription"] * {
+	white-space: normal;
+	text-overflow: clip;
+	overflow: visible;
+}
+.st-key-ways_model [data-testid="stMetric"] { border-color: #1fb1b9; }
+.st-key-ways_random { opacity: 0.6; }
+
 /* The muted note beside a section's question title on the phone tab (section_title) */
 .title-note {
 	font-size: 0.9rem;

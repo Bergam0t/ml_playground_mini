@@ -35,15 +35,21 @@ why it helps first, then how many calls to make, then a game as a bonus for thos
     filters sit above it, on one row with a "What does confidence mean?" popover, and narrow
     only the table: in the sidebar they would fight the forecast cards and call list, and the
     chart below would go round in circles (they select by the forecast it explains).
-  - **Same calls, three ways**: of 1,000 past appointments (80 missed), how many would 100 calls
-    have reached who then missed, phoning at random (8), phoning those who missed most before
-    (43, the best rule in the game) and phoning the model's list (46). It says plainly that the
-    simple rule does most of the work, and that the model adds a risk for every patient (to fit
-    the list to the calls the team can make) and the reasons behind it. Worked out by
+  - **Why not just phone those who've missed before?**: of 1,000 past appointments (80
+    missed), how many would 100 calls have reached who then missed, phoning the model's list
+    (46), phoning those who missed most before (43, the best rule in the game) and at random (8,
+    a quieter tile, as the baseline). The question sits in bold right above the tiles, and each
+    tile reads as a sentence ("46 / of 100 calls / reached someone who would have missed") so it
+    makes sense on its own.
+    It leads with what the simple rule can't do: 3 in 10 missed appointments are by people who'd
+    never missed before, and with more calls the model's lead grows (400 calls: 70 against 58)
+    because the rule runs out of people with a history. The model tile's help adds that the
+    model gives every patient a risk and the reasons behind it. Worked out by
     `rule_game.three_ways()` from `rule_game_past.csv` and `past_predictions.csv` (the same
-    rows). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
-    kept by phoning every forecast DNA, against the same number of calls made at random and by
-    the simple rule (valued the same way). Buttons lead to the phone tab ("Explore these
+    rows; the bigger budget is `rule_game.MORE_CALL_SHARE`). Under the numbers, the same in £ over the upcoming weeks: the value of appointments
+    kept by phoning every forecast DNA, against the same number of calls made by the simple rule and
+    at random (valued the same way, before the cost of the calls, which the line gives once as
+    it's the same all three ways; clinic time kept, not cash). Buttons lead to the phone tab ("Explore these
     assumptions") and the bonus game.
 - **Weekly summary** view (on the Upcoming appointments tab): appointments and forecast DNAs for
   every upcoming week, by weekday, coloured by either list. Click a day to list its appointments
@@ -201,7 +207,7 @@ python build/train_and_explain.py
 python build/rule_game_data.py
 ```
 
-`build/rule_game_data.py` makes the two files for the bonus game tab (and the landing page's "Same calls, three ways"). It uses the same
+`build/rule_game_data.py` makes the two files for the bonus game tab (and the landing page's "Why not just phone those who've missed before?" box). It uses the same
 split as the main build, and checks that its test appointments match `past_predictions.csv`.
 
 - `rule_game_past.csv`: the past test appointments with a "phone first" score per clue, as a

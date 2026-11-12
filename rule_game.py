@@ -62,11 +62,12 @@ def rule_score(past: pd.DataFrame, clues) -> np.ndarray:
     return np.asarray(total, dtype=float) + jitter
 
 
-def results(past: pd.DataFrame, score) -> dict:
+def results(past: pd.DataFrame, score, share: float = CALL_SHARE) -> dict:
     """Outcomes per 1,000 (for charts.outcome_blocks), share of misses reached and accuracy,
-    when phoning the top CALL_SHARE by score. Matches results() in build/rule_game_data.py."""
+    when phoning the top `share` by score (CALL_SHARE in the game). Matches results() in
+    build/rule_game_data.py."""
     y = past["Did_Not_Attend"].to_numpy()
-    called = calls.called_by_share(score, CALL_SHARE)
+    called = calls.called_by_share(score, share)
     out = calls.call_outcomes(called, y, score)
     return {
         "outcomes": {k: out[k] for k, _ in calls.GROUPS},
@@ -86,17 +87,35 @@ def precision_at_share(past: pd.DataFrame, score, share: float) -> float:
     return float(past["Did_Not_Attend"].to_numpy()[called].mean()) if called.any() else 0.0
 
 
+# A bigger call budget, to show the model's lead growing: SIMPLE_RULE runs out of patients
+# who've missed before (only about 3 in 10 have), then it's guessing.
+MORE_CALL_SHARE = 0.40
+
+
 def three_ways(past: pd.DataFrame, model_risk) -> dict:
     """Missed appointments reached per 1,000 past appointments with CALL_SHARE calls: at
     random, by SIMPLE_RULE and by the model. `model_risk` is the live model's predicted risk
-    for the same appointments, in the same order (data/past_predictions.csv)."""
-    n_missed = round(past["Did_Not_Attend"].mean() * 1000)
+    for the same appointments, in the same order (data/past_predictions.csv). Also the same
+    for SIMPLE_RULE and the model with MORE_CALL_SHARE calls, and the share of missed
+    appointments by patients who had never missed before (SIMPLE_RULE can't rank them)."""
+    y = past["Did_Not_Attend"].to_numpy()
+    n_missed = round(y.mean() * 1000)
+    rule = rule_score(past, SIMPLE_RULE)
+    risk = np.asarray(model_risk, dtype=float)
+
+    def caught(score, share=CALL_SHARE):
+        return results(past, score, share)["outcomes"]["called_dna"]
+
     return {
         "n_missed": n_missed,
         "n_calls": round(CALL_SHARE * 1000),
         "random": n_missed * CALL_SHARE,
-        "rule": results(past, rule_score(past, SIMPLE_RULE))["outcomes"]["called_dna"],
-        "model": results(past, np.asarray(model_risk, dtype=float))["outcomes"]["called_dna"],
+        "rule": caught(rule),
+        "model": caught(risk),
+        "never_missed_share": float(y[past["Previous_DNAs"].to_numpy() == 0].sum() / y.sum()),
+        "more_calls": round(MORE_CALL_SHARE * 1000),
+        "more_rule": caught(rule, MORE_CALL_SHARE),
+        "more_model": caught(risk, MORE_CALL_SHARE),
     }
 
 

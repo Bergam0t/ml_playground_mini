@@ -76,8 +76,8 @@ def load_rule_game():
     return rule_game.load_past(), rule_game.load_learning()
 
 
-# The same calls three ways (at random, by the simple rule, by the model), for the top of the
-# appointments tab; and the simple rule's score for each past appointment, for the savings box.
+# The same calls three ways (at random, by the simple rule, by the model), for the box under the
+# appointments table; and the simple rule's score for each past appointment, for the savings box.
 # The rule game's past appointments are the same rows as past_predictions.csv, in the same order
 # (build/rule_game_data.py checks this).
 @st.cache_data
@@ -285,7 +285,9 @@ CALL_LIST_FIELDS = {
 }
 
 
-def appointment_table(df, by_patient=False, call_list=False, highlight_row=None, flag=None):
+def appointment_table(
+    df, by_patient=False, call_list=False, highlight_row=None, flag=None
+):
     """Appointments to show in a table, with the forecast columns coloured.
 
     `by_patient` puts the patient columns first and shades every other patient's rows,
@@ -308,7 +310,9 @@ def appointment_table(df, by_patient=False, call_list=False, highlight_row=None,
         fields = patient + [f for f in fields if f not in patient]
     names = {**APPOINTMENT_FIELDS, **CALL_LIST_FIELDS}
     if call_list:
-        names["Activity_Date"] = "Date"  # the list is one week, so the short header will do
+        names["Activity_Date"] = (
+            "Date"  # the list is one week, so the short header will do
+        )
     shown = df[fields].rename(columns=names)
     styler = shown.style.apply(forecast_cell_styles, axis=None)
     if by_patient:
@@ -680,7 +684,14 @@ def appointments_table(table_data, filter_key, sidebar_choices):
 
 @st.fragment
 def explainable_table(
-    rows, filtered_data, filter_key, sidebar_choices, name, unique="", call_list=False, flag=None
+    rows,
+    filtered_data,
+    filter_key,
+    sidebar_choices,
+    name,
+    unique="",
+    call_list=False,
+    flag=None,
 ):
     """An appointments table (in the order passed in) where clicking a row opens the explanation
     overlay, like the All appointments table; a fragment, so only this part reruns. `name` keys
@@ -1004,7 +1015,8 @@ minutes_per_call = st.sidebar.number_input(
     help="On average, including unanswered attempts and noting the outcome.",
 )
 with st.sidebar.expander(
-    "Advanced settings for calls and missed appointment costs", icon=":material/payments:"
+    "Advanced settings for calls and missed appointment costs",
+    icon=":material/payments:",
 ):
     hourly = st.number_input(
         "Admin staff cost per hour (£)",
@@ -1297,54 +1309,90 @@ with tab_appts:
             ],
         )
 
-        # ---- Why use the model: the same calls three ways, under the table
+        # ---- Why use the model, not just the simple rule: the same calls three ways, under the
+        # table. It leads with what the rule can't do (people who'd never missed before, and the
+        # lead growing with more calls), and each tile reads on its own ("46 of 100").
         ways, _, _ = load_comparison()
+        n_calls = ways["n_calls"]
         with st.container(border=True, key="landing_compare"):
             ways_text, ways_numbers = st.container(
                 key="reflow_stack_landing_ways"
             ).columns([0.45, 0.55], gap="large", vertical_alignment="center")
             with ways_text:
-                st.markdown("#### Same calls, three ways")
-                st.caption(
-                    f"Of {1000:,} past appointments the model didn't learn from, {ways['n_missed']} "
-                    f"({past_dna_rate:.0%}) were missed. If the team had made {ways['n_calls']} calls, "
-                    "how many would have reached someone who then missed?"
-                )
+                st.markdown("#### Why not just phone those who've missed before?")
                 st.markdown(
-                    "**A simple rule does most of the work.** The model reaches a few more, and adds "
-                    "a risk for every patient, so the list fits the calls the team can make, and the "
-                    "reasons behind each one (click a row in the table)."
+                    f"**{ways['never_missed_share'] * 10:.0f} in 10 missed appointments are by people "
+                    "who'd never missed before.** That simple rule alone can't spot them, but the model can."
                 )
+                st.caption(
+                    f"Tested on {1000:,} past appointments the model didn't learn from, of which "
+                    f"{ways['n_missed']} ({past_dna_rate:.0%}) were missed."
+                )
+            # The question the tiles answer, right above them, and the same words under each
+            # number ("46 / of 100 calls / reached someone who would have missed"), so a tile makes
+            # sense to someone who reads nothing else
+            reached = "reached someone who would have missed"
+            ways_numbers.markdown(
+                f"**If the team made {n_calls} calls, how many would reach a patient who then "
+                "missed their appointment?**"
+            )
             with ways_numbers.container(horizontal=True, key="landing_ways"):
+                with st.container(key="ways_model"):
+                    st.metric(
+                        "The model's list",
+                        f"{ways['model']}",
+                        f"of {n_calls} calls",
+                        delta_color="off",
+                        delta_arrow="off",
+                        delta_description=reached,
+                        border=True,
+                        icon=":material/smart_toy:",
+                        help=f"Phoning the {n_calls} appointments with the highest predicted "
+                        "risk. The model also gives every patient a risk, so the list fits the "
+                        "calls the team can make, and the reasons behind each one (click a row "
+                        "in the table).",
+                    )
                 st.metric(
-                    "At random",
-                    f"{ways['random']:.0f}",
-                    border=True,
-                    icon=":material/casino:",
-                    help="Phoning 100 appointments picked at random.",
-                )
-                st.metric(
-                    "Missed before",
+                    "Missed most before",
                     f"{ways['rule']}",
+                    f"of {n_calls} calls",
+                    delta_color="off",
+                    delta_arrow="off",
+                    delta_description=reached,
                     border=True,
                     icon=":material/history:",
-                    help="Phoning the 100 patients who had missed the most appointments before: "
-                    "the simple rule most people would choose.",
+                    help=f"Phoning the {n_calls} patients who had missed the most appointments "
+                    "before: the simple rule most people would choose, and the best rule in the "
+                    "bonus game. Patients who've never missed look the same to it.",
                 )
-                st.metric(
-                    "The model",
-                    f"{ways['model']}",
-                    border=True,
-                    icon=":material/smart_toy:",
-                    help="Phoning the 100 appointments with the highest predicted risk.",
-                )
+                with st.container(key="ways_random"):
+                    st.metric(
+                        "At random",
+                        f"{ways['random']:.0f}",
+                        f"of {n_calls} calls",
+                        delta_color="off",
+                        delta_arrow="off",
+                        delta_description=reached,
+                        border=True,
+                        help=f"Phoning {n_calls} appointments picked at random: the baseline, "
+                        "with no way of choosing who to call.",
+                    )
+            ways_numbers.markdown(
+                f"**With more calls, the model's lead grows:** {ways['more_calls']} calls would "
+                f"reach {ways['more_model']} with the model's list, {ways['more_rule']} by those "
+                "who missed most before. The rule runs out of people with a history to go on."
+            )
             # The same in £: the value of the appointments kept by phoning every forecast DNA
-            # (the third card at the top), and by the same calls made the other two ways
+            # (the third card at the top), and by the same calls made the other two ways, in the
+            # tiles' order. Before the cost of the calls, which is the same all three ways.
             if savings is not None:
                 ways_numbers.markdown(
-                    f"**In £ over the next {length}**, phoning {savings['n_calls']:,} people: "
-                    f"£{savings['random']:,.0f} at random · £{savings['rule']:,.0f} by those who "
-                    f"missed before · **£{savings['value']:,.0f}** by the model's list",
+                    f"**Value of appointments kept over the next {length}**, phoning all "
+                    f"{savings['n_calls']:,} forecast DNAs: **£{savings['value']:,.0f}** with the "
+                    f"model's list · £{savings['rule']:,.0f} by those who missed before · "
+                    f"£{savings['random']:,.0f} at random. The calls cost "
+                    f"£{savings['call_cost']:,.0f} whichever way you choose; the value is clinic "
+                    "time kept, not cash.",
                     help=savings["compare_help"],
                 )
 
@@ -1508,7 +1556,8 @@ with tab_appts:
                         default=DEFAULT_MEASURE,
                         key="weekly_measure",
                         help="  \n".join(
-                            f"**{name}:** {mm.help}" for name, mm in weekly.MEASURES.items()
+                            f"**{name}:** {mm.help}"
+                            for name, mm in weekly.MEASURES.items()
                         ),
                     )
                     or DEFAULT_MEASURE
@@ -1577,7 +1626,9 @@ with tab_appts:
                         "–",
                         icon=":material/savings:",
                     )
-                    st.caption(f"Nobody {when_week} is on this list, so there are no calls to cost.")
+                    st.caption(
+                        f"Nobody {when_week} is on this list, so there are no calls to cost."
+                    )
                 else:
                     st.metric(
                         f"Estimated value of appointments kept {when_week}",
@@ -2391,7 +2442,7 @@ with tab_game:
         say = final["say"]
         top_two = say_order[:2]
         # The best rule the buttons can make, named, so the verdict is honest about how close
-        # it gets (the same comparison as "Same calls, three ways" on the appointments tab)
+        # it gets (the same comparison as "Why not just phone those who've missed before?" on the appointments tab)
         best_rule = max(all_catches, key=lambda rule: all_catches[rule])
         best_rule_text = " and ".join(
             f"*{rule_game.CLUES[c].lower()}*" for c in best_rule
