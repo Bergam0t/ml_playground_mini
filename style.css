@@ -435,6 +435,28 @@ select.mobile-nav,
 	gap: 0.75rem;
 }
 
+/* ---- The summary cards under the weekly summary grid ---- */
+/* One to three cards, sharing the row equally, wrapping onto separate lines when narrow. */
+.st-key-summary_cards > * { flex: 1 1 14rem; }
+
+/* ---- The key above the weekly summary grid ---- */
+.grid-key {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.4rem 1.25rem;
+	font-size: 0.9rem;
+	color: #c3c2b7;
+}
+.grid-key .sw {
+	display: inline-block;
+	width: 0.9rem;
+	height: 0.9rem;
+	margin-right: 0.35rem;
+	border-radius: 3px;
+	vertical-align: -0.1rem;
+}
+
 /* ---- "Click a row" in the call to action above the appointment tables ---- */
 /* The site's highlight yellow and a bit bigger, so the instruction is the first thing read. */
 [class*="st-key-click_cta_"] strong {
@@ -445,18 +467,18 @@ select.mobile-nav,
 /* ---- The All appointments and call list tables' scrollbars ---- */
 /* Styling the scrollbar makes browsers draw it all the time, not only while scrolling, so
 	people can see the table holds more rows. */
-:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller {
+:is(.st-key-appointments_grid, .st-key-call_list_grid, .st-key-day_list_grid) .dvn-scroller {
 	scrollbar-width: auto;
 	scrollbar-color: rgba(255, 255, 255, 0.45) rgba(255, 255, 255, 0.08);
 }
-:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar {
+:is(.st-key-appointments_grid, .st-key-call_list_grid, .st-key-day_list_grid) .dvn-scroller::-webkit-scrollbar {
 	width: 12px;
 	height: 12px;
 }
-:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar-track {
+:is(.st-key-appointments_grid, .st-key-call_list_grid, .st-key-day_list_grid) .dvn-scroller::-webkit-scrollbar-track {
 	background: rgba(255, 255, 255, 0.08);
 }
-:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar-thumb {
+:is(.st-key-appointments_grid, .st-key-call_list_grid, .st-key-day_list_grid) .dvn-scroller::-webkit-scrollbar-thumb {
 	background: rgba(255, 255, 255, 0.45);
 	border-radius: 6px;
 }
@@ -468,7 +490,7 @@ select.mobile-nav,
 .st-key-forecast_cards > *:nth-child(2) { flex: 1.8 1 14rem; }
 /* The call list's cards: the value card (last) carries a caption and a comparison line */
 .st-key-week_cards > * { flex: 1 1 9rem; }
-.st-key-week_cards > *:nth-child(4) { flex: 2.2 1 16rem; }
+.st-key-week_cards > *:last-child { flex: 2.2 1 16rem; }
 
 /* ---- The demonstration notice's poster and video buttons (demo_notice_full) ---- */
 /* Pulled up under the yellow notice and outlined in its yellow, so they read as the notice's

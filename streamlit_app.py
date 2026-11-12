@@ -206,8 +206,11 @@ def forecast_cell_styles(df):
         return f"background-color: {colour}; color: #ffffff;"
 
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
-    styles["Expected DNA"] = df["Expected DNA"].map(EXPECTED_DNA_COLOURS).map(css)
-    styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
+    # The call list leaves out Expected DNA and Confidence
+    if "Expected DNA" in df:
+        styles["Expected DNA"] = df["Expected DNA"].map(EXPECTED_DNA_COLOURS).map(css)
+    if "Confidence" in df:
+        styles["Confidence"] = df["Confidence"].map(CONFIDENCE_COLOURS).map(css)
     # Same bands as the table's "DNA Risk" filter
     styles["Probabilty"] = (
         (df["Probabilty"] / 100).map(DNA_Risk).map(RISK_COLOURS).map(css)
@@ -229,13 +232,14 @@ APPOINTMENT_FIELDS = {
     "Probabilty": "Probabilty",
 }
 
-# Fixed column widths (about 1,110px in total; about 1,300px on the call list, with its two
-# extra columns) so the whole table fits a 1,400px main area; the grid stretches them to fill
-# any space left over.
+# Fixed column widths (about 1,110px in total; about 1,185px on the call list, which adds three
+# columns and drops two) so the whole table fits a 1,400px main area; the grid stretches them
+# to fill any space left over.
 APPOINTMENT_COLUMNS = {
     "Appointment Date": st.column_config.DateColumn(
         "Appointment Date", format="DD/MM/YYYY", width=110
     ),
+    "Day": st.column_config.TextColumn(width=95),
     "Time": st.column_config.TextColumn(width=65),
     "Patient ID": st.column_config.TextColumn(width=95),
     "Patient Name": st.column_config.TextColumn(width=150),
@@ -265,6 +269,13 @@ APPOINTMENT_COLUMNS = {
 }
 
 
+# The call list's column settings: the same, with its date column headed "Date"
+CALL_LIST_COLUMNS = {
+    **{k: v for k, v in APPOINTMENT_COLUMNS.items() if k != "Appointment Date"},
+    "Date": st.column_config.DateColumn("Date", format="DD/MM/YYYY", width=110),
+}
+
+
 # The call list only: the admin team needs a name and a time to phone and remind. Not shown in
 # the all-appointments view
 CALL_LIST_FIELDS = {
@@ -273,29 +284,54 @@ CALL_LIST_FIELDS = {
 }
 
 
-def appointment_table(df, by_patient=False, call_list=False, highlight_row=None):
+def appointment_table(df, by_patient=False, call_list=False, highlight_row=None, flag=None):
     """Appointments to show in a table, with the forecast columns coloured.
 
     `by_patient` puts the patient columns first and shades every other patient's rows,
     for a table sorted so each patient's appointments are together. `call_list` adds the
-    appointment time and the patient's name. `highlight_row` is the position of a row to
+    day, the appointment time and the patient's name, and leaves out the Expected DNA and Confidence
+    columns (the list is already everyone at or above the chosen risk). `highlight_row` is the position of a row to
     shade (outside the coloured forecast columns), as the table's cell selection only
-    outlines the one cell clicked.
+    outlines the one cell clicked. `flag` is a True or False per row of `df` (in order): the
+    True rows are tinted yellow (outside the coloured forecast columns).
     """
     fields = list(APPOINTMENT_FIELDS)
     if call_list:
-        fields.insert(1, "Appointment_Time")
-        fields.insert(3, "Patient Name")
+        df = df.assign(Day=pd.to_datetime(df["Activity_Date"]).dt.day_name())
+        fields.insert(1, "Day")
+        fields.insert(2, "Appointment_Time")
+        fields.insert(4, "Patient Name")
+        fields = [f for f in fields if f not in ("DNA_Forecast_Text", "Confidence")]
     if by_patient:
         patient = ["MRN", "Mobile Telephone"]
         fields = patient + [f for f in fields if f not in patient]
-    shown = df[fields].rename(columns={**APPOINTMENT_FIELDS, **CALL_LIST_FIELDS})
+    names = {**APPOINTMENT_FIELDS, **CALL_LIST_FIELDS}
+    if call_list:
+        names["Activity_Date"] = "Date"  # the list is one week, so the short header will do
+    shown = df[fields].rename(columns=names)
     styler = shown.style.apply(forecast_cell_styles, axis=None)
     if by_patient:
         styler = styler.apply(patient_bands, axis=None)
+    if call_list:
+        styler = styler.apply(day_bands, axis=None)
+    if flag is not None:
+        styler = styler.apply(flagged_row_style, flag=list(flag), axis=None)
     if highlight_row is not None:
         styler = styler.apply(selected_row_style, position=highlight_row, axis=None)
     return styler
+
+
+def flagged_row_style(df, flag):
+    """Tint the rows marked True in `flag` yellow (outside the coloured forecast columns)."""
+    plain = [
+        c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")
+    ]
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    rows = [i for i, f in enumerate(flag) if f]
+    styles.iloc[rows, [df.columns.get_loc(c) for c in plain]] = (
+        "background-color: rgba(255, 230, 0, 0.22);"
+    )
+    return styles
 
 
 def selected_row_style(df, position):
@@ -308,6 +344,18 @@ def selected_row_style(df, position):
         styles.iloc[position, [df.columns.get_loc(c) for c in plain]] = (
             "background-color: #3d4f5c;"
         )
+    return styles
+
+
+def day_bands(df):
+    """Shade every other day's rows a faint dark grey (outside the coloured forecast columns),
+    for a table sorted by date so each day's rows are together."""
+    day_no = (df["Date"] != df["Date"].shift()).cumsum()
+    plain = [
+        c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")
+    ]
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    styles.loc[day_no % 2 == 0, plain] = "background-color: #2e2c2c;"
     return styles
 
 
@@ -630,17 +678,21 @@ def appointments_table(table_data, filter_key, sidebar_choices):
 
 
 @st.fragment
-def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
-    """The call list table (highest risk first, as passed in). Like the All appointments
-    table, clicking a row opens the explanation overlay; a fragment, so only this part reruns.
-    `filtered_data` (the sidebar's filters) and `sidebar_choices` are for the overlay's
-    Overall tab."""
-    with st.container(key="click_cta_call_list"):
+def explainable_table(
+    rows, filtered_data, filter_key, sidebar_choices, name, unique="", call_list=False, flag=None
+):
+    """An appointments table (in the order passed in) where clicking a row opens the explanation
+    overlay, like the All appointments table; a fragment, so only this part reruns. `name` keys
+    its pieces for style.css and `unique` tells apart tables that share a name (a different day's
+    list must not keep the last one's selection). `call_list` adds the time and patient name, and
+    `flag` marks rows (a True per row) to highlight. `filtered_data` (the sidebar's filters) and
+    `sidebar_choices` are for the overlay's Overall tab."""
+    with st.container(key=f"click_cta_{name}"):
         st.info(
             "**Click a row** to see why the model gave that appointment its risk of not attending.",
             icon=":material/touch_app:",
         )
-    table_key = f"call_list_{filter_key}_{st.session_state.get('table_nonce', 0)}"
+    table_key = f"{name}_{filter_key}_{unique}_{st.session_state.get('table_nonce', 0)}"
     # The table's selection from the click that caused this run, to shade that row
     picked = st.session_state.get(table_key)
     picked_rows = [
@@ -648,14 +700,15 @@ def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
         *(r for r, _ in (picked.selection.cells if picked else [])),
     ]
     # Keyed so style.css can keep this table's scrollbar visible
-    with st.container(key="call_list_grid"):
+    with st.container(key=f"{name}_grid"):
         table = st.dataframe(
             appointment_table(
-                listed,
-                call_list=True,
+                rows,
+                call_list=call_list,
                 highlight_row=picked_rows[0] if picked_rows else None,
+                flag=flag,
             ),
-            column_config=APPOINTMENT_COLUMNS,
+            column_config=CALL_LIST_COLUMNS if call_list else APPOINTMENT_COLUMNS,
             hide_index=True,
             on_select=open_explanation,
             selection_mode=["single-row", "single-cell"],
@@ -665,12 +718,12 @@ def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
     selected_rows = [
         r
         for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
-        if r < len(listed)
+        if r < len(rows)
     ]
     # Only on the run the click caused, so it doesn't reopen on later reruns
     if st.session_state.pop("explain_open", False) and selected_rows:
         explain_appointment(
-            listed.iloc[selected_rows[0]], (filtered_data, filter_key, sidebar_choices)
+            rows.iloc[selected_rows[0]], (filtered_data, filter_key, sidebar_choices)
         )
 
 
@@ -1311,19 +1364,24 @@ with tab_appts:
             m = weekly.MEASURES[measure]
             column = m.column
             h = weekly.headline(filtered_data, column)
-            st.markdown(weekly.summary_sentence(h, measure))
             low, high = m.thresholds
-            st.caption(
-                f"Each cell: appointments · {m.cell_label} (rate). "
-                f"Green below {low:.0%}, red above {high:.0%}."
-            )
             st.info(
                 "**Click a day in the table** to list that day's appointments below, highest risk "
                 "first. Click it again to hide the list.",
                 icon=":material/touch_app:",
             )
+            # A key with a worked example and the colours, in one line above the grid
+            st.markdown(
+                f"""<div class="grid-key">
+                <span><b>3 of 118 (3%)</b> = 118 appointments in total, 3 {m.cell_label}
+                (3% of total)</span>
+                <span><i class="sw" style="background:#198754"></i>up to {low:.0%}</span>
+                <span><i class="sw" style="background:#e0a526"></i>{round(low * 100) + 1}% to {round(high * 100) - 1}%</span>
+                <span><i class="sw" style="background:#dc3545"></i>{high:.0%} or more</span>                </div>""",
+                unsafe_allow_html=True,
+            )
 
-        # Week-by-weekday table: newest week first, weekdays with no appointments left out
+        # Week-by-weekday table: earliest week first, weekdays with no appointments left out
         counts, sums, rates = weekly.weekly_tables(filtered_data, column)
         week_index = pd.Index(
             [weekly.week_label(w, year=True) for w in counts.index], name="Week ending"
@@ -1331,16 +1389,15 @@ with tab_appts:
         cell_text = pd.DataFrame(
             {
                 d: [
-                    f"{c} · {s:.0f} ({r:.0%})" if c else "–"
+                    f"{s:.0f} of {c} ({r:.0%})" if c else "–"
                     for c, s, r in zip(counts[d], sums[d], rates[d])
                 ]
                 for d in counts.columns
             },
             index=week_index,
         )
-        cell_styles = rates.map(lambda r: weekly.cell_style(r, low, high)).set_axis(
-            week_index
-        )
+        # Colour from the rate, opacity from the number of calls
+        cell_styles = weekly.cell_styles(rates, sums, low, high).set_axis(week_index)
 
         week_table = st.dataframe(
             cell_text.style.apply(lambda _: cell_styles, axis=None),
@@ -1349,6 +1406,13 @@ with tab_appts:
             selection_mode="single-cell",
             key=f"weekly_{filter_key}",
         )
+        # The overall summary ("Across 6 weeks, ...") sits under the grid it describes, as small
+        # cards: plain bordered boxes, not metrics. Keyed so style.css shares the row equally.
+        with st.container(horizontal=True, key="summary_cards"):
+            for label, text in weekly.summary_cards(h, measure):
+                with st.container(border=True, height="stretch"):
+                    st.caption(label)
+                    st.markdown(text)
 
         # The clicked day's appointments, highest risk first (clicks on the week labels are ignored)
         picked = [
@@ -1365,22 +1429,28 @@ with tab_appts:
             st.subheader(
                 f"{date:%A} {date.day} {date:%B}: {len(day_data)} appointments"
             )
-            st.dataframe(
-                appointment_table(day_data),
-                column_config=APPOINTMENT_COLUMNS,
-                hide_index=True,
-                alt=f"Appointments on {date:%A} {date.day} {date:%B}, highest risk first",
-            )
             st.caption(
-                "To see why the model gave an appointment its risk, choose **All appointments** "
-                "in the sidebar and click its row."
+                f":yellow-badge[Yellow rows] are on the call list: those {m.day_phrase}."
+            )
+            explainable_table(
+                day_data,
+                filtered_data,
+                filter_key,
+                [
+                    ("site", selected_reporting_site),
+                    ("specialty", selected_specialty),
+                    ("appointment type", selected_appointment_type),
+                ],
+                name="day_list",
+                unique=f"{date:%Y%m%d}",
+                flag=day_data[column] == 1,
             )
 
         # ---- The way on: one button, to the admin team's call list
         next_step(
             "summary",
             "See the list for the admin team",
-            "What the team would actually work from: next week's appointments, highest risk first, "
+            "What the team would actually work from: next week's appointments, earliest first, "
             "ready to phone from the top.",
             "See next week's call list",
             go_to_view,
@@ -1481,18 +1551,6 @@ with tab_appts:
                 )
                 st.caption(f"{hw['overall']:.0%} of all appointments {when_week}")
             with st.container(border=True, height="stretch"):
-                st.metric(
-                    "Highest-risk weekday",
-                    hw["top_day"],
-                    weekly.pts_vs_average(hw["top_day_rate"], hw["overall"])
-                    if hw["n_days"] > 1
-                    else None,
-                    delta_color="inverse",
-                    icon=":material/today:",
-                    help=f"{hw['top_day_rate']:.0%} on {hw['top_day']}, against {hw['overall']:.0%} "
-                    "for the week.",
-                )
-            with st.container(border=True, height="stretch"):
                 if sv is None:
                     st.metric(
                         f"Estimated value of appointments kept {when_week}",
@@ -1514,19 +1572,24 @@ with tab_appts:
                     )
                     st.markdown(f":gray-badge[Staff time: £{sv['call_cost']:,.0f}]")
 
-        # The call list itself, highest risk first
+        # The call list itself, earliest appointment first: everyone on it is to be phoned, so
+        # the soonest appointments come first (highest risk first at the same time)
         st.subheader("Calls to make")
-        listed = listed.sort_values("DNA_Prob_Forecast", ascending=False)
+        listed = listed.sort_values(
+            ["Activity_Date", "Appointment_Time", "DNA_Prob_Forecast"],
+            ascending=[True, True, False],
+            kind="stable",
+        )
         st.markdown(
             f"**{len(listed)} of {len(period)} appointments {when} are on the call list**: those "
-            f"{m.day_phrase}, highest risk first. Phone from the top."
+            f"{m.day_phrase}, earliest appointment first. Phone from the top."
         )
         if period.empty:
             st.info("There are no appointments in the sidebar filters in this period.")
         elif listed.empty:
             st.info(f"None of the appointments {when} are {m.day_phrase}.")
         else:
-            call_list_table(
+            explainable_table(
                 listed,
                 filtered_data,
                 filter_key,
@@ -1535,6 +1598,8 @@ with tab_appts:
                     ("specialty", selected_specialty),
                     ("appointment type", selected_appointment_type),
                 ],
+                name="call_list",
+                call_list=True,
             )
         # ---- The way on: one button, to the phone tab
         next_step(

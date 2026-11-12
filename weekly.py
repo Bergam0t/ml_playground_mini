@@ -6,9 +6,8 @@ the forecast data (high-risk flag, yes/no forecast) whose mean is a rate.
 
 from dataclasses import dataclass
 
-import matplotlib
 import pandas as pd
-from matplotlib.colors import to_hex
+from matplotlib.colors import to_rgb
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -61,7 +60,7 @@ def _week_and_day(df):
 
 
 def weekly_tables(df, column):
-    """Appointments, measure totals and rates by week ending (newest first) and weekday.
+    """Appointments, measure totals and rates by week ending (earliest first) and weekday.
 
     Weekdays with no appointments at all (e.g. weekends) are left out. A rate is NaN
     where a week has no appointments on that day.
@@ -78,7 +77,7 @@ def weekly_tables(df, column):
         .fillna(0)
     )
     rates = sums / counts.where(counts > 0)
-    order = counts.index.sort_values(ascending=False)
+    order = counts.index.sort_values()
     return counts.loc[order], sums.loc[order], rates.loc[order]
 
 
@@ -141,20 +140,17 @@ def week_title(week_end, today=None):
     return f"Week ending {week_label(week_end)}"
 
 
-def pts_vs_average(rate, overall):
-    return f"{(rate - overall) * 100:+.1f} pts vs average"
-
-
 def week_label(week_end, year=False):
     return f"{week_end.day} {week_end:%b}" + (f" {week_end:%Y}" if year else "")
 
 
-def summary_sentence(h, measure):
-    """Plain-English summary; comparisons that don't apply under the filters are left out."""
+def summary_cards(h, measure):
+    """Plain-English summary as (label, text) pairs, one per card; comparisons that don't apply
+    under the filters are left out."""
     m = MEASURES[measure]
     weeks = f"{h['n_weeks']} week{'s' if h['n_weeks'] != 1 else ''}"
-    parts = [
-        f"Across {weeks}, " + m.rate_phrase.format(rate=f"**{h['overall']:.0%}**") + "."
+    cards = [
+        (f"Across {weeks}", m.rate_phrase.format(rate=f"**{h['overall']:.0%}**") + ".")
     ]
 
     if h["n_days"] > 1:
@@ -164,23 +160,50 @@ def summary_sentence(h, measure):
             s += f", about {top / low:.1f} times **{h['low_day']}s** ({low:.0%})"
         else:
             s += f", and **{h['low_day']}s** lowest at {low:.0%}"
-        parts.append(s + ".")
+        cards.append(("By weekday", s + "."))
 
     if h["n_weeks"] > 1:
-        parts.append(
-            f"The week ending **{week_label(h['top_week'])}** is highest at {h['top_week_rate']:.0%}."
+        cards.append(
+            (
+                "By week",
+                f"The week ending **{week_label(h['top_week'])}** is highest at {h['top_week_rate']:.0%}.",
+            )
         )
-    return " ".join(parts)
+    return cards
 
 
-def cell_style(rate, low, high):
-    """Green below `low`, red above `high`, a red-yellow-green gradient between."""
+def cell_style(rate, low, high, alpha=1.0):
+    """Green up to `low`, red from `high` up, amber between: three flat colours, so the only
+    thing that varies within a colour is `alpha`, its opacity (1 is solid). Amber takes black
+    text only while solid enough, as a faded one lets the dark page show through. Compared as
+    the whole percentage the cell shows, so a cell reading 2% is green when `low` is 2%, and
+    one reading 6% is red when `high` is 6%."""
     if pd.isna(rate):
         return ""
-    if rate < low:
-        return "background-color: #198754; color: white;"
-    if rate > high:
-        return "background-color: #dc3545; color: white;"
-    cmap = matplotlib.colormaps["RdYlGn_r"]
-    norm = matplotlib.colors.Normalize(vmin=low, vmax=high)
-    return f"background-color: {to_hex(cmap(norm(rate)))}; color: black;"
+    shown = round(rate * 100)
+    if shown <= round(low * 100):
+        rgb, text = to_rgb("#198754"), "white"
+    elif shown >= round(high * 100):
+        rgb, text = to_rgb("#dc3545"), "white"
+    else:
+        rgb, text = to_rgb("#e0a526"), "black" if alpha >= 0.6 else "white"
+    r, g, b = (round(c * 255) for c in rgb)
+    return f"background-color: rgba({r}, {g}, {b}, {alpha:.2f}); color: {text};"
+
+
+MIN_ALPHA = 0.15  # the faintest a cell with a rate goes, so even one with no calls is visible
+
+
+def cell_styles(rates, sums, low, high):
+    """cell_style for every cell of the weekly grid: colour from the rate, and opacity from the
+    number of calls (`sums`), from MIN_ALPHA for none up to solid for the busiest cell."""
+    busiest = sums.to_numpy().max() if sums.size else 0
+    alpha = MIN_ALPHA + (1 - MIN_ALPHA) * (sums / busiest if busiest else sums * 0)
+    return pd.DataFrame(
+        [
+            [cell_style(rates.iloc[i, j], low, high, alpha.iloc[i, j]) for j in range(rates.shape[1])]
+            for i in range(rates.shape[0])
+        ],
+        index=rates.index,
+        columns=rates.columns,
+    )
