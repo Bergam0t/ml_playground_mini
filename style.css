@@ -435,6 +435,32 @@ select.mobile-nav,
 	gap: 0.75rem;
 }
 
+/* ---- "Click a row" in the call to action above the appointment tables ---- */
+/* The site's highlight yellow and a bit bigger, so the instruction is the first thing read. */
+[class*="st-key-click_cta_"] strong {
+	color: #ffe600;
+	font-size: 1.2em;
+}
+
+/* ---- The All appointments and call list tables' scrollbars ---- */
+/* Styling the scrollbar makes browsers draw it all the time, not only while scrolling, so
+	people can see the table holds more rows. */
+:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller {
+	scrollbar-width: auto;
+	scrollbar-color: rgba(255, 255, 255, 0.45) rgba(255, 255, 255, 0.08);
+}
+:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.08);
+}
+:is(.st-key-appointments_grid, .st-key-call_list_grid) .dvn-scroller::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.45);
+	border-radius: 6px;
+}
+
 /* ---- The three forecast cards under the intro ---- */
 /* The middle card (confident DNAs) carries a longer takeaway, so it gets more of the row
 	and the cards either side get less. Still wraps onto separate lines when narrow. */

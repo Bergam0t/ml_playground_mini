@@ -8,6 +8,7 @@ the same app's "Who would we phone?" page.
 Red and blue are the dataviz skill's dark-mode diverging poles, validated against the
 app background (#1b1a1a). The +/- value labels mean colour is never the only cue.
 """
+import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -187,6 +188,58 @@ def guide_waterfall() -> go.Figure:
     )
     fig.update_layout(font_size=12)  # smaller than the real chart: it is only a guide
     _highlight_values(fig, labels, measure, 15, 16)
+    return fig
+
+
+def confidence_curve(risk, confidence, forecast_min: float, bands: list, examples: list) -> go.Figure:
+    """Confidence against predicted risk, for the "What does confidence mean?" popover.
+
+    `risk` and `confidence` are the model's own figures for the upcoming appointments (so the
+    curve can't disagree with the table). `bands` is [(low, high, label, colour)] in confidence;
+    `examples` is the risks to mark with a dot. Static: it is a picture to read, not to explore.
+    """
+    order = sorted(set(zip(risk, confidence)))
+    xs = [r for r, _ in order]
+    ys = [c for _, c in order]
+    fig = go.Figure()
+    for low, high, label, colour in bands:
+        fig.add_hrect(
+            y0=low, y1=high, fillcolor=colour, opacity=0.9, line_width=0, layer="below",
+            annotation_text=label, annotation_position="top right",
+            annotation_font=dict(size=11, color=MUTED),
+        )
+    fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines", line=dict(color=TEXT, width=3), hoverinfo="skip"))
+    fig.add_vline(x=forecast_min, line=dict(color=MUTED, width=1, dash="dash"))
+    # Dots on the curve at the examples, read off the model's own figures
+    ex_y = [float(np.interp(r, xs, ys)) for r in examples]
+    fig.add_trace(
+        go.Scatter(
+            x=examples,
+            y=ex_y,
+            mode="markers+text",
+            marker=dict(size=10, color=VALUE),
+            text=[f"{r:.0%} risk: {y:.0%}" for r, y in zip(examples, ex_y)],
+            textposition="top right",
+            textfont=dict(color=VALUE, size=12),
+            hoverinfo="skip",
+        )
+    )
+    fig.update_layout(
+        height=260,
+        margin=dict(l=0, r=0, t=6, b=0),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family=FONT["family"], color=TEXT, size=12),
+        showlegend=False,
+        xaxis=dict(
+            title="Predicted risk of not attending", tickformat=".0%", range=[0, 1],
+            showgrid=False, zeroline=False, fixedrange=True,
+        ),
+        yaxis=dict(
+            title="Confidence", tickformat=".0%", range=[0, 1], showgrid=False,
+            zeroline=False, fixedrange=True,
+        ),
+    )
     return fig
 
 

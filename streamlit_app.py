@@ -98,9 +98,8 @@ def load_rule_catches():
 # Fewer filtered appointments than this and their factor chart is too noisy to show
 MIN_GROUP_FOR_CHART = 30
 
-# Rows shown at once in the All appointments table (it scrolls), and their height in px: short,
-# so the table and the chart below it are on screen together
-TABLE_ROWS = 6
+# Rows shown at once in the All appointments table (it scrolls), and their height in px
+TABLE_ROWS = 10
 TABLE_ROW_HEIGHT = 35
 
 # The "How to read this chart" steps; the numbers match the badges on charts.guide_waterfall()
@@ -145,12 +144,17 @@ def DNA_Risk(prob):
         return "Very High"
 
 
+# Where the confidence bands change (the popover's chart draws the same bands)
+CONFIDENCE_EDGES = (0.5, 0.8, 0.9)
+
+
 def Confidence_Score_Txt(confidence):
-    if confidence < 0.5:
+    medium, high, very_high = CONFIDENCE_EDGES
+    if confidence < medium:
         return "Low"
-    elif confidence < 0.8:
+    elif confidence < high:
         return "Medium"
-    elif confidence < 0.9:
+    elif confidence < very_high:
         return "High"
     else:
         return "Very High"
@@ -166,9 +170,10 @@ RISK_HELP = (
     "About 8% of appointments are missed. High and Very High (20% or more, about two and a half "
     "times the average) are forecast as DNAs; Very High is also flagged high-risk."
 )
+# Only the bands: what confidence means, with examples, is in the "What does confidence
+# mean?" popover beside it, so the two don't say the same thing
 CONFIDENCE_HELP = (
-    "How clear-cut the model's yes-or-no call is: how far the risk is from 20%, where the "
-    "forecast changes from No to Yes. It follows from the risk.  \n"
+    "Confidence bands, and the predicted risk each covers.  \n"
     "**Low:** under 50% (risk 8% to 43%)  \n"
     "**Medium:** 50% to 80% (risk 3% to 8% or 43% to 69%)  \n"
     "**High:** 80% to 90% (risk 1.3% to 3% or 69% to 83%)  \n"
@@ -517,11 +522,12 @@ def appointments_table(table_data, filter_key, sidebar_choices):
     one reruns the page, which passes the newly filtered appointments in here."""
     filtered_data = table_data  # the sidebar's filters, before this table's own
     st.subheader("Appointment details")
-    st.info(
-        "**Click a row** (highest risk first) to see why the model gave that appointment its "
-        "risk of not attending.",
-        icon=":material/touch_app:",
-    )
+    with st.container(key="click_cta_all"):
+        st.info(
+            "**Click a row** (highest risk first) to see why the model gave that appointment its "
+            "risk of not attending.",
+            icon=":material/touch_app:",
+        )
 
     # The model's forecast filters, for this table only (the rest of the page follows
     # just the sidebar's filters), with the confidence explainer on the same row: a
@@ -540,11 +546,29 @@ def appointments_table(table_data, filter_key, sidebar_choices):
     ):
         st.markdown(
             f"Confidence is how clear-cut the model's yes-or-no call is: how far the risk is "
-            f"from {FORECAST_MIN:.0%}, where the forecast changes from No to Yes. A "
-            f"{FORECAST_MIN:.0%} risk gives 0% confidence, because the model could go either "
-            "way. A 70% risk gives about 80% confidence that the patient won't attend, and a 2% "
-            "risk about 85% confidence that they will. So it is **Low for any risk between 8% "
-            "and 43%**, and rises towards both ends."
+            f"from {FORECAST_MIN:.0%}, where the forecast changes from No to Yes."
+        )
+        edges = (0, *CONFIDENCE_EDGES, 1)
+        data_now = load_data()
+        st.plotly_chart(
+            charts.confidence_curve(
+                data_now["DNA_Prob_Forecast"],
+                data_now["Confidence_Score"],
+                FORECAST_MIN,
+                [
+                    (edges[i], edges[i + 1], band, CONFIDENCE_COLOURS[band])
+                    for i, band in enumerate(BANDS)
+                ],
+                [FORECAST_MIN, HIGH_RISK_MIN, 0.02],
+            ),
+            key="confidence_curve",
+            width="stretch",
+            config={"staticPlot": True},
+        )
+        st.caption(
+            f"A {FORECAST_MIN:.0%} risk gives 0% confidence, because the model could go either "
+            "way. The further the risk is from there, the more confident the model is, in either "
+            "direction. So it is **Low for any risk between 8% and 43%**."
         )
     if selected_dna_risk != "All":
         table_data = table_data[table_data["Risk"] == selected_dna_risk]
@@ -572,22 +596,24 @@ def appointments_table(table_data, filter_key, sidebar_choices):
             *(picked.selection.rows if picked else []),
             *(r for r, _ in (picked.selection.cells if picked else [])),
         ]
-        table = st.dataframe(
-            appointment_table(
-                table_data, highlight_row=picked_rows[0] if picked_rows else None
-            ),
-            column_config=APPOINTMENT_COLUMNS,
-            hide_index=True,
-            alt="Upcoming appointments with the forecast risk of not attending",
-            on_select=open_explanation,
-            selection_mode=["single-row", "single-cell"],
-            # Short, so the table and the chart below it are on screen together; it scrolls
-            row_height=TABLE_ROW_HEIGHT,
-            height=(TABLE_ROWS + 1) * TABLE_ROW_HEIGHT + 3,
-            # A new key when any filter changes, so an old selection never points at a
-            # different appointment, and when the explanation is dismissed, to clear it
-            key=table_key,
-        )
+        # Keyed so style.css can keep this table's scrollbar visible
+        with st.container(key="appointments_grid"):
+            table = st.dataframe(
+                appointment_table(
+                    table_data, highlight_row=picked_rows[0] if picked_rows else None
+                ),
+                column_config=APPOINTMENT_COLUMNS,
+                hide_index=True,
+                alt="Upcoming appointments with the forecast risk of not attending",
+                on_select=open_explanation,
+                selection_mode=["single-row", "single-cell"],
+                # A fixed number of rows; it scrolls
+                row_height=TABLE_ROW_HEIGHT,
+                height=(TABLE_ROWS + 1) * TABLE_ROW_HEIGHT + 3,
+                # A new key when any filter changes, so an old selection never points at a
+                # different appointment, and when the explanation is dismissed, to clear it
+                key=table_key,
+            )
         # A ticked row or a clicked cell both select. Positions refer to the rows as passed
         # in, whatever sorting the user applies
         selected_rows = [
@@ -609,10 +635,11 @@ def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
     table, clicking a row opens the explanation overlay; a fragment, so only this part reruns.
     `filtered_data` (the sidebar's filters) and `sidebar_choices` are for the overlay's
     Overall tab."""
-    st.info(
-        "**Click a row** to see why the model gave that appointment its risk of not attending.",
-        icon=":material/touch_app:",
-    )
+    with st.container(key="click_cta_call_list"):
+        st.info(
+            "**Click a row** to see why the model gave that appointment its risk of not attending.",
+            icon=":material/touch_app:",
+        )
     table_key = f"call_list_{filter_key}_{st.session_state.get('table_nonce', 0)}"
     # The table's selection from the click that caused this run, to shade that row
     picked = st.session_state.get(table_key)
@@ -620,19 +647,21 @@ def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
         *(picked.selection.rows if picked else []),
         *(r for r, _ in (picked.selection.cells if picked else [])),
     ]
-    table = st.dataframe(
-        appointment_table(
-            listed,
-            call_list=True,
-            highlight_row=picked_rows[0] if picked_rows else None,
-        ),
-        column_config=APPOINTMENT_COLUMNS,
-        hide_index=True,
-        on_select=open_explanation,
-        selection_mode=["single-row", "single-cell"],
-        # A new key when the explanation is dismissed, to clear the selection
-        key=table_key,
-    )
+    # Keyed so style.css can keep this table's scrollbar visible
+    with st.container(key="call_list_grid"):
+        table = st.dataframe(
+            appointment_table(
+                listed,
+                call_list=True,
+                highlight_row=picked_rows[0] if picked_rows else None,
+            ),
+            column_config=APPOINTMENT_COLUMNS,
+            hide_index=True,
+            on_select=open_explanation,
+            selection_mode=["single-row", "single-cell"],
+            # A new key when the explanation is dismissed, to clear the selection
+            key=table_key,
+        )
     selected_rows = [
         r
         for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
@@ -728,16 +757,6 @@ def next_step(key, heading, text, label, on_click, args=()):
             icon=":material/arrow_forward:",
             type="primary",
         )
-
-
-def go_to_forecast_calls(risk_min):
-    """From the predicted savings on the appointments tab to the phone tab, set to phone
-    everyone at or above `risk_min` with the default guess at what a call changes, so the
-    figures match."""
-    st.session_state.call_mode = "Predicted risk"
-    st.session_state.risk_min = round(risk_min * 100)
-    st.session_state.call_effect = DEFAULT_CALL_EFFECT
-    go_to_tab(TAB_CALLS)
 
 
 # Streamlit app
@@ -1087,21 +1106,6 @@ def forecast_savings(called, risk_min, weeks=None):
     }
 
 
-def explore_button(risk_min, key, scope, primary=True):
-    """Opens the phone tab set to phone everyone at or above `risk_min`, with the default
-    effect, so its figures match the savings shown here."""
-    st.button(
-        "Explore these assumptions",
-        key=f"to_calls_from_{key}",
-        on_click=go_to_forecast_calls,
-        args=(risk_min,),
-        icon=":material/arrow_forward:",
-        type="primary" if primary else "secondary",
-        help="Try other values, and other numbers of calls, on the next tab. It uses all the "
-        f"upcoming appointments, {scope}.",
-    )
-
-
 # ---------------------------------------------------------------- tab 1: Upcoming appointments (the landing page)
 # One tab, three views picked by the switch at the top of the sidebar
 with tab_appts:
@@ -1238,21 +1242,6 @@ with tab_appts:
                     "a risk for every patient, so the list fits the calls the team can make, and the "
                     "reasons behind each one (click a row in the table)."
                 )
-                with st.container(horizontal=True):
-                    if savings is not None:
-                        explore_button(
-                            FORECAST_MIN,
-                            "savings",
-                            "not just your filters",
-                            primary=False,
-                        )
-                    st.button(
-                        "Bonus: can you beat the model?",
-                        key="to_game_from_appts",
-                        on_click=go_to_tab,
-                        args=(TAB_GAME,),
-                        icon=":material/sports_esports:",
-                    )
             with ways_numbers.container(horizontal=True, key="landing_ways"):
                 st.metric(
                     "At random",
@@ -2004,6 +1993,17 @@ with tab_calls:
             "and compare how many from each half attend.",
             icon=":material/warning:",
         )
+
+    # ---- The way on: one button, to the bonus game
+    next_step(
+        "game",
+        "Bonus: beat the model",
+        "Make your own rule for who to phone, and see if you can catch more missed appointments "
+        "than a machine learning model.",
+        "Play the bonus game",
+        go_to_tab,
+        (TAB_GAME,),
+    )
 
 
 # ---------------------------------------------------------------- tab 3: Bonus: beat the model
