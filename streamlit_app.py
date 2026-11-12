@@ -603,6 +603,48 @@ def appointments_table(table_data, filter_key, sidebar_choices):
             )
 
 
+@st.fragment
+def call_list_table(listed, filtered_data, filter_key, sidebar_choices):
+    """The call list table (highest risk first, as passed in). Like the All appointments
+    table, clicking a row opens the explanation overlay; a fragment, so only this part reruns.
+    `filtered_data` (the sidebar's filters) and `sidebar_choices` are for the overlay's
+    Overall tab."""
+    st.info(
+        "**Click a row** to see why the model gave that appointment its risk of not attending.",
+        icon=":material/touch_app:",
+    )
+    table_key = f"call_list_{filter_key}_{st.session_state.get('table_nonce', 0)}"
+    # The table's selection from the click that caused this run, to shade that row
+    picked = st.session_state.get(table_key)
+    picked_rows = [
+        *(picked.selection.rows if picked else []),
+        *(r for r, _ in (picked.selection.cells if picked else [])),
+    ]
+    table = st.dataframe(
+        appointment_table(
+            listed,
+            call_list=True,
+            highlight_row=picked_rows[0] if picked_rows else None,
+        ),
+        column_config=APPOINTMENT_COLUMNS,
+        hide_index=True,
+        on_select=open_explanation,
+        selection_mode=["single-row", "single-cell"],
+        # A new key when the explanation is dismissed, to clear the selection
+        key=table_key,
+    )
+    selected_rows = [
+        r
+        for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
+        if r < len(listed)
+    ]
+    # Only on the run the click caused, so it doesn't reopen on later reruns
+    if st.session_state.pop("explain_open", False) and selected_rows:
+        explain_appointment(
+            listed.iloc[selected_rows[0]], (filtered_data, filter_key, sidebar_choices)
+        )
+
+
 def demo_notice_full(key):
     """The fuller version of the notice, beside tab 1's opening text.
 
@@ -1495,11 +1537,15 @@ with tab_appts:
         elif listed.empty:
             st.info(f"None of the appointments {when} are {m.day_phrase}.")
         else:
-            st.dataframe(
-                appointment_table(listed, call_list=True),
-                column_config=APPOINTMENT_COLUMNS,
-                hide_index=True,
-                key=f"call_list_{filter_key}",
+            call_list_table(
+                listed,
+                filtered_data,
+                filter_key,
+                [
+                    ("site", selected_reporting_site),
+                    ("specialty", selected_specialty),
+                    ("appointment type", selected_appointment_type),
+                ],
             )
         # ---- The way on: one button, to the phone tab
         next_step(
