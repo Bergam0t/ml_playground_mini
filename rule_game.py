@@ -147,12 +147,38 @@ def three_ways_outcomes(past: pd.DataFrame, model_risk) -> dict:
 def all_rule_catches(past: pd.DataFrame) -> dict:
     """Missed appointments on the list (per 1,000) for every rule the visitor can make:
     each combination of one or more clues, keyed by its sorted clues: 2^n - 1 for n clues
-    (4,095 for 12)."""
-    return {
-        tuple(sorted(combo)): results(past, rule_score(past, combo))["outcomes"]["called_dna"]
-        for k in range(1, len(CLUES) + 1)
-        for combo in itertools.combinations(CLUES, k)
-    }
+    (4,095 for 12).
+
+    The same figures as results(past, rule_score(past, combo)) for each combo, but fast enough
+    for the page's first load (about 15s the slow way): each clue is ranked once, and each
+    rule's total reuses the total of the same rule without its last clue. The clues are added
+    in the same order as rule_score() adds them, so the totals, and so the calls, are the same
+    to the last bit."""
+    y = past["Did_Not_Attend"].to_numpy() == 1
+    n = len(past)
+    n_called = int(round(n * CALL_SHARE))
+    would_miss = int(round(y.mean() * 1000))
+    ranks = {c: past[c].rank(pct=True).to_numpy(dtype=float) for c in CLUES}
+    jitter = np.random.default_rng(0).random(n) * 1e-6
+    totals = {(): 0}
+    catches = {}
+    for k in range(1, len(CLUES) + 1):
+        for combo in itertools.combinations(CLUES, k):
+            # combinations() keeps CLUES' order, so combo[:-1] was made at k - 1
+            total = totals[combo] = totals[combo[:-1]] + ranks[combo[-1]]
+            score = total + jitter
+            # As calls.called_by_share() and calls.call_outcomes(). Only which appointments
+            # make the top n_called matters, so a partial sort will do, unless the cut-off
+            # falls inside a tie: then the stable full sort picks them, as called_by_share() does.
+            top = np.argpartition(-score, n_called - 1)[:n_called]
+            cut = score[top].min()
+            if (score == cut).sum() > 1:
+                top = np.argsort(-score, kind="stable")[:n_called]
+            reached = int(round(y[top].sum() * 1000 / n))
+            catches[tuple(sorted(combo))] = min(reached, round(n_called * 1000 / n), would_miss)
+        # Only the totals one clue shorter are needed next time round
+        totals = {c: t for c, t in totals.items() if len(c) == k}
+    return catches
 
 
 def rank_of(caught: int, catches: dict) -> int:

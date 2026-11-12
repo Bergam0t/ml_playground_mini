@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import io
 import json
 import random
 import time
@@ -27,8 +28,30 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# The widest Streamlit ever sends an image to the browser (its MAXIMUM_CONTENT_WIDTH)
+MAX_IMAGE_WIDTH = 1460
+
+
+@st.cache_resource
+def fitted_image(path):
+    """The PNG at `path` as Streamlit would send it: shrunk to MAX_IMAGE_WIDTH if wider, in the
+    same way. Streamlit would do that on every run, which for the two big logos took about 0.4s
+    of each page load; this does it once."""
+    from PIL import Image
+
+    image = Image.open(path)
+    if image.width > MAX_IMAGE_WIDTH:
+        height = int(1.0 * image.height * MAX_IMAGE_WIDTH / image.width)
+        image = image.resize((MAX_IMAGE_WIDTH, height), resample=Image.BILINEAR)
+    out = io.BytesIO()
+    image.save(out, format="PNG")
+    return out.getvalue()
+
+
 st.logo(
-    "resources/Chalky HSMA-07-wide white logo tall with tagline - new tagline.png",
+    fitted_image("resources/Chalky HSMA-07-wide white logo tall with tagline - new tagline.png"),
     size="large",
     link=HSMA_URL,
 )
@@ -972,7 +995,7 @@ data["Probabilty"] = data["DNA_Prob_Forecast"] * 100
 # hover "fullscreen" button.
 with st.sidebar.container(key="nihr_logo"):
     st.image(
-        "resources/NIHR_APPLIED_RESEARCH_COLLABORATION_Logo_Horizontal_RGB_WHITE.png",
+        fitted_image("resources/NIHR_APPLIED_RESEARCH_COLLABORATION_Logo_Horizontal_RGB_WHITE.png"),
         width="stretch",
         link="https://arc-sw.nihr.ac.uk/",
     )
