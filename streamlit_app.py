@@ -268,12 +268,14 @@ CALL_LIST_FIELDS = {
 }
 
 
-def appointment_table(df, by_patient=False, call_list=False):
+def appointment_table(df, by_patient=False, call_list=False, highlight_row=None):
     """Appointments to show in a table, with the forecast columns coloured.
 
     `by_patient` puts the patient columns first and shades every other patient's rows,
     for a table sorted so each patient's appointments are together. `call_list` adds the
-    appointment time and the patient's name.
+    appointment time and the patient's name. `highlight_row` is the position of a row to
+    shade (outside the coloured forecast columns), as the table's cell selection only
+    outlines the one cell clicked.
     """
     fields = list(APPOINTMENT_FIELDS)
     if call_list:
@@ -284,7 +286,24 @@ def appointment_table(df, by_patient=False, call_list=False):
         fields = patient + [f for f in fields if f not in patient]
     shown = df[fields].rename(columns={**APPOINTMENT_FIELDS, **CALL_LIST_FIELDS})
     styler = shown.style.apply(forecast_cell_styles, axis=None)
-    return styler.apply(patient_bands, axis=None) if by_patient else styler
+    if by_patient:
+        styler = styler.apply(patient_bands, axis=None)
+    if highlight_row is not None:
+        styler = styler.apply(selected_row_style, position=highlight_row, axis=None)
+    return styler
+
+
+def selected_row_style(df, position):
+    """Shade the row at `position` (outside the coloured forecast columns)."""
+    plain = [
+        c for c in df.columns if c not in ("Expected DNA", "Confidence", "Probabilty")
+    ]
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+    if 0 <= position < len(df):
+        styles.iloc[position, [df.columns.get_loc(c) for c in plain]] = (
+            "background-color: #3d4f5c;"
+        )
+    return styles
 
 
 def patient_bands(df):
@@ -541,23 +560,39 @@ def appointments_table(table_data, filter_key, sidebar_choices):
             "in either to see more."
         )
     else:
+        table_key = (
+            f"appointments_{filter_key}_{selected_dna_risk}_"
+            f"{selected_confidence}_{st.session_state.get('table_nonce', 0)}"
+        )
+        # The table's selection from the click that caused this run, to shade that row
+        picked = st.session_state.get(table_key)
+        picked_rows = [
+            *(picked.selection.rows if picked else []),
+            *(r for r, _ in (picked.selection.cells if picked else [])),
+        ]
         table = st.dataframe(
-            appointment_table(table_data),
+            appointment_table(
+                table_data, highlight_row=picked_rows[0] if picked_rows else None
+            ),
             column_config=APPOINTMENT_COLUMNS,
             hide_index=True,
             alt="Upcoming appointments with the forecast risk of not attending",
             on_select=open_explanation,
-            selection_mode="single-row",
+            selection_mode=["single-row", "single-cell"],
             # Short, so the table and the chart below it are on screen together; it scrolls
             row_height=TABLE_ROW_HEIGHT,
             height=(TABLE_ROWS + 1) * TABLE_ROW_HEIGHT + 3,
             # A new key when any filter changes, so an old selection never points at a
             # different appointment, and when the explanation is dismissed, to clear it
-            key=f"appointments_{filter_key}_{selected_dna_risk}_"
-            f"{selected_confidence}_{st.session_state.get('table_nonce', 0)}",
+            key=table_key,
         )
-        # Selected positions refer to the rows as passed in, whatever sorting the user applies
-        selected_rows = [r for r in table.selection.rows if r < len(table_data)]
+        # A ticked row or a clicked cell both select. Positions refer to the rows as passed
+        # in, whatever sorting the user applies
+        selected_rows = [
+            r
+            for r in [*table.selection.rows, *(r for r, _ in table.selection.cells)]
+            if r < len(table_data)
+        ]
         # Only on the run the click caused, so it doesn't reopen on later reruns
         if st.session_state.pop("explain_open", False) and selected_rows:
             explain_appointment(
