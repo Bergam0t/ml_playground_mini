@@ -1405,7 +1405,10 @@ def calling_right_people(out, list_name, note, key):
 
 
 def choose_way(way):
-    """A tile in the comparison box on the first tab was clicked: show its calls under the tiles."""
+    """A tile in the comparison box on the first tab was clicked: show its calls under the tiles.
+    A different tile also counts a change, so the numbers under the tiles flash (style.css)."""
+    if way != st.session_state.get("landing_way", "model"):
+        st.session_state.landing_flash = st.session_state.get("landing_flash", 0) + 1
     st.session_state.landing_way = way
 
 
@@ -1528,12 +1531,17 @@ def compare_ways(savings, length):
             "random": "a random pick (the counts expected on average)",
         }
         tile_label = next(label for key, label, *_ in tiles if key == chosen)
-        calling_right_people(
-            load_way_outcomes()[chosen],
-            list_names[chosen],
-            f"{tile_label.lower()}: {n_calls} calls in 1,000 past appointments",
-            "landing",
-        )
+        # After a click on a different tile, the numbers that changed flash yellow (style.css).
+        # The key swaps between two names on each change, each with its own copy of the
+        # animation, so it plays again every time; before any change, no flash.
+        flash = st.session_state.get("landing_flash", 0)
+        with st.container(key=f"landing_who_flash{flash % 2}" if flash else "landing_who"):
+            calling_right_people(
+                load_way_outcomes()[chosen],
+                list_names[chosen],
+                f"{tile_label.lower()}: {n_calls} calls in 1,000 past appointments",
+                "landing",
+            )
 
 
 # The patients the first tab's explanation chart picks from: label, range in words, and the

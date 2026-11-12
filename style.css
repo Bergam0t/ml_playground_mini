@@ -686,6 +686,30 @@ select.mobile-nav,
 	opacity: 1;
 }
 
+/* After a click on a different tile, the numbers under the tiles flash the highlight yellow and
+	fade back, so the change is seen: the four box counts in the chart (its SVG text) and the two
+	rate cards. Not the column headings ("On the call list: 100"): only the box titles hold a
+	coloured symbol, a tspan with its own fill, hence the :has(). Two copies of the animation,
+	one per container key (landing_who_flash0/1, swapped on each change), as an animation only
+	replays when its name changes. */
+@keyframes landing-flash-0 {
+	0%, 35% { color: #ffe600; fill: #ffe600; text-shadow: 0 0 10px rgba(255, 230, 0, 0.7); }
+}
+@keyframes landing-flash-1 {
+	0%, 35% { color: #ffe600; fill: #ffe600; text-shadow: 0 0 10px rgba(255, 230, 0, 0.7); }
+}
+.st-key-landing_who_flash0 :is([data-testid="stMetricValue"], [data-testid="stMetricDelta"], .annotation-text:has(tspan[style*="fill"])) {
+	animation: landing-flash-0 1.6s ease-out;
+}
+.st-key-landing_who_flash1 :is([data-testid="stMetricValue"], [data-testid="stMetricDelta"], .annotation-text:has(tspan[style*="fill"])) {
+	animation: landing-flash-1 1.6s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+	[class*="st-key-landing_who_flash"] :is([data-testid="stMetricValue"], [data-testid="stMetricDelta"], .annotation-text:has(tspan[style*="fill"])) {
+		animation: none;
+	}
+}
+
 /* ---- The first tab's explanation chart ---- */
 /* Big buttons to choose a high-, medium- or low-risk patient: the chosen one filled, the
 	others outlined, and "Show a different patient" at the far end of the row */
