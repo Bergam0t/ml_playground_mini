@@ -28,6 +28,8 @@ from demo_data import (
 from mobile_nav import add_mobile_nav
 
 HSMA_URL = "https://hsma.co.uk"
+REAL_TOOL_CODE_URL = "https://github.com/WX-BIU/Outpatient-DNAs"
+CODE_URL = "https://github.com/hsma-programme/ml_playground_mini"
 
 st.set_page_config(
     page_title="Outpatient DNA Forecast",
@@ -478,17 +480,43 @@ POSTER_URL = "https://hsma.co.uk/impact_posters/Outpatient%20non%20attendance.pn
 VIDEO_URL = "https://youtu.be/tWcLIMTQb8A"
 
 
+def learn_more():
+    """The HSMA "want to learn" note, ported from the geographic mini's footer, under the
+    poster and the video."""
+    st.divider()
+    qr, text = st.columns([1, 5], vertical_alignment="center")
+    qr.image("resources/hsma_qr.png", width=130)
+    text.markdown(
+        f"""
+        **Want to learn how to build tools like this?**
+
+        The Health Service Modelling Associates (HSMA) programme trains people working in
+        health and social care in modelling, machine learning
+        and data science. Scan the code or visit the
+        [HSMA website]({HSMA_URL}) to find out more, look at
+        [the code for the real tool]({REAL_TOOL_CODE_URL}), or
+        [explore the code for this app]({CODE_URL}).
+        """
+    )
+
+
 @st.dialog("Impact poster", width="large")
 def show_poster():
     """The HSMA impact poster, in a pop-up so the visitor stays in the app."""
     st.image(POSTER_URL)
     st.caption(f"[Open full size in a new tab]({POSTER_URL})")
+    learn_more()
 
 
-@st.dialog("Hear from the associate", width="large")
+@st.dialog(
+    "Hear from the person who made the real tool this is based on, who was a member of the "
+    "6th cohort of the Health Service Modelling Associates (HSMA) programme",
+    width="large",
+)
 def show_video():
-    """The associate's video about the project, in a pop-up."""
+    """The video from the person who made the real tool, about the project, in a pop-up."""
     st.video(VIDEO_URL)
+    learn_more()
 
 
 def overall_importance(filtered_data, filter_key, sidebar_choices):
