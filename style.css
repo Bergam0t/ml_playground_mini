@@ -424,6 +424,23 @@ select.mobile-nav,
 .stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }
 .stButton button:hover, .stButton button:focus:not(:active) { background-color: #1fb1b9; border-color: #1fb1b9; color: #ffffff; }
 
+/* ---- Pop-ups' close X ---- */
+/* Streamlit draws it as a 10px icon with a 2px pad, hard to see and to hit: twice the size,
+	in a bigger target, kept level with the title. The title is given room so a long one
+	(the SHAP pop-up names the patient, date and risk) wraps before it reaches the X. */
+[data-testid="stDialog"] button[aria-label="Close"] {
+	top: 1.6rem;
+	right: 1.5rem;
+	padding: 0.5rem;
+}
+[data-testid="stDialog"] button[aria-label="Close"] svg {
+	width: 20px;
+	height: 20px;
+}
+[data-testid="stDialog"] [slot="title"] {
+	padding-right: 4.5rem;
+}
+
 /* ---- The call list view's call to action, which holds the "Who goes on the list" control ---- */
 /* An st.info can't contain a widget, so this keyed container is drawn to match one (the
 	default dark-theme info colours). */
