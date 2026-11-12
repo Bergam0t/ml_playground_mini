@@ -395,6 +395,8 @@ select.mobile-nav,
 
 /* ---- Tab 1 intro: highlighted text and threshold pills (from the geographic playground mini) ---- */
 .highlight { color: #ffe600; font-weight: 700; }
+/* A term being defined in passing (DNA): the theme teal, so it differs from the yellow highlight */
+.term { color: #1fb1b9; font-weight: 700; }
 .threshold-pills { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
 .pill {
 	display: inline-block;
@@ -419,6 +421,12 @@ select.mobile-nav,
 /* Buttons in the theme teal */
 .stButton button { background-color: #076b72; border-color: #076b72; color: #ffffff; }
 .stButton button:hover, .stButton button:focus:not(:active) { background-color: #1fb1b9; border-color: #1fb1b9; color: #ffffff; }
+
+/* ---- The three forecast cards under the intro ---- */
+/* The middle card (confident DNAs) carries a longer takeaway, so it gets more of the row
+	and the cards either side get less. Still wraps onto separate lines when narrow. */
+.st-key-forecast_cards > * { flex: 1 1 10rem; }
+.st-key-forecast_cards > *:nth-child(2) { flex: 1.8 1 14rem; }
 
 /* ---- The demonstration notice's poster and video buttons (demo_notice_full) ---- */
 /* Pulled up under the yellow notice and outlined in its yellow, so they read as the notice's

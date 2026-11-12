@@ -624,7 +624,7 @@ def demo_notice_full(key):
     # One per line: the labels are too long to sit side by side in the narrow column
     with st.container(key=f"demo_links_{key}"):
         if st.button(
-            ":material/image: Read the story behind this HSMA project",
+            ":material/image: Read about the impact of this HSMA project",
             key=f"poster_{key}",
         ):
             show_poster()
@@ -1099,7 +1099,7 @@ with tab_appts:
                 ### Which appointments are patients most likely to miss?
 
                 A machine-learning model, trained on past appointments, gives each upcoming one a
-                predicted **risk of not attending** (a DNA, or 'did not attend'), so outpatient
+                predicted **risk of not attending** <span class="term">(a DNA, or 'did not attend')</span>, so outpatient
                 teams can phone the patients most likely to miss. The forecasts are
                 <span class="highlight">estimates to support staff judgement, not decisions</span>.
                 """,
@@ -1123,10 +1123,11 @@ with tab_appts:
                 filtered_data[filtered_data["DNA_Forecast"] == 1], FORECAST_MIN, weeks
             )
 
-            def card_caption(count, recall):
-                return f"{count / n_filtered:.1%} of appointments · catches {recall:.0%} of past DNAs"
+            def card_caption(count):
+                return f"{count / n_filtered:.1%} of appointments"
 
-            with st.container(horizontal=True):
+            # Keyed so style.css can make the middle card wider than the two beside it
+            with st.container(horizontal=True, key="forecast_cards"):
                 with st.container(border=True, height="stretch"):
                     st.metric(
                         f"Forecast DNAs ({FORECAST_MIN:.0%}+ risk)",
@@ -1139,7 +1140,7 @@ with tab_appts:
                         f"{forecast_recall:.0%} had a risk this high; of all those forecast as a DNA, "
                         f"{forecast_precision:.0%} were missed.",
                     )
-                    st.caption(card_caption(n_forecast, forecast_recall))
+                    st.caption(card_caption(n_forecast))
                 with st.container(border=True, height="stretch"):
                     n_high = int(filtered_data["High_Risk_DNA"].sum())
                     st.metric(
@@ -1151,9 +1152,11 @@ with tab_appts:
                         f"appointments the model was tested on, {high_recall:.0%} had a risk this high; "
                         f"of all those flagged, {high_precision:.0%} were missed.",
                     )
-                    st.caption(
-                        f"{card_caption(n_high, high_recall)}. If we can only call a few "
-                        "patients, calling these gives the best return on staff time."
+                    st.caption(card_caption(n_high))
+                    # Bold and full size, not caption: this is the card's takeaway
+                    st.markdown(
+                        "**If we can only call a few patients, calling these gives the best "
+                        "return on staff time.**"
                     )
                 with st.container(border=True, height="stretch"):
                     if savings is None:
