@@ -791,6 +791,13 @@ def reset_game():
     st.session_state.scroll_to_top = True
 
 
+def reset_costs():
+    """Put every cost assumption in the sidebar back to its default: a widget with no value in
+    the session state starts again from its default. All their keys start with cost_."""
+    for key in [k for k in st.session_state if k.startswith("cost_")]:
+        del st.session_state[key]
+
+
 def go_to_view(view):
     """From the bottom of one Upcoming appointments view to the next (the sidebar's switch)."""
     st.session_state.appt_view = view
@@ -986,7 +993,19 @@ if not show_filters:
 st.sidebar.divider()
 st.sidebar.subheader("Cost assumptions")
 band5 = costs.admin_hourly_cost(**costs.BAND5)
-with st.sidebar.expander("Calls and missed appointments", icon=":material/payments:"):
+# Minutes per call stays out of the expander: the one assumption most people will want to try
+minutes_per_call = st.sidebar.number_input(
+    "Minutes per call",
+    min_value=0.5,
+    value=float(costs.MINUTES_PER_CALL),
+    step=0.5,
+    format="%.1f",
+    key="cost_minutes",
+    help="On average, including unanswered attempts and noting the outcome.",
+)
+with st.sidebar.expander(
+    "Advanced settings for calls and missed appointment costs", icon=":material/payments:"
+):
     hourly = st.number_input(
         "Admin staff cost per hour (£)",
         min_value=0.0,
@@ -999,15 +1018,6 @@ with st.sidebar.expander("Calls and missed appointments", icon=":material/paymen
         f"pension £{band5['pension']:,.0f}: £{band5['total']:,.0f} a year, over about "
         f"{band5['hours']:,.0f} working hours once leave, bank holidays, sickness and training "
         "are taken off.",
-    )
-    minutes_per_call = st.number_input(
-        "Minutes per call",
-        min_value=0.5,
-        value=float(costs.MINUTES_PER_CALL),
-        step=0.5,
-        format="%.1f",
-        key="cost_minutes",
-        help="On average, including unanswered attempts and noting the outcome.",
     )
     cost_per_call = hourly * minutes_per_call / 60
     st.caption(f"So each call costs about **£{cost_per_call:.2f}** in staff time.")
@@ -1058,6 +1068,15 @@ with st.sidebar.expander("Calls and missed appointments", icon=":material/paymen
             )
         cost_rows.append((specialty, new_cost, fu_cost))
     dna_costs = pd.DataFrame(cost_rows, columns=["Specialty", *costs.APPOINTMENT_TYPES])
+
+st.sidebar.button(
+    "Reset to defaults",
+    key="reset_costs",
+    on_click=reset_costs,
+    icon=":material/restart_alt:",
+    width="stretch",
+    help="Put every cost assumption back to its starting value.",
+)
 
 if filtered_data.empty:
     st.info("No appointments match the selected filters.")
@@ -1663,7 +1682,7 @@ with tab_calls:
     st.session_state["call_mode"] = (
         st.session_state.get("call_mode") or "Calls the team can make"
     )
-    st.session_state.setdefault("calls_per_week", min(100, busiest))
+    st.session_state.setdefault("calls_per_week", min(50, busiest))
     st.session_state.setdefault("risk_min", round(HIGH_RISK_MIN * 100))
     st.session_state.setdefault("call_effect", DEFAULT_CALL_EFFECT)
     # Streamlit forgets a widget's value on a run that doesn't draw it: the controls are only
@@ -1866,18 +1885,21 @@ with tab_calls:
             # The two pound figures, then the two counts of appointments, so the break-even sits
             # beside the number the calls might save
             c2.metric(
-                "Possibly saved",
-                f"£{econ['value_avoided']:,.0f}",
-                # A minus only for a loss, so st.metric still colours it red; no plus or arrow
-                f"{'-' if econ['net'] < 0 else ''}£{abs(econ['net']):,.0f} after costs",
+                "Possibly saved, after costs",
+                # After the cost of the calls is the main figure, with a minus for a loss; the
+                # figure before costs is the small one under it, neutral (no colour, no arrow)
+                f"{'-' if econ['net'] < 0 else ''}£{abs(econ['net']):,.0f}",
+                f"£{econ['value_avoided']:,.0f} before costs",
+                delta_color="off",
                 delta_arrow="off",
                 border=True,
                 height="stretch",
                 icon=":material/savings:",
-                help=f"If a call gets {effect}% of the people it reaches, who would have missed, "
-                f"to attend. A missed appointment among the patients these calls reach is valued at "
-                f"about £{dna_cost:,.0f} on average. Change this and the call cost under **Cost "
-                "assumptions** in the sidebar.",
+                help=f"The value of the missed appointments the calls might save, less the cost of "
+                f"the calls. If a call gets {effect}% of the people it reaches, who would have "
+                f"missed, to attend. A missed appointment among the patients these calls reach is "
+                f"valued at about £{dna_cost:,.0f} on average. Change this and the call cost under "
+                "**Cost assumptions** in the sidebar.",
             )
             # The words in the label, not the value: a longer value is cut short on the card.
             # The labels can wrap onto two lines; style.css keeps the numbers level.
