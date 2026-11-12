@@ -1454,6 +1454,16 @@ def compare_ways(savings, length):
             f"**If the team made {n_calls} calls, how many would reach a patient who would "
             "otherwise have missed their appointment?**"
         )
+        # What the £ in each tile means, above them rather than under, so the chart a click
+        # changes sits right under the tiles
+        if savings is not None:
+            ways_numbers.caption(
+                f"**£ in each box:** the value of appointments kept over the next {length} by "
+                f"phoning {savings['n_calls']:,} patients chosen that way (as many as the model "
+                f"forecasts as DNAs), less £{savings['call_cost']:,.0f} of staff time for the "
+                "calls. Clinic time kept, not cash.",
+                help=savings["compare_help"],
+            )
         # The same call to action as above the appointment tables ("Click" in yellow, style.css)
         with ways_numbers.container(key="click_cta_ways"):
             st.info(
@@ -1463,7 +1473,7 @@ def compare_ways(savings, length):
         # One tile per way: the number reached per 100 calls, then the same in £ over the
         # upcoming weeks (the value of the appointments kept by phoning every forecast DNA,
         # and by the same number of calls made the other two ways). The £ is after the cost
-        # of the calls, which is the same all three ways and is also given once under the tiles.
+        # of the calls, which is the same all three ways and is also given once above the tiles.
         tiles = [
             ("model", "The model's list", ways["model"], ":material/smart_toy:", "value",
              (f"Phoning the {n_calls} appointments with the highest predicted risk. The model "
@@ -1509,18 +1519,9 @@ def compare_ways(savings, length):
                             f"**{'-' if net < 0 else ''}£{abs(net):,.0f}** kept over {length}, "
                             "after call costs"
                         )
-        if savings is not None:
-            ways_numbers.caption(
-                f"**£ in each box:** the value of appointments kept over the next {length} if "
-                f"the team phoned {savings['n_calls']:,} patients chosen that way (as many as "
-                f"the model forecasts as DNAs), less the £{savings['call_cost']:,.0f} the calls "
-                "cost in staff time, the same whichever way you choose. The value is clinic time "
-                "kept, not cash.",
-                help=savings["compare_help"],
-            )
 
-        # Who the chosen tile's calls would reach, as on the phone tab
-        st.divider()
+        # Who the chosen tile's calls would reach, as on the phone tab. No divider above, so
+        # the chart a click changes stays close to the tiles.
         list_names = {
             "model": "the model's list",
             "rule": "the patients who had missed the most appointments before",

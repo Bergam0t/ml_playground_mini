@@ -471,14 +471,18 @@ def outcome_blocks(
             y -= box_h + 0.8
         total_h = max(total_h, -y)
         x0 += box_w + 1.2
+    # Full size: rows and columns locked to the same scale, so the game's 10 x 10 square stays
+    # square. Compact: not locked, so in a column narrower than it was laid out for, only the
+    # columns close up; each row stays `unit` pixels tall, so the text never runs into the markers
+    # and there's no empty band under the chart.
+    lock = {} if compact else dict(scaleanchor="x", constrain="domain", constraintoward="top")
     fig.update_layout(
         height=round((total_h + 0.5) * unit),
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
         xaxis=dict(visible=False, range=[-0.6, x0 - 0.8], fixedrange=True,
                    constrain="domain", constraintoward="left"),
-        yaxis=dict(visible=False, scaleanchor="x", range=[-total_h - 0.3, 0.4], fixedrange=True,
-                   constrain="domain", constraintoward="top"),
+        yaxis=dict(visible=False, range=[-total_h - 0.3, 0.4], fixedrange=True, **lock),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=FONT,
