@@ -718,6 +718,12 @@ select.mobile-nav,
 }
 
 /* ---- The first tab's explanation chart ---- */
+/* The two notes under it side by side, in equal shares and the same height; one per row once
+	each would be narrower than about 16rem (a phone) */
+.st-key-intro_caveats { align-items: stretch; flex-wrap: wrap; }
+.st-key-intro_caveats > * { flex: 1 1 0; min-width: 16rem; }
+.st-key-intro_caveats [data-testid="stAlert"],
+.st-key-intro_caveats [data-testid="stAlertContainer"] { height: 100%; }
 /* Big buttons to choose a high-, medium- or low-risk patient: the chosen one filled, the
 	others outlined, and "Show a different patient" at the far end of the row */
 .st-key-intro_risk_buttons { flex-wrap: wrap; gap: 0.75rem; }

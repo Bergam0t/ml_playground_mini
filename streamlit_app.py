@@ -198,19 +198,29 @@ def in_words(share):
     return f"{round(share * 10)} in 10"
 
 
-def model_caveat():
-    """The explanation overlay's note on what the bars mean and how good the model is, for a
-    non-technical reader: how often a Very High flag was right, and how many missed
-    appointments it caught, on past appointments the model hadn't seen."""
-    recall, precision = catch_rates(HIGH_RISK_MIN)
+def bars_caveat():
+    """What an explanation chart's bars mean, for a non-technical reader."""
     return (
         "These bars show patterns the model spotted, not causes: changing one of these facts "
-        "wouldn't necessarily make a patient more likely to attend. How good is the model? We "
-        "checked it on past appointments it hadn't seen. Of the patients it rated Very High "
-        f"risk ({HIGH_RISK_MIN:.0%} or more), about {in_words(precision)} did miss. "
-        f"But it can't spot everyone: only about {in_words(recall)} missed "
+        "wouldn't necessarily make a patient more likely to attend."
+    )
+
+
+def model_accuracy(question="How good is the model?"):
+    """How good the model is, for a non-technical reader: how often a Very High flag was right,
+    and how many missed appointments it caught, on past appointments the model hadn't seen."""
+    recall, precision = catch_rates(HIGH_RISK_MIN)
+    return (
+        f"{question} We checked it on past appointments it hadn't seen. Of the patients it "
+        f"rated Very High risk ({HIGH_RISK_MIN:.0%} or more), about {in_words(precision)} did "
+        f"miss. But it can't spot everyone: only about {in_words(recall)} missed "
         "appointments had a risk that high."
     )
+
+
+def model_caveat():
+    """The explanation overlay's note on what the bars mean and how good the model is."""
+    return f"{bars_caveat()} {model_accuracy()}"
 
 
 def DNA_Risk(prob):
@@ -1659,6 +1669,11 @@ def explain_a_patient():
         "The model doesn't just give a risk: it shows which facts about the appointment pushed "
         "that risk up or down. **Pick a patient** to see what it relied on for them."
     )
+    st.warning(
+        "This is not a real patient, and the factors shown here should not be used for "
+        "service planning.",
+        icon=":material/science:",
+    )
     # Big buttons (style.css): the chosen group filled, the others outlined
     with st.container(horizontal=True, key="intro_risk_buttons"):
         for g, (label, span, _, _) in RISK_GROUPS.items():
@@ -1699,15 +1714,14 @@ def explain_a_patient():
     with guide_col.container(border=True, key="intro_guide"):
         st.markdown("**How to read this chart** (a made-up example)")
         how_to_read("intro_guide_chart", stacked=True)
-    st.info(
-        "A predicted risk is an estimate based on similar appointments in past data, not a "
-        f"forecast of what this one person will do. {model_caveat()}"
-    )
-    st.warning(
-        "This is not a real patient, and the factors shown here should not be used for "
-        "service planning.",
-        icon=":material/science:",
-    )
+    # Two boxes side by side, the same height (style.css), stacked on a phone: what the chart
+    # means, and how good the model is
+    with st.container(horizontal=True, key="intro_caveats"):
+        st.info(
+            "**A predicted risk is an estimate** based on similar appointments in past data, "
+            f"not a forecast of what this one person will do. {bars_caveat()}"
+        )
+        st.info(model_accuracy("**How good is the model?**"))
 
 
 # ---------------------------------------------------------------- tab 1: Why use a model? (the landing page)
